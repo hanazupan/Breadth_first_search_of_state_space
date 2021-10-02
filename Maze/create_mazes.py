@@ -5,6 +5,8 @@ In this file, class Maze is introduced and random mazes of different sizes can b
 # imports
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import random
 
 
 class Maze:
@@ -17,7 +19,9 @@ class Maze:
         :param algorithm:
         """
         self.size = (height, width)
-        self.maze = np.zeros(self.size)
+        self.maze = np.full(self.size, 2)
+        # list of images for animation
+        self.image_list = []
         if algorithm == 'handmade':
             self._create_handmade()
         elif algorithm == 'Prim':
@@ -48,7 +52,88 @@ class Maze:
             print("Please, initialize a larger maze.")
 
     def _create_prim(self):
-        pass
+        # pick a random cell as a starting point and turn it into a hall
+        height, width = self.size
+        random_cell = np.random.randint(height), np.random.randint(width)
+        self.maze[random_cell] = 0
+        self.image_list.append(self.maze.copy())
+        # add walls of the cell to the wall list (periodic boundary conditions)
+        wall_list = self._determine_neighbours_periodic(random_cell)
+        for w in wall_list:
+            self.maze[w] = 1
+        assert len(wall_list) == 4
+        while len(wall_list) > 0:
+            random_wall = random.choice(wall_list)
+            neighbours = self._determine_neighbours_periodic(random_wall)
+            values = [self.maze[l, c] for (l, c) in neighbours]
+            known_hall = neighbours[values.index(0.0)]
+            assert len(neighbours) == len(values) == 4
+            # if the opposite site 3 walls
+            opposite_side = self._determine_opposite(random_wall, known_hall)
+            if self.maze[opposite_side] == 2:
+                # make this wall a hall
+                self.maze[random_wall[0], random_wall[1]] = 0
+                # add directly neighbouring walls (not halls) to the wall_list
+                new_walls = [n for n, v in zip(neighbours, values) if v]
+                for w in new_walls:
+                    self.maze[w] = 1
+                wall_list.extend(new_walls)
+            wall_list.remove(random_wall)
+            self.image_list.append(self.maze.copy())
+
+
+    def animation_building_maze(self):
+        # for producing a video
+        fig = plt.figure()
+        im = plt.imshow(self.image_list[0], animated=True) #cmap='Greys',
+
+        def updatefig(i):
+            im.set_array(self.image_list[i])
+            return im,
+
+        im.axes.get_xaxis().set_visible(False)
+        im.axes.get_yaxis().set_visible(False)
+        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=len(self.image_list),
+                                       repeat=False, interval=50)
+        plt.show()
+        writergif = animation.PillowWriter(fps=10)
+        anim.save("Images/animation.gif", writer=writergif)
+
+    def _determine_neighbours_periodic(self, cell):
+        height, width = self.size
+        line, column = cell
+        neighbours = [
+            ((line - 1) % height, column),
+            (line, (column + 1) % width),
+            ((line + 1) % height, column),
+            (line, (column - 1) % width)
+            #((line - 1) % height, (column - 1) % width),
+            #((line - 1) % height, (column + 1) % width),
+            #((line + 1) % height, (column + 1) % width),
+            #((line + 1) % height, (column - 1) % width),
+
+        ]
+        return neighbours
+
+    def _determine_opposite(self, central, known_hall):
+        height, width = self.size
+        if central[0] == known_hall[0]:
+            return (central[0], (2*central[1] - known_hall[1]) % width)
+        elif central[1] == known_hall[1]:
+            return ((2*central[0] - known_hall[0]) % height, central[1])
+        else:
+            raise ValueError("They are not neighbouring cells.")
+
+    def _determine_direct_neighbours(self, line, column):
+        height, width = self.size
+        neighbours = [
+            ((line - 1) % height, column),
+            (line, (column + 1) % width),
+            ((line + 1) % height, column),
+            (line, (column + 1) % width)
+        ]
+        return neighbours
+
 
     def visualize(self, save_as=None):
         """
@@ -67,6 +152,7 @@ class Maze:
 
 
 if __name__ == '__main__':
-    maze = Maze(7, 8)
-    print(maze)
-    maze.visualize()
+    maze = Maze(20, 30)
+    #print(maze)
+    #maze.visualize()
+    maze.animation_building_maze()
