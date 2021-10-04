@@ -10,6 +10,7 @@ import matplotlib.animation as animation
 import random
 from collections import deque
 from matplotlib import colors
+import networkx as nx
 
 
 class Maze:
@@ -205,12 +206,16 @@ class Maze:
         plt.show()
         return ax
 
-    def breadth_first_search(self):
+    def breadth_first_search(self, save_as=None, with_labels=False):
         """
-        Determine the connectivity graph of accessible states (states with value 0) in the maze.
+        Determine the connectivity graph of accessible states (states with value 0) in the maze. Plot the
+        connectivity graph. Prepare images for animation of path searching.
 
-        :return:
+        :param save_as: string, path and name of file where you want to save the graph
+        :param with_labels: bool, should the graph have labels
+        :return: numpy array, adjacency matrix of the graph
         """
+        G = nx.Graph()
         # for video
         self.search_image_list.append(self.maze.copy())
         visited = np.zeros(self.size, dtype=int)
@@ -224,14 +229,19 @@ class Maze:
         # determine neighbours of the random cell and add them to queue
         visited[random_cell] = 1
         accessible[random_cell] = 1
+        G.add_node(random_cell)
         # for video
         self.search_image_list.append(self.maze.copy() - accessible.copy())
+        # take care of the neighbours of the first random cell
         neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
             visited[n] = 1
             if self.accessible(n):
+                G.add_node(n)
+                G.add_edge(random_cell, n)
                 accessible[n] = 1
                 check_queue.append(n)
+        # take care of all other cells
         while len(check_queue) > 0:
             # next point
             cell = check_queue.popleft()
@@ -243,18 +253,36 @@ class Maze:
             for n in unvis_neig:
                 visited[n] = 1
                 if self.accessible(n):
+                    G.add_node(n)
+                    G.add_edge(cell, n)
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
             self.search_image_list.append(self.maze.copy() - accessible.copy())
+        # draw graph of connections
+        plt.figure()
+        nx.draw_kamada_kawai(G, with_labels=with_labels)
+        if save_as:
+            plt.savefig(save_as)
         # accessible states are the logical inverse of the maze
         assert np.all(np.logical_not(accessible) == self.maze)
+        # returns adjacency matrix
+        adj_matrix = nx.to_numpy_matrix(G)
+        assert len(adj_matrix) == np.isclose(self.maze, 0).sum()
+        return adj_matrix
 
     def animation_solving_maze(self, save_as=None):
+        """
+        Animate solving the maze - blue squares represent the newly discovered accessible cells.
+
+        :param save_as: string, path and name of file where you want to save the animation
+        :return:
+        """
         if not self.search_image_list:
             self.breadth_first_search()
-        #print(self.search_image_list[3], self.search_image_list[15])
         fig = plt.figure()
+        # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
+        # 1 are the walls.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
         bounds = [-1.5, -0.5, 0.5, 1.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
@@ -278,9 +306,8 @@ class Maze:
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(40, 50)
-    print(maze)
-    maze.visualize()
-    maze.breadth_first_search()
-    maze.animation_solving_maze(save_as=images_path+"animation_solve.gif")
-    #maze.animation_building_maze()
+    maze = Maze(13, 15)
+    maze.visualize(save_as=images_path + "maze")
+    adjacency = maze.breadth_first_search(save_as=images_path+"graph")
+    maze.animation_solving_maze(save_as=images_path+"filling_graph.gif")
+    #maze.animation_building_maze(save_as=images_path+"making_maze.gif")
