@@ -1,11 +1,22 @@
 import unittest
 from create_mazes import Maze
 
+all_algorithms = ["Prim", "random"]
+
 
 class MazeTestCase(unittest.TestCase):
+
     def test_init(self):
-        test_maze = Maze(17, 8)
-        self.assertEqual(test_maze.maze.shape, (17, 8))
+
+        for alg in all_algorithms:
+            test_maze = Maze(17, 8, algorithm=alg)
+            # shape correct
+            self.assertEqual(test_maze.maze.shape, (17, 8))
+            # only 0 and 1 in the final maze
+            heig, wid = test_maze.maze.shape
+            for x in range(heig):
+                for y in range(wid):
+                    self.assertIn(test_maze.maze[x, y], [0, 1])
 
     def test_neighbours(self):
         test_maze = Maze(20, 30)

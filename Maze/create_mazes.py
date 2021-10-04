@@ -1,5 +1,6 @@
 """
-In this file, class Maze is introduced and random mazes of different sizes can be created.
+In this file, class Maze is introduced and mazes of different sizes can be created using Prim's
+algorithm or a random distribution of cells.
 """
 
 # imports
@@ -13,10 +14,14 @@ class Maze:
 
     def __init__(self, height, width, algorithm='Prim'):
         """
+        Creates a maze of user-defined size. A maze is represented as a numpy array with:
+        - 1 to represent a wall (high energy)
+        - 0 to represent a hall (low energy)
+        - 2 to represent not assigned cells (should not occur in the final maze)
 
-        :param height:
-        :param width:
-        :param algorithm:
+        :param height: int, number of rows
+        :param width: int, number of columns
+        :param algorithm: string, maze generation algorithm, options ['handmade', 'Prim', 'random']
         """
         self.algorithm = algorithm
         self.size = (height, width)
@@ -95,15 +100,24 @@ class Maze:
                         for w in new_walls:
                             create_wall(w)
             wall_list.remove(random_wall)
+            # for video
             self.image_list.append(self.maze.copy())
+        # everything unassigned becomes a wall
         self.maze[self.maze == 2] = 1
+        # to get the final image for animation with no unassigned cells
         self.image_list.append(self.maze.copy())
 
-    def animation_building_maze(self):
+    def animation_building_maze(self, save_as=None):
+        """
+        Creates an animation showing how the maze has been built.
+
+        :param save_as: string, path and name of file where you want to save the animation
+        :return: None
+        """
         if self.algorithm != 'Prim':
             print("Animation only available for Prim algorithm.")
             return
-        # for producing a video
+
         fig = plt.figure()
         im = plt.imshow(self.image_list[0], cmap='Greys', animated=True)
 
@@ -113,13 +127,23 @@ class Maze:
 
         im.axes.get_xaxis().set_visible(False)
         im.axes.get_yaxis().set_visible(False)
+        # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
+        # interval determines how fast the video when played (not saved)
         anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=len(self.image_list),
-                                       repeat=False, interval=50)
+                                       repeat=False, interval=20)
         plt.show()
-        writergif = animation.PillowWriter(fps=30)
-        anim.save("Images/animation.gif", writer=writergif)
+        if save_as:
+            writergif = animation.PillowWriter(fps=30)
+            anim.save(save_as, writer=writergif)
 
     def _determine_neighbours_periodic(self, cell):
+        """
+        Given the cell (coordinate x, coordinate y) calculates the direct 4 neighbours of that cell
+        in self.maze using periodic boundary conditions.
+
+        :param cell: tuple (coo_x, coo_y), position of the cell whose neighbours we search for
+        :return: list, a list of tuples with coordinates of the four neighbouring cells.
+        """
         height, width = self.size
         line, column = cell
         neighbours = [
@@ -131,32 +155,49 @@ class Maze:
         return neighbours
 
     def _determine_opposite(self, central, known_hall):
+        """
+        Determines the coordinates of the cell obtained if you start in the known_hall cell
+        and jump over the central cell. E.g. if central = X, known_hall = O and opposite = ?
+
+        |O|X|?| or |?|X|O| or
+
+        |O|          |?|
+        |X|    or    |X|
+        |?|          |O|
+
+        :param central: tuple, coordinates of the central cell
+        :param known_hall: tuple, coordinates of a cell next to the central cell
+        :return: tuple, coordinates of the opposite cell
+        """
         height, width = self.size
-        if central[0] == known_hall[0]:
+        if central == known_hall:
+            raise ValueError("Opposite cell nonexistent: central and known_hall are the same cell.")
+        elif central[0] == known_hall[0]:
             return central[0], (2*central[1] - known_hall[1]) % width
         elif central[1] == known_hall[1]:
             return (2*central[0] - known_hall[0]) % height, central[1]
         else:
-            raise ValueError("They are not neighbouring cells.")
+            raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
 
     def visualize(self, save_as=None):
         """
         Visualize the Maze with black squares (walls) and white squares (halls).
 
-        :param save_as: path and name of file where you want to save the image of the maze
+        :param save_as: string, path and name of file where you want to save the image of the maze
         :return: matplotlib.image.AxesImage
         """
         ax = plt.imshow(self.maze, cmap="Greys")
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
         if save_as:
-            ax.figure.savefig(save_as, bbox_inches='tight')
+            ax.figure.savefig(save_as, bbox_inches='tight', dpi=1200)
         plt.show()
         return ax
 
 
 if __name__ == '__main__':
-    maze = Maze(20, 30, algorithm = 'random')
+    images_path = "Images/"
+    maze = Maze(20, 30)
     print(maze)
     maze.visualize()
     maze.animation_building_maze()
