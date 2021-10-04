@@ -22,14 +22,14 @@ class MazeTestCase(unittest.TestCase):
         test_maze = Maze(20, 30)
         # test a cell in the middle
         chosen_cell = (5, 3)
-        neig = test_maze._determine_neighbours_periodic(chosen_cell)
+        neig = test_maze.determine_neighbours_periodic(chosen_cell)
         assert len(neig) == 4
         correct_neig = [(5, 2), (5, 4), (4, 3), (6, 3)]
         for el in correct_neig:
             self.assertIn(el, neig)
         # also test periodic boundary
         chosen_cell = (0, 29)
-        neig = test_maze._determine_neighbours_periodic(chosen_cell)
+        neig = test_maze.determine_neighbours_periodic(chosen_cell)
         assert len(neig) == 4
         correct_neig = [(0, 28), (0, 0), (1, 29), (19, 29)]
         for el in correct_neig:

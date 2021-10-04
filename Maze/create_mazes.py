@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
+from collections import deque
+from matplotlib import colors
 
 
 class Maze:
@@ -28,6 +30,7 @@ class Maze:
         self.maze = np.full(self.size, 2)
         # list of images for animation
         self.image_list = []
+        self.search_image_list = []
         if algorithm == 'handmade':
             self._create_handmade()
         elif algorithm == 'Prim':
@@ -84,12 +87,12 @@ class Maze:
         # for video
         self.image_list.append(self.maze.copy())
         # add walls of the cell to the wall list (periodic boundary conditions)
-        neighbours = self._determine_neighbours_periodic(random_cell)
+        neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
             create_wall(n)
         while len(wall_list) > 0:
             random_wall = random.choice(wall_list)
-            neighbours = self._determine_neighbours_periodic(random_wall)
+            neighbours = self.determine_neighbours_periodic(random_wall)
             # whether neighbours are 0, 1 or 2
             values = [self.maze[l, c] for (l, c) in neighbours]
             # select only neighbours that are halls/empty
@@ -141,7 +144,7 @@ class Maze:
             writergif = animation.PillowWriter(fps=30)
             anim.save(save_as, writer=writergif)
 
-    def _determine_neighbours_periodic(self, cell):
+    def determine_neighbours_periodic(self, cell):
         """
         Given the cell (coordinate x, coordinate y) calculates the direct 4 neighbours of that cell
         in self.maze using periodic boundary conditions.
@@ -158,6 +161,9 @@ class Maze:
             (line, (column - 1) % width)
         ]
         return neighbours
+
+    def accessible(self, cell):
+        return not self.maze[cell]
 
     def _determine_opposite(self, central, known_hall):
         """
@@ -199,10 +205,82 @@ class Maze:
         plt.show()
         return ax
 
+    def breadth_first_search(self):
+        """
+        Determine the connectivity graph of accessible states (states with value 0) in the maze.
+
+        :return:
+        """
+        # for video
+        self.search_image_list.append(self.maze.copy())
+        visited = np.zeros(self.size, dtype=int)
+        accessible = np.zeros(self.size, dtype=int)
+        check_queue = deque()
+        height, width = self.size
+        # get a random starting point that is accessible
+        random_cell = np.random.randint(height), np.random.randint(width)
+        while self.maze[random_cell] != 0:
+            random_cell = np.random.randint(height), np.random.randint(width)
+        # determine neighbours of the random cell and add them to queue
+        visited[random_cell] = 1
+        accessible[random_cell] = 1
+        # for video
+        self.search_image_list.append(self.maze.copy() - accessible.copy())
+        neighbours = self.determine_neighbours_periodic(random_cell)
+        for n in neighbours:
+            visited[n] = 1
+            if self.accessible(n):
+                accessible[n] = 1
+                check_queue.append(n)
+        while len(check_queue) > 0:
+            # next point
+            cell = check_queue.popleft()
+            # print(cell)
+            neighbours = self.determine_neighbours_periodic(cell)
+            # if neighbours visited already, don't need to bother with them
+            unvis_neig = [n for n in neighbours if visited[n] == 0]
+            # if accessible, add to queue
+            for n in unvis_neig:
+                visited[n] = 1
+                if self.accessible(n):
+                    accessible[n] = 1
+                    check_queue.append(n)
+            # for video
+            self.search_image_list.append(self.maze.copy() - accessible.copy())
+        # accessible states are the logical inverse of the maze
+        assert np.all(np.logical_not(accessible) == self.maze)
+
+    def animation_solving_maze(self, save_as=None):
+        if not self.search_image_list:
+            self.breadth_first_search()
+        #print(self.search_image_list[3], self.search_image_list[15])
+        fig = plt.figure()
+        cmap = colors.ListedColormap(['blue', 'white', 'black'])
+        bounds = [-1.5, -0.5, 0.5, 1.5]
+        norm = colors.BoundaryNorm(bounds, cmap.N)
+        im = plt.imshow(self.search_image_list[0], animated=True, cmap=cmap, norm=norm)
+
+        def updatefig(i):
+            im.set_array(self.search_image_list[i])
+            return im,
+
+        im.axes.get_xaxis().set_visible(False)
+        im.axes.get_yaxis().set_visible(False)
+        # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
+        # interval determines how fast the video when played (not saved)
+        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=len(self.search_image_list),
+                                       repeat=False, interval=20)
+        plt.show()
+        if save_as:
+            writergif = animation.PillowWriter(fps=30)
+            anim.save(save_as, writer=writergif)
+
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(20, 30)
+    maze = Maze(40, 50)
     print(maze)
     maze.visualize()
-    maze.animation_building_maze()
+    maze.breadth_first_search()
+    maze.animation_solving_maze(save_as=images_path+"animation_solve.gif")
+    #maze.animation_building_maze()
