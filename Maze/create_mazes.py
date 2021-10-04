@@ -61,12 +61,17 @@ class Maze:
             print("Please, initialize a larger maze.")
 
     def _create_prim(self):
-        hall_list = []
+        """
+        Generate a maze using Prim's algorithm. From wiki (https://en.wikipedia.org/wiki/Maze_generation_algorithm):
+        1. Start with a grid full of walls.
+        2. Pick a cell, mark it as part of the maze. Add the walls of the cell to the wall list.
+        3. While there are walls in the list:
+            1. Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
+                1. Make the wall a passage and mark the unvisited cell as part of the maze.
+                2. Add the neighboring walls of the cell to the wall list.
+            2. Remove the wall from the list.
+        """
         wall_list = []
-
-        def create_hall(cell):
-            self.maze[cell] = 0
-            hall_list.append(cell)
 
         def create_wall(cell):
             self.maze[cell] = 1
@@ -75,30 +80,30 @@ class Maze:
         # pick a random cell as a starting point and turn it into a hall
         height, width = self.size
         random_cell = np.random.randint(height), np.random.randint(width)
-        create_hall(random_cell)
-        assert len(hall_list) == 1
+        self.maze[random_cell] = 0
         # for video
         self.image_list.append(self.maze.copy())
         # add walls of the cell to the wall list (periodic boundary conditions)
         neighbours = self._determine_neighbours_periodic(random_cell)
         for n in neighbours:
             create_wall(n)
-        assert len(wall_list) == 4
         while len(wall_list) > 0:
             random_wall = random.choice(wall_list)
             neighbours = self._determine_neighbours_periodic(random_wall)
+            # whether neighbours are 0, 1 or 2
             values = [self.maze[l, c] for (l, c) in neighbours]
-            for n in neighbours:
-                if n in hall_list:
-                    known_hall = n
-                    opposite_side = self._determine_opposite(random_wall, known_hall)
-                    if self.maze[opposite_side] == 2 and values.count(0) == 1:
-                        # make this wall a hall
-                        create_hall(random_wall)
-                        # add directly neighbouring empty cells to the wall_list
-                        new_walls = [n for n in neighbours if self.maze[n] == 2]
-                        for w in new_walls:
-                            create_wall(w)
+            # select only neighbours that are halls/empty
+            neig_halls = [n for n in neighbours if self.maze[n] == 0]
+            neig_empty = [n for n in neighbours if self.maze[n] == 2]
+            for n in neig_halls:
+                opposite_side = self._determine_opposite(random_wall, n)
+                # values.count(0) == 1 makes sure all halls are only lines (not thicker than 1 cell)
+                if self.maze[opposite_side] == 2 and values.count(0) == 1:
+                    # make this wall a hall
+                    self.maze[random_wall] = 0
+                    # add directly neighbouring empty cells to the wall_list
+                    for w in neig_empty:
+                        create_wall(w)
             wall_list.remove(random_wall)
             # for video
             self.image_list.append(self.maze.copy())
