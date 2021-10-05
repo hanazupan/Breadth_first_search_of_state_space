@@ -229,7 +229,8 @@ class Maze:
         # determine neighbours of the random cell and add them to queue
         visited[random_cell] = 1
         accessible[random_cell] = 1
-        G.add_node(random_cell)
+        index_rc = random_cell[0]*width + random_cell[1]
+        G.add_node(index_rc)
         # for video
         self.search_image_list.append(self.maze.copy() - accessible.copy())
         # take care of the neighbours of the first random cell
@@ -237,14 +238,16 @@ class Maze:
         for n in neighbours:
             visited[n] = 1
             if self.accessible(n):
-                G.add_node(n)
-                G.add_edge(random_cell, n)
+                index_n = n[0]*width + n[1]
+                G.add_node(index_n)
+                G.add_edge(index_rc, index_n)
                 accessible[n] = 1
                 check_queue.append(n)
         # take care of all other cells
         while len(check_queue) > 0:
             # next point
             cell = check_queue.popleft()
+            index_cell = cell[0]*width + cell[1]
             # print(cell)
             neighbours = self.determine_neighbours_periodic(cell)
             # if neighbours visited already, don't need to bother with them
@@ -253,8 +256,9 @@ class Maze:
             for n in unvis_neig:
                 visited[n] = 1
                 if self.accessible(n):
-                    G.add_node(n)
-                    G.add_edge(cell, n)
+                    index_n = n[0] * width + n[1]
+                    G.add_node(index_n)
+                    G.add_edge(index_cell, index_n)
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
@@ -306,8 +310,8 @@ class Maze:
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(13, 15)
-    maze.visualize(save_as=images_path + "maze")
-    adjacency = maze.breadth_first_search(save_as=images_path+"graph")
-    maze.animation_solving_maze(save_as=images_path+"filling_graph.gif")
+    maze = Maze(9, 6)
+    #maze.visualize(save_as=images_path + "maze")
+    adjacency = maze.breadth_first_search(save_as=images_path+"graph", with_labels=True)
     #maze.animation_building_maze(save_as=images_path+"making_maze.gif")
+    maze.animation_solving_maze(save_as=images_path + "filling_graph.gif")
