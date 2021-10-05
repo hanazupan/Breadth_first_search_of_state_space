@@ -28,17 +28,16 @@ class Maze:
         """
         self.algorithm = algorithm
         self.size = (height, width)
-        self.maze = np.full(self.size, 2)
+        self.maze = np.full(self.size, 2, dtype=int)
         # list of images for animation
         self.image_list = []
         self.search_image_list = []
-        if algorithm == 'handmade':
-            self._create_handmade()
+        if algorithm == 'handmade1':
+            self._create_handmade1()
         elif algorithm == 'Prim':
             self._create_prim()
         elif algorithm == 'random':
-            self.maze = np.random.rand(height, width)
-            self.maze = np.round(self.maze)
+            self.maze = np.random.randint(0, 2, size=(height, width))
         else:
             raise AttributeError("Not a valid algorithm choice.")
 
@@ -48,21 +47,21 @@ class Maze:
         """
         return self.maze.__str__()
 
-    def _create_handmade(self):
+    def _create_handmade1(self):
         """
-        Only for testing. Hand-pick some cells and turn them into walls.
+        Only for testing. Hand-pick some cells and turn them into walls. Warning: ignores height and
+        width, the size is always (6, 6)
         :return: None
         """
-        try:
-            self.maze.fill(0)
-            self.maze[:, 0] = 1
-            self.maze[:, -1] = 1
-            self.maze[0, :-3] = 1
-            self.maze[0, :-2] = 1
-            self.maze[2, 1:4] = 1
-            self.maze[-5:, 3] = 1
-        except IndexError:
-            print("Please, initialize a larger maze.")
+        self.size = (6, 6)
+        self.maze = np.full(self.size, 1, dtype=int)
+        self.maze[0:4, 0] = 0
+        self.maze[1, 1] = 0
+        self.maze[3:5, 1] = 0
+        self.maze[0, 3:6] = 0
+        self.maze[2, 3:6] = 0
+        self.maze[4:6, 3] = 0
+        self.maze[5, 5] = 0
 
     def _create_prim(self):
         """
@@ -270,10 +269,10 @@ class Maze:
             plt.savefig(save_as)
         # accessible states are the logical inverse of the maze
         assert np.all(np.logical_not(accessible) == self.maze)
-        # returns adjacency matrix
-        adj_matrix = nx.to_numpy_matrix(G)
+        # returns adjacency matrix - ensures the order to be left-right, top-bottom
+        adj_matrix = nx.to_numpy_matrix(G,nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
         assert len(adj_matrix) == np.isclose(self.maze, 0).sum()
-        return adj_matrix
+        return adj_matrix.astype(int)
 
     def animation_solving_maze(self, save_as=None):
         """
@@ -310,8 +309,8 @@ class Maze:
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(9, 6)
-    #maze.visualize(save_as=images_path + "maze")
+    maze = Maze(6, 6, algorithm='handmade1')
+    maze.visualize(save_as=images_path + "maze")
     adjacency = maze.breadth_first_search(save_as=images_path+"graph", with_labels=True)
     #maze.animation_building_maze(save_as=images_path+"making_maze.gif")
     maze.animation_solving_maze(save_as=images_path + "filling_graph.gif")

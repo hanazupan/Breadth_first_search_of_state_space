@@ -1,4 +1,7 @@
 import unittest
+
+import numpy as np
+
 from create_mazes import Maze
 
 all_algorithms = ["Prim", "random"]
@@ -60,6 +63,46 @@ class MazeTestCase(unittest.TestCase):
         correct_opposite = (5, 8)
         opposite = test_maze._determine_opposite(central, known_hall)
         self.assertEqual(opposite, correct_opposite)
+
+    def test_adjacency(self):
+        test_maze = Maze(6, 6, algorithm="handmade1")
+        correct_adj = np.zeros((16, 16), dtype=int)
+        correct_adj[0, 3] = 1
+        correct_adj[0, 4] = 1
+        correct_adj[1, 2] = 1
+        correct_adj[1, 14] = 1
+        correct_adj[2, 3] = 1
+        correct_adj[3, 15] = 1
+        correct_adj[4, 5] = 1
+        correct_adj[4, 6] = 1
+        correct_adj[6, 9] = 1
+        correct_adj[6, 10] = 1
+        correct_adj[7, 8] = 1
+        correct_adj[8, 9] = 1
+        correct_adj[10, 11] = 1
+        correct_adj[11, 12] = 1
+        correct_adj[13, 14] = 1
+        # below diagonal
+        correct_adj[3, 0] = 1
+        correct_adj[4, 0] = 1
+        correct_adj[2, 1] = 1
+        correct_adj[14, 1] = 1
+        correct_adj[3, 2] = 1
+        correct_adj[15, 3] = 1
+        correct_adj[5, 4] = 1
+        correct_adj[6, 4] = 1
+        correct_adj[9, 6] = 1
+        correct_adj[10, 6] = 1
+        correct_adj[8, 7] = 1
+        correct_adj[9, 8] = 1
+        correct_adj[11, 10] = 1
+        correct_adj[12, 11] = 1
+        correct_adj[14, 13] = 1
+        # assert diagonally symmetrical
+        assert (correct_adj == correct_adj.T).all()
+        # compare to the created one
+        adj = test_maze.breadth_first_search()
+        np.testing.assert_array_equal(correct_adj, adj)
 
 
 if __name__ == '__main__':
