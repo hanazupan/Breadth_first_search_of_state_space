@@ -11,11 +11,12 @@ import random
 from collections import deque
 from matplotlib import colors
 import networkx as nx
+import sys
 
 
 class Maze:
 
-    def __init__(self, height, width, algorithm='Prim', animate=False):
+    def __init__(self, height, width, algorithm='Prim', animate=False, images_path=".", images_name="maze"):
         """
         Creates a maze of user-defined size. A maze is represented as a numpy array with:
         - 1 to represent a wall (high energy)
@@ -33,10 +34,18 @@ class Maze:
         # prepare empty objects for solving maze
         self.graph = None
         self.adj_matrix = None
+        # prepare for saving images/gifs
+        self.images_path = images_path
+        self.images_name = images_name
+        # start the generation of a maze
         if algorithm == 'handmade1':
             self._create_handmade1()
         elif algorithm == 'Prim':
-            self.animation_building_maze()
+            if animate:
+                self.animation_building_maze()
+            else:
+                for x in self._create_prim():
+                    pass
         elif algorithm == 'random':
             self.maze = np.random.randint(0, 2, size=(height, width))
         else:
@@ -123,10 +132,7 @@ class Maze:
         :param save_as: string, path and name of file where you want to save the animation
         :return: None
         """
-        if self.algorithm != 'Prim':
-            print("Animation only available for Prim algorithm.")
-            return
-
+        height, width = self.size
         fig = plt.figure()
         iterator = self._create_prim()
         im = plt.imshow(next(iterator), cmap='Greys', animated=True)
@@ -139,13 +145,10 @@ class Maze:
         im.axes.get_yaxis().set_visible(False)
         # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
         # interval determines how fast the video when played (not saved)
-        if self.animate:
-            anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
-                                       repeat=False, interval=10)
-            plt.show()
-            if save_as:
-                writergif = animation.PillowWriter(fps=30)
-                anim.save(save_as, writer=writergif)
+        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
+                                       repeat=False, interval=10, save_count=height*width)
+        writergif = animation.PillowWriter(fps=30)
+        anim.save(self.images_path + f"building_{self.images_name}.gif", writer=writergif)
         for x in iterator:
             pass
 
@@ -306,8 +309,7 @@ class Maze:
         :param save_as: string, path and name of file where you want to save the animation
         :return:
         """
-        #if not self.search_image_list:
-        #    self.breadth_first_search()
+        height, width = self.size
         fig = plt.figure()
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
         # 1 are the walls.
@@ -326,20 +328,19 @@ class Maze:
         # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
         # interval determines how fast the video when played (not saved)
         anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
-                                       repeat=False, interval=20)
-        plt.show()
-        if save_as:
-            writergif = animation.PillowWriter(fps=30)
-            anim.save(save_as, writer=writergif)
+                                       repeat=False, interval=20, save_count=height*width)
+        writergif = animation.PillowWriter(fps=30)
+        anim.save(self.images_path + f"solving_{self.images_name}.gif", writer=writergif)
+
         for x in iterator:
             pass
 
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(20, 30, animate=False)
+    maze = Maze(20, 30, animate=False, images_path=images_path)
     maze.visualize()
     adjacency = maze.breadth_first_search(animate=False)
-    maze.draw_connections_graph()
+    #maze.draw_connections_graph()
     #maze.animation_building_maze(save_as=images_path+"making_maze.gif")
     #maze.animation_solving_maze()
