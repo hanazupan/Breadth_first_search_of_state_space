@@ -101,7 +101,7 @@ class MazeTestCase(unittest.TestCase):
         # assert diagonally symmetrical
         assert (correct_adj == correct_adj.T).all()
         # compare to the created one
-        adj = test_maze.breadth_first_search()
+        adj = test_maze.get_adjacency_matrix()
         np.testing.assert_array_equal(correct_adj, adj)
 
 

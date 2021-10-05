@@ -15,7 +15,7 @@ import networkx as nx
 
 class Maze:
 
-    def __init__(self, height, width, algorithm='Prim'):
+    def __init__(self, height, width, algorithm='Prim', animate=False):
         """
         Creates a maze of user-defined size. A maze is represented as a numpy array with:
         - 1 to represent a wall (high energy)
@@ -27,15 +27,16 @@ class Maze:
         :param algorithm: string, maze generation algorithm, options ['handmade', 'Prim', 'random']
         """
         self.algorithm = algorithm
+        self.animate = animate
         self.size = (height, width)
         self.maze = np.full(self.size, 2, dtype=int)
-        # list of images for animation
-        self.image_list = []
-        self.search_image_list = []
+        # prepare empty objects for solving maze
+        self.graph = None
+        self.adj_matrix = None
         if algorithm == 'handmade1':
             self._create_handmade1()
         elif algorithm == 'Prim':
-            self._create_prim()
+            self.animation_building_maze()
         elif algorithm == 'random':
             self.maze = np.random.randint(0, 2, size=(height, width))
         else:
@@ -85,7 +86,7 @@ class Maze:
         random_cell = np.random.randint(height), np.random.randint(width)
         self.maze[random_cell] = 0
         # for video
-        self.image_list.append(self.maze.copy())
+        yield self.maze.copy()
         # add walls of the cell to the wall list (periodic boundary conditions)
         neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
@@ -109,11 +110,11 @@ class Maze:
                         create_wall(w)
             wall_list.remove(random_wall)
             # for video
-            self.image_list.append(self.maze.copy())
+            yield self.maze.copy()
         # everything unassigned becomes a wall
         self.maze[self.maze == 2] = 1
         # to get the final image for animation with no unassigned cells
-        self.image_list.append(self.maze.copy())
+        yield self.maze.copy()
 
     def animation_building_maze(self, save_as=None):
         """
@@ -127,22 +128,28 @@ class Maze:
             return
 
         fig = plt.figure()
-        im = plt.imshow(self.image_list[0], cmap='Greys', animated=True)
+        iterator = self._create_prim()
+        im = plt.imshow(next(iterator), cmap='Greys', animated=True)
 
         def updatefig(i):
-            im.set_array(self.image_list[i])
+            im.set_array(i)
             return im,
 
         im.axes.get_xaxis().set_visible(False)
         im.axes.get_yaxis().set_visible(False)
         # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
         # interval determines how fast the video when played (not saved)
-        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=len(self.image_list),
-                                       repeat=False, interval=20)
-        plt.show()
-        if save_as:
-            writergif = animation.PillowWriter(fps=30)
-            anim.save(save_as, writer=writergif)
+        if self.animate:
+            anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
+                                       repeat=False, interval=10)
+            plt.show()
+            if save_as:
+                writergif = animation.PillowWriter(fps=30)
+                anim.save(save_as, writer=writergif)
+        for x in iterator:
+            pass
+
+
 
     def determine_neighbours_periodic(self, cell):
         """
@@ -205,7 +212,15 @@ class Maze:
         plt.show()
         return ax
 
-    def breadth_first_search(self, save_as=None, with_labels=False):
+    def breadth_first_search(self, animate=False):
+        if animate:
+            self.animation_solving_maze()
+            return next(self._bfs())
+        else:
+            for image in self._bfs():
+                pass
+
+    def _bfs(self):
         """
         Determine the connectivity graph of accessible states (states with value 0) in the maze. Plot the
         connectivity graph. Prepare images for animation of path searching.
@@ -214,9 +229,9 @@ class Maze:
         :param with_labels: bool, should the graph have labels
         :return: numpy array, adjacency matrix of the graph
         """
-        G = nx.Graph()
+        self.graph = nx.Graph()
         # for video
-        self.search_image_list.append(self.maze.copy())
+        yield self.maze.copy()
         visited = np.zeros(self.size, dtype=int)
         accessible = np.zeros(self.size, dtype=int)
         check_queue = deque()
@@ -229,17 +244,17 @@ class Maze:
         visited[random_cell] = 1
         accessible[random_cell] = 1
         index_rc = random_cell[0]*width + random_cell[1]
-        G.add_node(index_rc)
+        self.graph.add_node(index_rc)
         # for video
-        self.search_image_list.append(self.maze.copy() - accessible.copy())
+        yield self.maze.copy() - accessible.copy()
         # take care of the neighbours of the first random cell
         neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
             visited[n] = 1
             if self.accessible(n):
                 index_n = n[0]*width + n[1]
-                G.add_node(index_n)
-                G.add_edge(index_rc, index_n)
+                self.graph.add_node(index_n)
+                self.graph.add_edge(index_rc, index_n)
                 accessible[n] = 1
                 check_queue.append(n)
         # take care of all other cells
@@ -256,23 +271,33 @@ class Maze:
                 visited[n] = 1
                 if self.accessible(n):
                     index_n = n[0] * width + n[1]
-                    G.add_node(index_n)
-                    G.add_edge(index_cell, index_n)
+                    self.graph.add_node(index_n)
+                    self.graph.add_edge(index_cell, index_n)
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
-            self.search_image_list.append(self.maze.copy() - accessible.copy())
-        # draw graph of connections
-        plt.figure()
-        nx.draw_kamada_kawai(G, with_labels=with_labels)
-        if save_as:
-            plt.savefig(save_as)
+            yield self.maze.copy() - accessible.copy()
         # accessible states are the logical inverse of the maze
         assert np.all(np.logical_not(accessible) == self.maze)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
-        adj_matrix = nx.to_numpy_matrix(G,nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
-        assert len(adj_matrix) == np.isclose(self.maze, 0).sum()
-        return adj_matrix.astype(int)
+        self.adj_matrix = nx.to_numpy_matrix(self.graph,
+                                             nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
+        assert len(self.adj_matrix) == np.isclose(self.maze, 0).sum()
+
+    def draw_connections_graph(self, save_as=None, with_labels=False):
+        if not self.graph:
+            self.breadth_first_search()
+        plt.figure()
+        nx.draw_kamada_kawai(self.graph, with_labels=with_labels)
+        # causes MatplotlibDeprecationWarning
+        plt.show()
+        if save_as:
+            plt.savefig(save_as)
+
+    def get_adjacency_matrix(self):
+        if not self.adj_matrix:
+            self.breadth_first_search()
+        return self.adj_matrix
 
     def animation_solving_maze(self, save_as=None):
         """
@@ -281,36 +306,40 @@ class Maze:
         :param save_as: string, path and name of file where you want to save the animation
         :return:
         """
-        if not self.search_image_list:
-            self.breadth_first_search()
+        #if not self.search_image_list:
+        #    self.breadth_first_search()
         fig = plt.figure()
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
         # 1 are the walls.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
         bounds = [-1.5, -0.5, 0.5, 1.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
-        im = plt.imshow(self.search_image_list[0], animated=True, cmap=cmap, norm=norm)
+        iterator = self._bfs()
+        im = plt.imshow(next(iterator), animated=True, cmap=cmap, norm=norm)
 
         def updatefig(i):
-            im.set_array(self.search_image_list[i])
+            im.set_array(i)
             return im,
 
         im.axes.get_xaxis().set_visible(False)
         im.axes.get_yaxis().set_visible(False)
         # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
         # interval determines how fast the video when played (not saved)
-        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=len(self.search_image_list),
+        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
                                        repeat=False, interval=20)
         plt.show()
         if save_as:
             writergif = animation.PillowWriter(fps=30)
             anim.save(save_as, writer=writergif)
+        for x in iterator:
+            pass
 
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(6, 6, algorithm='handmade1')
-    maze.visualize(save_as=images_path + "maze")
-    adjacency = maze.breadth_first_search(save_as=images_path+"graph", with_labels=True)
+    maze = Maze(20, 30, animate=False)
+    maze.visualize()
+    adjacency = maze.breadth_first_search(animate=False)
+    maze.draw_connections_graph()
     #maze.animation_building_maze(save_as=images_path+"making_maze.gif")
-    maze.animation_solving_maze(save_as=images_path + "filling_graph.gif")
+    #maze.animation_solving_maze()
