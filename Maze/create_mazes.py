@@ -1,9 +1,9 @@
 """
 In this file, class Maze is introduced and mazes of different sizes can be created using Prim's
-algorithm or a random distribution of cells.
+algorithm or a random distribution of cells. The mazes can also be solved using breadth-first search
+algorithm, visualized as graphs and transformed into an adjacency matrix.
 """
 
-# imports
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -24,10 +24,12 @@ class Maze:
 
         :param height: int, number of rows
         :param width: int, number of columns
-        :param algorithm: string, maze generation algorithm, options ['handmade', 'Prim', 'random']
+        :param algorithm: string, maze generation algorithm, options ['handmade1', 'Prim', 'random']
+        :param animate: bool, whether an animation of the maze generation should be computed and saved
+        :param images_path: string, path where any generated images/videos will be saved
+        :param images_name: string, identifier of all images/videos generated from this maze object
         """
         self.algorithm = algorithm
-        self.animate = animate
         self.size = (height, width)
         self.maze = np.full(self.size, 2, dtype=int)
         # prepare empty objects for solving maze
@@ -43,7 +45,8 @@ class Maze:
             if animate:
                 self._animate_building_maze()
             else:
-                for x in self._create_prim():
+                # necessary to empty the generator
+                for _ in self._create_prim():
                     pass
         elif algorithm == 'random':
             self.maze = np.random.randint(0, 2, size=(height, width))
@@ -58,9 +61,8 @@ class Maze:
 
     def _create_handmade1(self):
         """
-        Only for testing. Hand-pick some cells and turn them into walls. Warning: ignores height and
-        width, the size is always (6, 6)
-        :return: None
+        Only for testing. Hand-pick some cells and turn them into halls.
+        Warning: ignores height and width, the size is always (6, 6)
         """
         self.size = (6, 6)
         self.maze = np.full(self.size, 1, dtype=int)
@@ -71,6 +73,10 @@ class Maze:
         self.maze[2, 3:6] = 0
         self.maze[4:6, 3] = 0
         self.maze[5, 5] = 0
+
+    ############################################################################
+    # ---------------------   PRIM'S ALGORITHM   -------------------------------
+    ############################################################################
 
     def _create_prim(self):
         """
@@ -99,6 +105,7 @@ class Maze:
         neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
             create_wall(n)
+        # continue until you run out of walls
         while len(wall_list) > 0:
             random_wall = random.choice(wall_list)
             neighbours = self.determine_neighbours_periodic(random_wall)
@@ -124,8 +131,6 @@ class Maze:
         # to get the final image for animation with no unassigned cells
         yield self.maze.copy()
 
-
-
     def determine_neighbours_periodic(self, cell):
         """
         Given the cell (coordinate x, coordinate y) calculates the direct 4 neighbours of that cell
@@ -143,9 +148,6 @@ class Maze:
             (line, (column - 1) % width)
         ]
         return neighbours
-
-    def accessible(self, cell):
-        return not self.maze[cell]
 
     def _determine_opposite(self, central, known_hall):
         """
@@ -172,39 +174,37 @@ class Maze:
         else:
             raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
 
-    def visualize(self, show=True):
-        """
-        Visualize the Maze with black squares (walls) and white squares (halls).
-
-        :param save_as: string, path and name of file where you want to save the image of the maze
-        :return: matplotlib.image.AxesImage
-        """
-        ax = plt.imshow(self.maze, cmap="Greys")
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
-            plt.close
-        return ax
+    ############################################################################
+    # ---------------------------   BFS    -------------------------------------
+    ############################################################################
 
     def breadth_first_search(self, animate=False):
+        """
+        Perform a breadth-first search of the maze. This also generates a graph of connections and an
+        adjacency matrix of the maze. The algorithm does this:
+        1. Find a random accessible cell in the maze, mark it as visited and accessible
+        2. Add accessible neighbours of the cell to the queue
+        3. While queue not empty:
+            1. Take an element from the beginning of the queue
+            2. Mark all its unvisited neighbours as visited
+            3. Mark all its accessible neighbours as accessible and add them to the queue
+
+        :param animate: bool, whether to generate and save the animation of solving the maze
+        """
         if animate:
             self._animate_solving_maze()
-            return next(self._bfs())
         else:
-            for image in self._bfs():
+            # this needs to be done to exhaust the generator
+            for _ in self._bfs():
                 pass
+
+    def accessible(self, cell):
+        return not self.maze[cell]
 
     def _bfs(self):
         """
-        Determine the connectivity graph of accessible states (states with value 0) in the maze. Plot the
-        connectivity graph. Prepare images for animation of path searching.
-
-        :param save_as: string, path and name of file where you want to save the graph
-        :param with_labels: bool, should the graph have labels
-        :return: numpy array, adjacency matrix of the graph
+        Determine the connectivity graph of accessible states (states with value 0) in the maze. Determine
+        the adjacency matrix. Yield images for animation of path searching.
         """
         self.graph = nx.Graph()
         # for video
@@ -217,9 +217,9 @@ class Maze:
         random_cell = np.random.randint(height), np.random.randint(width)
         while self.maze[random_cell] != 0:
             random_cell = np.random.randint(height), np.random.randint(width)
-        # determine neighbours of the random cell and add them to queue
         visited[random_cell] = 1
         accessible[random_cell] = 1
+        # for the graph we are using index of the flattened maze as the identifier
         index_rc = random_cell[0]*width + random_cell[1]
         self.graph.add_node(index_rc)
         # for video
@@ -236,16 +236,14 @@ class Maze:
                 check_queue.append(n)
         # take care of all other cells
         while len(check_queue) > 0:
-            # next point
             cell = check_queue.popleft()
             index_cell = cell[0]*width + cell[1]
-            # print(cell)
             neighbours = self.determine_neighbours_periodic(cell)
             # if neighbours visited already, don't need to bother with them
             unvis_neig = [n for n in neighbours if visited[n] == 0]
-            # if accessible, add to queue
             for n in unvis_neig:
                 visited[n] = 1
+                # if accessible, add to queue
                 if self.accessible(n):
                     index_n = n[0] * width + n[1]
                     self.graph.add_node(index_n)
@@ -254,39 +252,28 @@ class Maze:
                     check_queue.append(n)
             # for video
             yield self.maze.copy() - accessible.copy()
-        # accessible states are the logical inverse of the maze
+        # accessible states must be the logical inverse of the maze
         assert np.all(np.logical_not(accessible) == self.maze)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
-        assert len(self.adj_matrix) == np.isclose(self.maze, 0).sum()
+        # the adjacency matrix must be as long as there are accessible cells in the maze
+        assert len(self.adj_matrix) == np.count_nonzero(accessible)
 
-    def draw_connections_graph(self, show=True, **kwargs):
-        if not self.graph:
-            self.breadth_first_search()
-        plt.figure()
-        nx.draw_kamada_kawai(self.graph, **kwargs)
-        plt.savefig(self.images_path + f"graph_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        # causes MatplotlibDeprecationWarning
-        if show:
-            plt.show()
-        else:
-            plt.close()
-
-    def get_adjacency_matrix(self):
-        if self.algorithm == 'random':
-            print("Adjacency matrix only for Prim's algorithm (and handmade).")
-            return
-        elif not np.any(self.adj_matrix):
-            self.breadth_first_search()
-            return self.adj_matrix
-        else:
-            return self.adj_matrix
+    ############################################################################
+    # -----------------------   ANIMATIONS    ----------------------------------
+    ############################################################################
 
     def _animate(self, iterator, name_addition="animate", **kwargs):
+        """
+        A general method for animation. Should only be called by more specific animation functions.
+
+        :param iterator: an iterator that yields numpy arrays that should be visualized
+        :param name_addition: how the gifs resulting from this animation process should be identified
+        :param kwargs: named arguments that can be passed to plt.imshow(), e.g. cmap
+        """
         height, width = self.size
         fig = plt.figure()
-
         im = plt.imshow(next(iterator), animated=True, **kwargs)
 
         def updatefig(i):
@@ -304,21 +291,20 @@ class Maze:
 
     def _animate_building_maze(self):
         """
-        Creates an animation showing how the maze has been built.
-
-        :param save_as: string, path and name of file where you want to save the animation
-        :return: None
+        Creates an animation showing how the maze has been built. Colormap as follows:
+            white = hall
+            gray = wall
+            black = unassigned
         """
         iterator = self._create_prim()
         self._animate(iterator, name_addition="building", cmap='Greys')
 
     def _animate_solving_maze(self):
         """
-        Animate solving the maze - blue squares represent the newly discovered accessible cells.
-
-        :param save_as: string, path and name of file where you want to save the animation
-        :return:
-
+        Animate solving the maze with bfa. Color map as follows:
+            blue = discovered accessible cells
+            white = undiscovered accessible cells
+            black = walls
         """
         iterator = self._bfs()
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
@@ -328,10 +314,64 @@ class Maze:
         norm = colors.BoundaryNorm(bounds, cmap.N)
         self._animate(iterator, name_addition="solving", cmap=cmap, norm=norm)
 
+    ############################################################################
+    # ---------------------   PUBLIC METHODS    --------------------------------
+    ############################################################################
+
+    def visualize(self, show=True):
+        """
+        Visualize the Maze with black squares (walls) and white squares (halls).
+
+        :param show: bool, should the visualization be displayed
+        :return: matplotlib.image.AxesImage
+        """
+        ax = plt.imshow(self.maze, cmap="Greys")
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        return ax
+
+    def draw_connections_graph(self, show=True, **kwargs):
+        """
+        Visualize the graph of connections between the cells of the maze.
+
+        :param show: bool, should the visualization be displayed
+        :param kwargs: named arguments that can be passed to nx.draw_kamada_kawai(), e.g. with_labels
+        """
+        if not self.graph:
+            self.breadth_first_search()
+        plt.figure()
+        nx.draw_kamada_kawai(self.graph, **kwargs)
+        plt.savefig(self.images_path + f"graph_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        # causes MatplotlibDeprecationWarning
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+    def get_adjacency_matrix(self):
+        """
+        Get (and create if not yet created) an adjacency matrix of the maze with breadth-first search.
+
+        :return: numpy array, adjacency matrix, square number the size of the number of halls
+        """
+        if self.algorithm == 'random':
+            print("Adjacency matrix not available for a randomly created maze.")
+            return
+        elif not np.any(self.adj_matrix):
+            self.breadth_first_search()
+            return self.adj_matrix
+        else:
+            return self.adj_matrix
+
 
 if __name__ == '__main__':
-    images_path = "Images/"
-    maze = Maze(15, 8, animate=False, images_path=images_path)
+    path = "Images/"
+    maze = Maze(15, 8, animate=False, images_path=path)
     maze.visualize()
     maze.breadth_first_search(animate=False)
     adjacency = maze.get_adjacency_matrix()
