@@ -21,6 +21,18 @@ class MazeTestCase(unittest.TestCase):
                 for y in range(wid):
                     self.assertIn(test_maze.maze[x, y], [0, 1])
 
+    def test_run_everything(self):
+        images_path = "Images/"
+        for animate in [True, False]:
+            height = np.random.randint(5, 15)
+            width = np.random.randint(6, 20)
+            test_maze = Maze(height, width, algorithm='Prim', animate=animate,
+                             images_path=images_path, images_name="test")
+            test_maze.breadth_first_search(animate=animate)
+            test_maze.get_adjacency_matrix()
+            test_maze.visualize(show=False)
+            test_maze.draw_connections_graph(show=False, with_labels=True)
+
     def test_neighbours(self):
         test_maze = Maze(20, 30)
         # test a cell in the middle

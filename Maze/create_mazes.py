@@ -11,12 +11,11 @@ import random
 from collections import deque
 from matplotlib import colors
 import networkx as nx
-import sys
 
 
 class Maze:
 
-    def __init__(self, height, width, algorithm='Prim', animate=False, images_path=".", images_name="maze"):
+    def __init__(self, height, width, algorithm='Prim', animate=False, images_path="./", images_name="maze"):
         """
         Creates a maze of user-defined size. A maze is represented as a numpy array with:
         - 1 to represent a wall (high energy)
@@ -42,7 +41,7 @@ class Maze:
             self._create_handmade1()
         elif algorithm == 'Prim':
             if animate:
-                self.animation_building_maze()
+                self._animate_building_maze()
             else:
                 for x in self._create_prim():
                     pass
@@ -125,33 +124,6 @@ class Maze:
         # to get the final image for animation with no unassigned cells
         yield self.maze.copy()
 
-    def animation_building_maze(self, save_as=None):
-        """
-        Creates an animation showing how the maze has been built.
-
-        :param save_as: string, path and name of file where you want to save the animation
-        :return: None
-        """
-        height, width = self.size
-        fig = plt.figure()
-        iterator = self._create_prim()
-        im = plt.imshow(next(iterator), cmap='Greys', animated=True)
-
-        def updatefig(i):
-            im.set_array(i)
-            return im,
-
-        im.axes.get_xaxis().set_visible(False)
-        im.axes.get_yaxis().set_visible(False)
-        # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
-        # interval determines how fast the video when played (not saved)
-        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
-                                       repeat=False, interval=10, save_count=height*width)
-        writergif = animation.PillowWriter(fps=30)
-        anim.save(self.images_path + f"building_{self.images_name}.gif", writer=writergif)
-        for x in iterator:
-            pass
-
 
 
     def determine_neighbours_periodic(self, cell):
@@ -200,7 +172,7 @@ class Maze:
         else:
             raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
 
-    def visualize(self, save_as=None):
+    def visualize(self, show=True):
         """
         Visualize the Maze with black squares (walls) and white squares (halls).
 
@@ -210,14 +182,16 @@ class Maze:
         ax = plt.imshow(self.maze, cmap="Greys")
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
-        if save_as:
-            ax.figure.savefig(save_as, bbox_inches='tight', dpi=1200)
-        plt.show()
+        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close
         return ax
 
     def breadth_first_search(self, animate=False):
         if animate:
-            self.animation_solving_maze()
+            self._animate_solving_maze()
             return next(self._bfs())
         else:
             for image in self._bfs():
@@ -287,37 +261,33 @@ class Maze:
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
         assert len(self.adj_matrix) == np.isclose(self.maze, 0).sum()
 
-    def draw_connections_graph(self, save_as=None, with_labels=False):
+    def draw_connections_graph(self, show=True, **kwargs):
         if not self.graph:
             self.breadth_first_search()
         plt.figure()
-        nx.draw_kamada_kawai(self.graph, with_labels=with_labels)
+        nx.draw_kamada_kawai(self.graph, **kwargs)
+        plt.savefig(self.images_path + f"graph_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         # causes MatplotlibDeprecationWarning
-        plt.show()
-        if save_as:
-            plt.savefig(save_as)
+        if show:
+            plt.show()
+        else:
+            plt.close()
 
     def get_adjacency_matrix(self):
-        if not self.adj_matrix:
+        if self.algorithm == 'random':
+            print("Adjacency matrix only for Prim's algorithm (and handmade).")
+            return
+        elif not np.any(self.adj_matrix):
             self.breadth_first_search()
-        return self.adj_matrix
+            return self.adj_matrix
+        else:
+            return self.adj_matrix
 
-    def animation_solving_maze(self, save_as=None):
-        """
-        Animate solving the maze - blue squares represent the newly discovered accessible cells.
-
-        :param save_as: string, path and name of file where you want to save the animation
-        :return:
-        """
+    def _animate(self, iterator, name_addition="animate", **kwargs):
         height, width = self.size
         fig = plt.figure()
-        # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
-        # 1 are the walls.
-        cmap = colors.ListedColormap(['blue', 'white', 'black'])
-        bounds = [-1.5, -0.5, 0.5, 1.5]
-        norm = colors.BoundaryNorm(bounds, cmap.N)
-        iterator = self._bfs()
-        im = plt.imshow(next(iterator), animated=True, cmap=cmap, norm=norm)
+
+        im = plt.imshow(next(iterator), animated=True, **kwargs)
 
         def updatefig(i):
             im.set_array(i)
@@ -328,19 +298,41 @@ class Maze:
         # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
         # interval determines how fast the video when played (not saved)
         anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
-                                       repeat=False, interval=20, save_count=height*width)
-        writergif = animation.PillowWriter(fps=30)
-        anim.save(self.images_path + f"solving_{self.images_name}.gif", writer=writergif)
+                                       repeat=False, interval=10, save_count=height * width)
+        writergif = animation.PillowWriter(fps=50)
+        anim.save(self.images_path + f"{name_addition}_{self.images_name}.gif", writer=writergif)
 
-        for x in iterator:
-            pass
+    def _animate_building_maze(self):
+        """
+        Creates an animation showing how the maze has been built.
+
+        :param save_as: string, path and name of file where you want to save the animation
+        :return: None
+        """
+        iterator = self._create_prim()
+        self._animate(iterator, name_addition="building", cmap='Greys')
+
+    def _animate_solving_maze(self):
+        """
+        Animate solving the maze - blue squares represent the newly discovered accessible cells.
+
+        :param save_as: string, path and name of file where you want to save the animation
+        :return:
+
+        """
+        iterator = self._bfs()
+        # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
+        # 1 are the walls.
+        cmap = colors.ListedColormap(['blue', 'white', 'black'])
+        bounds = [-1.5, -0.5, 0.5, 1.5]
+        norm = colors.BoundaryNorm(bounds, cmap.N)
+        self._animate(iterator, name_addition="solving", cmap=cmap, norm=norm)
 
 
 if __name__ == '__main__':
     images_path = "Images/"
-    maze = Maze(20, 30, animate=False, images_path=images_path)
+    maze = Maze(15, 8, animate=False, images_path=images_path)
     maze.visualize()
-    adjacency = maze.breadth_first_search(animate=False)
-    #maze.draw_connections_graph()
-    #maze.animation_building_maze(save_as=images_path+"making_maze.gif")
-    #maze.animation_solving_maze()
+    maze.breadth_first_search(animate=False)
+    adjacency = maze.get_adjacency_matrix()
+    maze.draw_connections_graph(with_labels=True)
