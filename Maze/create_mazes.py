@@ -214,9 +214,7 @@ class Maze:
         check_queue = deque()
         height, width = self.size
         # get a random starting point that is accessible
-        random_cell = np.random.randint(height), np.random.randint(width)
-        while self.maze[random_cell] != 0:
-            random_cell = np.random.randint(height), np.random.randint(width)
+        random_cell = self._find_random_accessible()
         visited[random_cell] = 1
         accessible[random_cell] = 1
         # for the graph we are using index of the flattened maze as the identifier
@@ -368,11 +366,67 @@ class Maze:
         else:
             return self.adj_matrix
 
+    ############################################################################
+    # ------------------   DIJKSTRA'S ALGORITHM    -----------------------------
+    ############################################################################
+
+    def _find_random_accessible(self):
+        height, width = self.size
+        cell = np.random.randint(height), np.random.randint(width)
+        while not self.accessible(cell):
+            cell = np.random.randint(height), np.random.randint(width)
+        return cell
+
+    def find_shortest_path(self, start_cell=None, end_cell=None):
+        # if no cells provided, a random start cell
+        if not start_cell:
+            start_cell = self._find_random_accessible()
+        elif not self.accessible(start_cell):
+            raise ValueError("Start cell must lie on a passage (white cell) in the maze.")
+        if not end_cell:
+            end_cell = self._find_random_accessible()
+        elif not self.accessible(end_cell):
+            raise ValueError("End cell must lie on a passage (white cell) in the maze.")
+        return self._dijkstra_connect_two(start_cell, end_cell)
+
+    def _dijkstra_connect_two(self, start_cell, end_cell):
+        print(start_cell, end_cell)
+        # create empty objects
+        visited = np.zeros(self.size, dtype=int)
+        distances = np.full(self.size, np.inf)
+        check_queue = deque()
+        current_cell = start_cell
+        distances[current_cell] = 0
+        # here first frame of the animation
+        # determine accessible neighbours - their distances to
+        check_queue.extend([n for n in maze.determine_neighbours_periodic(current_cell) if self.accessible(n)])
+        for n in check_queue:
+            distances[n] = 1
+        # here snapshot for animation
+        visited[current_cell] = 1
+        while check_queue:
+            current_cell = check_queue.popleft()
+            # unvisited, accessible neighbours
+            neig = [n for n in maze.determine_neighbours_periodic(current_cell)
+                    if self.accessible(n) and not visited[n]]
+            for n in neig:
+                tent_dist = distances[current_cell] + 1
+                if tent_dist < distances[n]:
+                    distances[n] = tent_dist
+            check_queue.extend(neig)
+            # here snapshot for animation
+            visited[current_cell] = 1
+            if visited[end_cell] == 1:
+                return distances[end_cell]
+        return distances
+
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze(15, 8, animate=False, images_path=path)
-    maze.visualize()
-    maze.breadth_first_search(animate=False)
-    adjacency = maze.get_adjacency_matrix()
-    maze.draw_connections_graph(with_labels=True)
+    maze = Maze(11, 11, animate=False, images_path=path)
+    maze.visualize(show=False)
+    #maze.breadth_first_search(animate=False)
+    #adjacency = maze.get_adjacency_matrix()
+    #maze.draw_connections_graph(show=False, with_labels=True)
+    length = maze.find_shortest_path()
+    print(length)
