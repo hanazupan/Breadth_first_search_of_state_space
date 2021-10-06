@@ -1,5 +1,7 @@
 # Images
 Maze/Images/
+Maze/*.gif
+Maze/*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
