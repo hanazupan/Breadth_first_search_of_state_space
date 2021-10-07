@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
 from collections import deque
-from matplotlib import colors, patches
+from matplotlib import colors, patches, cm
 import networkx as nx
 
 
@@ -272,6 +272,15 @@ class Maze:
         """
         height, width = self.size
         fig = plt.figure()
+
+        if "start_cell" and "end_cell" in kwargs:
+            start = kwargs.pop("start_cell")
+            stop = kwargs.pop("end_cell")
+            ax = plt.gca()
+            circ = plt.Circle((start[1], start[0]), 0.4, fill=False, color="black", linewidth=1)
+            ax.add_patch(circ)
+            plt.plot(stop[1], stop[0], marker="x", color="black", linewidth=1.5)
+
         im = plt.imshow(next(iterator), animated=True, **kwargs)
 
         def updatefig(i):
@@ -313,11 +322,15 @@ class Maze:
         self._animate(iterator, name_addition="solving", cmap=cmap, norm=norm)
 
     def _animate_dijkstra(self, **kwargs):
+        height, width = self.size
+        start_cell = kwargs["start_cell"]
+        end_cell = kwargs["end_cell"]
         iterator = self._dijkstra_connect_two(**kwargs)
-        cmap = colors.ListedColormap(['blue', 'orange', 'white', 'red', 'black'])
-        bounds = [-2.5, -1.5, -0.5, 0.5, 999.5, 1000.5]
-        norm = colors.BoundaryNorm(bounds, cmap.N)
-        self._animate(iterator, name_addition="dijkstra", cmap=cmap, norm=norm)
+        cmap = cm.get_cmap("RdBu")
+        cmap.set_under("white")
+        cmap.set_over("black")
+        self._animate(iterator, name_addition="dijkstra", cmap=cmap, vmin=0.5, vmax=999,
+                      start_cell=start_cell, end_cell=end_cell)
 
 
     ############################################################################
@@ -342,15 +355,18 @@ class Maze:
         return ax
 
     def visualize_distances(self, distances, start, stop, show=True):
-        plt.imshow(distances, cmap="plasma")
+        new_fig = plt.figure()
+        cmap = cm.get_cmap("plasma")
+        cmap.set_under("white")
+        cmap.set_over("black")
+        plt.imshow(self.maze, cmap="Greys")
+        plt.imshow(distances, cmap=cmap)
 
         ax = plt.gca()
         circ = plt.Circle((start[1], start[0]), 0.4, fill=False, color="white", linewidth=1)
         ax.add_patch(circ)
         plt.plot(stop[1], stop[0], marker="x", color="black", linewidth=1.5)
-        #triangle = patches.RegularPolygon(stop, 3, color="black", linewidth=1)
-        #ax.add_patch(triangle)
-        plt.show()
+        plt.savefig(self.images_path + f"distances_{self.images_name}.png")
 
     def draw_connections_graph(self, show=True, **kwargs):
         """
@@ -412,7 +428,8 @@ class Maze:
             try:
                 next(self._dijkstra_connect_two(start_cell=start_cell, end_cell=end_cell, animate=animate))
             except StopIteration as ex:
-                return ex
+                self.visualize_distances(ex, start_cell, end_cell)
+                return ex[end_cell]
 
     def _dijkstra_connect_two(self, start_cell, end_cell, animate):
         print(start_cell, end_cell)
@@ -420,8 +437,8 @@ class Maze:
         visited = np.zeros(self.size, dtype=int)
         distances = np.full(self.size, np.inf)
         for_plotting = np.zeros(self.size, dtype=int)
-        for_plotting[start_cell] = -1
-        for_plotting[end_cell] = -2
+        for_plotting[start_cell] = 1
+        #for_plotting[end_cell] = 2
         check_queue = deque()
         current_cell = start_cell
         distances[current_cell] = 0
@@ -446,14 +463,12 @@ class Maze:
                 if tent_dist < distances[n]:
                     distances[n] = tent_dist
             check_queue.extend(neig)
+            visited[current_cell] = 1
             # here snapshot for animation
             if animate:
                 yield np.where(visited != 0, distances, self.maze * 1000) + for_plotting
-            visited[current_cell] = 1
             if visited[end_cell] == 1:
-                self.visualize_distances(distances, start_cell, end_cell)
-                return distances[end_cell]
-        return distances
+                return distances
 
 
 if __name__ == '__main__':
