@@ -44,7 +44,7 @@ class Maze:
         elif algorithm == 'Prim':
             if animate:
                 ma = MazeAnimation(self)
-                ma.animate_bulding_maze()
+                ma.animate_building_maze()
             else:
                 # necessary to empty the generator
                 for _ in self._create_prim():
@@ -101,7 +101,7 @@ class Maze:
         random_cell = np.random.randint(height), np.random.randint(width)
         self.maze[random_cell] = 0
         # for video
-        yield self.maze.copy()
+        yield self.maze
         # add walls of the cell to the wall list (periodic boundary conditions)
         neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
@@ -126,11 +126,11 @@ class Maze:
                         create_wall(w)
             wall_list.remove(random_wall)
             # for video
-            yield self.maze.copy()
+            yield self.maze
         # everything unassigned becomes a wall
         self.maze[self.maze == 2] = 1
         # to get the final image for animation with no unassigned cells
-        yield self.maze.copy()
+        yield self.maze
 
     def determine_neighbours_periodic(self, cell):
         """
@@ -211,7 +211,7 @@ class Maze:
         """
         self.graph = nx.Graph()
         # for video
-        yield self.maze.copy()
+        yield self.maze
         visited = np.zeros(self.size, dtype=int)
         accessible = np.zeros(self.size, dtype=int)
         check_queue = deque()
@@ -224,7 +224,7 @@ class Maze:
         index_rc = random_cell[0]*width + random_cell[1]
         self.graph.add_node(index_rc)
         # for video
-        yield self.maze.copy() - accessible.copy()
+        yield self.maze - accessible
         # take care of the neighbours of the first random cell
         neighbours = self.determine_neighbours_periodic(random_cell)
         for n in neighbours:
@@ -252,7 +252,7 @@ class Maze:
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
-            yield self.maze.copy() - accessible.copy()
+            yield self.maze - accessible
         # accessible states must be the logical inverse of the maze
         assert np.all(np.logical_not(accessible) == self.maze)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
@@ -287,12 +287,10 @@ class Maze:
         cmap = cm.get_cmap("plasma").copy()
         cmap.set_under("white")
         cmap.set_over("black")
-        plt.imshow(self.maze, cmap="Greys")
         plt.imshow(distances, cmap=cmap, vmin=0.5, vmax=distances[end_cell])
         plt.plot(end_cell[1], end_cell[0], marker="x", color="black", linewidth=1.5)
         plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
-        plt.savefig(self.images_path + f"distances_{self.images_name}.png")
-        plt.show()
+        plt.savefig(self.images_path + f"distances_{self.images_name}.png", dpi=1200)
 
     def draw_connections_graph(self, show=True, **kwargs):
         """
@@ -332,6 +330,11 @@ class Maze:
     ############################################################################
 
     def _find_random_accessible(self):
+        """
+        Find a random cell in the maze that is acessible (is a passage).
+
+        :return: tuple, (x, y) coordinates of the cell.
+        """
         height, width = self.size
         cell = np.random.randint(height), np.random.randint(width)
         while not self.accessible(cell):
@@ -339,7 +342,17 @@ class Maze:
         return cell
 
     def find_shortest_path(self, start_cell=None, end_cell=None, animate=False):
+        """
+        Apply Dijkstra's algorithm to find the distance between start and end cell (both passages in maze).
+        If start or end cell are None, random accessible cells will be selected.
+
+        :param start_cell: tuple or None, (x, y) coordinates of the cell where the path starts
+        :param end_cell: tuple or None, (x, y) coordinates of the cell where the path ends
+        :param animate: bool, whether to animate the algorithm
+        :return: int, the min number of cells to reach end cell from start cell
+        """
         # if no cells provided, a random start cell
+        # if cells are provided, check if they are actually passages
         if not start_cell:
             start_cell = self._find_random_accessible()
         elif not self.accessible(start_cell):
@@ -348,18 +361,38 @@ class Maze:
             end_cell = self._find_random_accessible()
         elif not self.accessible(end_cell):
             raise ValueError("End cell must lie on a passage (white cell) in the maze.")
+        # run the actual algorithm and animate if you want
         if animate:
             ma = MazeAnimation(self)
-            return ma.animate_dijkstra(start_cell, end_cell)[end_cell]
+            return int(ma.animate_dijkstra(start_cell, end_cell)[end_cell])
         else:
             iterator = self._dijkstra_connect_two(start_cell=start_cell, end_cell=end_cell)
             dist = None
+            # exhaust the iterator and save the last returned value
             for cv in iterator:
                 dist = cv
             self.visualize_distances(dist, start_cell, end_cell)
-            return dist[end_cell]
+            return int(dist[end_cell])
 
     def _dijkstra_connect_two(self, start_cell, end_cell):
+        """
+        The description of Dijkstra's algorithm from wiki (https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm):
+        1. Mark all nodes unvisited.
+        2. Set initial tentative distances: 0 for start cell, infinity for all others.
+        3. Add accessible neighbours of start cell to the queue. Set their distances to 1. Mark start cell as visited.
+        4. While queue not empty:
+            1. Set current cell to be the first element from the queue and remove from the queue
+            2. Calculate tentative distances of unvisited, accesible neighbours of the current cell.
+            3. If tentative distance < value of the neighbour:
+                1. Replace value of the neighbour with the tentative distance.
+            4. Mark current cell as visited.
+            5. If end cell has been visited:
+                6. Return value of end cell.
+
+        :param start_cell: tuple, (x, y) coordinates of the cell where the path starts
+        :param end_cell: tuple, (x, y) coordinates of the cell where the path ends
+        :return: np.ndarray, an array of distances to start cell for all visited cells
+        """
         # create empty objects
         visited = np.zeros(self.size, dtype=int)
         distances = np.full(self.size, np.inf)
@@ -442,7 +475,7 @@ class MazeAnimation:
         writergif = animation.PillowWriter(fps=50)
         anim.save(self.maze.images_path + f"{name_addition}_{self.maze.images_name}.gif", writer=writergif)
 
-    def animate_bulding_maze(self):
+    def animate_building_maze(self):
         """
         Creates an animation showing how the maze has been built. Colormap as follows:
             white = hall
@@ -484,15 +517,16 @@ class MazeAnimation:
         self._put_marker(end_cell[1], end_cell[0], "x", color="black", linewidth=1.5)
         self._put_marker(start_cell[1], start_cell[0], "o", color="black", linewidth=1.5)
         self._animate("dijkstra", cmap=cmap, vmin=0.5, vmax=999)
+        self.maze.visualize_distances(self.iterator_value, start_cell, end_cell)
         return self.iterator_value
 
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze(20, 20, animate=False, images_path=path, images_name="class")
+    maze = Maze(20, 20, animate=True, images_path=path, images_name="new")
     #maze.visualize(show=False)
-    maze.breadth_first_search(animate=False)
+    maze.breadth_first_search(animate=True)
     #adjacency = maze.get_adjacency_matrix()
     #maze.draw_connections_graph(show=False, with_labels=True)
-    length = maze.find_shortest_path(animate=False)
-    print(length)
+    #length = maze.find_shortest_path(animate=True)
+    #print(length)
