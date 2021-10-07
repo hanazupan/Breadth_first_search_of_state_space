@@ -43,7 +43,8 @@ class Maze:
             self._create_handmade1()
         elif algorithm == 'Prim':
             if animate:
-                self._animate_building_maze()
+                ma = MazeAnimation(self)
+                ma.animate_bulding_maze()
             else:
                 # necessary to empty the generator
                 for _ in self._create_prim():
@@ -192,7 +193,9 @@ class Maze:
         :param animate: bool, whether to generate and save the animation of solving the maze
         """
         if animate:
-            self._animate_solving_maze()
+            ma = MazeAnimation(self)
+            ma.animate_bfs()
+            #self._animate_solving_maze()
         else:
             # this needs to be done to exhaust the generator
             for _ in self._bfs():
@@ -259,81 +262,6 @@ class Maze:
         assert len(self.adj_matrix) == np.count_nonzero(accessible)
 
     ############################################################################
-    # -----------------------   ANIMATIONS    ----------------------------------
-    ############################################################################
-
-    def _animate(self, iterator, name_addition="animate", **kwargs):
-        """
-        A general method for animation. Should only be called by more specific animation functions.
-
-        :param iterator: an iterator that yields numpy arrays that should be visualized
-        :param name_addition: how the gifs resulting from this animation process should be identified
-        :param kwargs: named arguments that can be passed to plt.imshow(), e.g. cmap
-        """
-        height, width = self.size
-        fig = plt.figure()
-
-        if "start_cell" and "end_cell" in kwargs:
-            start = kwargs.pop("start_cell")
-            stop = kwargs.pop("end_cell")
-            ax = plt.gca()
-            circ = plt.Circle((start[1], start[0]), 0.4, fill=False, color="black", linewidth=1)
-            ax.add_patch(circ)
-            plt.plot(stop[1], stop[0], marker="x", color="black", linewidth=1.5)
-
-        im = plt.imshow(next(iterator), animated=True, **kwargs)
-
-        def updatefig(i):
-            im.set_array(i)
-            return im,
-
-        im.axes.get_xaxis().set_visible(False)
-        im.axes.get_yaxis().set_visible(False)
-        # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
-        # interval determines how fast the video when played (not saved)
-        anim = animation.FuncAnimation(fig, updatefig, blit=True, frames=iterator,
-                                       repeat=False, interval=10, save_count=height * width)
-        writergif = animation.PillowWriter(fps=50)
-        anim.save(self.images_path + f"{name_addition}_{self.images_name}.gif", writer=writergif)
-
-    def _animate_building_maze(self):
-        """
-        Creates an animation showing how the maze has been built. Colormap as follows:
-            white = hall
-            gray = wall
-            black = unassigned
-        """
-        iterator = self._create_prim()
-        self._animate(iterator, name_addition="building", cmap='Greys')
-
-    def _animate_solving_maze(self):
-        """
-        Animate solving the maze with bfa. Color map as follows:
-            blue = discovered accessible cells
-            white = undiscovered accessible cells
-            black = walls
-        """
-        iterator = self._bfs()
-        # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
-        # 1 are the walls.
-        cmap = colors.ListedColormap(['blue', 'white', 'black'])
-        bounds = [-1.5, -0.5, 0.5, 1.5]
-        norm = colors.BoundaryNorm(bounds, cmap.N)
-        self._animate(iterator, name_addition="solving", cmap=cmap, norm=norm)
-
-    def _animate_dijkstra(self, **kwargs):
-        height, width = self.size
-        start_cell = kwargs["start_cell"]
-        end_cell = kwargs["end_cell"]
-        iterator = self._dijkstra_connect_two(**kwargs)
-        cmap = cm.get_cmap("RdBu")
-        cmap.set_under("white")
-        cmap.set_over("black")
-        self._animate(iterator, name_addition="dijkstra", cmap=cmap, vmin=0.5, vmax=999,
-                      start_cell=start_cell, end_cell=end_cell)
-
-
-    ############################################################################
     # ---------------------   PUBLIC METHODS    --------------------------------
     ############################################################################
 
@@ -354,19 +282,17 @@ class Maze:
             plt.close()
         return ax
 
-    def visualize_distances(self, distances, start, stop, show=True):
-        new_fig = plt.figure()
-        cmap = cm.get_cmap("plasma")
+    def visualize_distances(self, distances, start_cell, end_cell):
+        plt.figure()
+        cmap = cm.get_cmap("plasma").copy()
         cmap.set_under("white")
         cmap.set_over("black")
         plt.imshow(self.maze, cmap="Greys")
-        plt.imshow(distances, cmap=cmap)
-
-        ax = plt.gca()
-        circ = plt.Circle((start[1], start[0]), 0.4, fill=False, color="white", linewidth=1)
-        ax.add_patch(circ)
-        plt.plot(stop[1], stop[0], marker="x", color="black", linewidth=1.5)
+        plt.imshow(distances, cmap=cmap, vmin=0.5, vmax=distances[end_cell])
+        plt.plot(end_cell[1], end_cell[0], marker="x", color="black", linewidth=1.5)
+        plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
         plt.savefig(self.images_path + f"distances_{self.images_name}.png")
+        plt.show()
 
     def draw_connections_graph(self, show=True, **kwargs):
         """
@@ -423,35 +349,33 @@ class Maze:
         elif not self.accessible(end_cell):
             raise ValueError("End cell must lie on a passage (white cell) in the maze.")
         if animate:
-            self._animate_dijkstra(start_cell=start_cell, end_cell=end_cell, animate=animate)
+            ma = MazeAnimation(self)
+            return ma.animate_dijkstra(start_cell, end_cell)[end_cell]
         else:
-            try:
-                next(self._dijkstra_connect_two(start_cell=start_cell, end_cell=end_cell, animate=animate))
-            except StopIteration as ex:
-                self.visualize_distances(ex, start_cell, end_cell)
-                return ex[end_cell]
+            iterator = self._dijkstra_connect_two(start_cell=start_cell, end_cell=end_cell)
+            dist = None
+            for cv in iterator:
+                dist = cv
+            self.visualize_distances(dist, start_cell, end_cell)
+            return dist[end_cell]
 
-    def _dijkstra_connect_two(self, start_cell, end_cell, animate):
-        print(start_cell, end_cell)
+    def _dijkstra_connect_two(self, start_cell, end_cell):
         # create empty objects
         visited = np.zeros(self.size, dtype=int)
         distances = np.full(self.size, np.inf)
         for_plotting = np.zeros(self.size, dtype=int)
         for_plotting[start_cell] = 1
-        #for_plotting[end_cell] = 2
         check_queue = deque()
         current_cell = start_cell
         distances[current_cell] = 0
         # here first frame of the animation
-        if animate:
-            yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
+        yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
         # determine accessible neighbours - their distances to
         check_queue.extend([n for n in maze.determine_neighbours_periodic(current_cell) if self.accessible(n)])
         for n in check_queue:
             distances[n] = 1
         # here snapshot for animation
-        if animate:
-            yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
+        yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
         visited[current_cell] = 1
         while check_queue:
             current_cell = check_queue.popleft()
@@ -465,18 +389,110 @@ class Maze:
             check_queue.extend(neig)
             visited[current_cell] = 1
             # here snapshot for animation
-            if animate:
-                yield np.where(visited != 0, distances, self.maze * 1000) + for_plotting
+            yield np.where(visited != 0, distances, self.maze * 1000) + for_plotting
             if visited[end_cell] == 1:
                 return distances
 
 
+class MazeAnimation:
+
+    def __init__(self, maze):
+        """
+        MazeAnimation class enables creating an animation of a specific algorithm on a Maze object.
+
+        :param maze: Maze object, a maze that we want to animate.
+        """
+        self.iterator = None
+        self.iterator_value = None
+        self.maze = maze
+        self.fig, self.ax = plt.subplots()
+
+    def _put_marker(self, x, y, letter, **kwargs):
+        """
+        Add a marker (e.g. a letter) to a position (x, y) in the whole animation.
+
+        :param x: int, line of the displayed array
+        :param y: int, column of the displayed array
+        :param letter: string, which marker to use
+        """
+        self.ax.plot(x, y, marker=letter, **kwargs)
+
+    def _animate(self, name_addition, **kwargs):
+        """
+        A general method for animation. Should only be called by more specific animation functions.
+
+        :param iterator: an iterator that yields numpy arrays that should be visualized
+        :param name_addition: how the gifs resulting from this animation process should be identified
+        :param kwargs: named arguments that can be passed to plt.imshow(), e.g. cmap
+        """
+        height, width = self.maze.size
+        self.ax = plt.imshow(next(self.iterator), animated=True, **kwargs)
+
+        def updatefig(i):
+            self.iterator_value = i
+            self.ax.set_array(i)
+            return self.ax,
+
+        self.ax.axes.get_xaxis().set_visible(False)
+        self.ax.axes.get_yaxis().set_visible(False)
+        # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
+        # interval determines how fast the video when played (not saved)
+        anim = animation.FuncAnimation(self.fig, updatefig, blit=True, frames=self.iterator,
+                                       repeat=False, interval=10, save_count=height * width)
+        writergif = animation.PillowWriter(fps=50)
+        anim.save(self.maze.images_path + f"{name_addition}_{self.maze.images_name}.gif", writer=writergif)
+
+    def animate_bulding_maze(self):
+        """
+        Creates an animation showing how the maze has been built. Colormap as follows:
+            white = hall
+            gray = wall
+            black = unassigned
+        """
+        self.iterator = self.maze._create_prim()
+        self._animate("building", cmap="Greys")
+
+    def animate_bfs(self):
+        """
+        Animate solving the maze with bfa. Color map as follows:
+            blue = discovered accessible cells
+            white = undiscovered accessible cells
+            black = walls
+        """
+        self.iterator = self.maze._bfs()
+        # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
+        # 1 are the walls.
+        cmap = colors.ListedColormap(['blue', 'white', 'black'])
+        bounds = [-1.5, -0.5, 0.5, 1.5]
+        norm = colors.BoundaryNorm(bounds, cmap.N)
+        self._animate("solving", cmap=cmap, norm=norm)
+
+    def animate_dijkstra(self, start_cell, end_cell):
+        """
+        Animate finding the connection between start_cell and end_cell (both passages the in maze).
+            red = visited cells
+            circle = start cell
+            cross = end cell
+
+        :param start_cell: tuple, (x, y) coordinates of the start cell
+        :param end_cell: tuple, (x, y) coordinates of the end cell
+        """
+        self.iterator = self.maze._dijkstra_connect_two(start_cell, end_cell)
+        cmap = cm.get_cmap("RdBu").copy()
+        cmap.set_under("white")
+        cmap.set_over("black")
+        self._put_marker(end_cell[1], end_cell[0], "x", color="black", linewidth=1.5)
+        self._put_marker(start_cell[1], start_cell[0], "o", color="black", linewidth=1.5)
+        self._animate("dijkstra", cmap=cmap, vmin=0.5, vmax=999)
+        return self.iterator_value
+
+
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze(40, 40, animate=False, images_path=path)
-    maze.visualize(show=False)
-    #maze.breadth_first_search(animate=False)
+    maze = Maze(20, 20, animate=False, images_path=path, images_name="class")
+    #maze.visualize(show=False)
+    maze.breadth_first_search(animate=False)
     #adjacency = maze.get_adjacency_matrix()
     #maze.draw_connections_graph(show=False, with_labels=True)
-    length = maze.find_shortest_path(animate=True)
+    length = maze.find_shortest_path(animate=False)
     print(length)
