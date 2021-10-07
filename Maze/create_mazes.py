@@ -368,6 +368,8 @@ class Maze:
         cmap = cm.get_cmap("plasma").copy()
         cmap.set_under("white")
         cmap.set_over("black")
+        plt.gca().axes.get_xaxis().set_visible(False)
+        plt.gca().axes.get_yaxis().set_visible(False)
         plt.imshow(distances, cmap=cmap, vmin=0.5, vmax=distances[end_cell])
         plt.plot(end_cell[1], end_cell[0], marker="x", color="black", linewidth=1.5)
         plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
@@ -522,7 +524,7 @@ class MazeAnimation:
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze(40, 40, images_path=path, images_name="maze")
+    maze = Maze(40, 40, images_path=path, images_name="new")
     maze.visualize(show=False)
     maze.breadth_first_search(animate=True)
     adjacency = maze.get_adjacency_matrix()
