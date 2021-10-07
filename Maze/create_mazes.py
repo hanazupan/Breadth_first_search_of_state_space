@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
 from collections import deque
-from matplotlib import colors, patches, cm
+from matplotlib import colors, cm
 import networkx as nx
 
 
@@ -195,7 +195,6 @@ class Maze:
         if animate:
             ma = MazeAnimation(self)
             ma.animate_bfs()
-            #self._animate_solving_maze()
         else:
             # this needs to be done to exhaust the generator
             for _ in self._bfs():
@@ -282,16 +281,6 @@ class Maze:
             plt.close()
         return ax
 
-    def visualize_distances(self, distances, start_cell, end_cell):
-        plt.figure()
-        cmap = cm.get_cmap("plasma").copy()
-        cmap.set_under("white")
-        cmap.set_over("black")
-        plt.imshow(distances, cmap=cmap, vmin=0.5, vmax=distances[end_cell])
-        plt.plot(end_cell[1], end_cell[0], marker="x", color="black", linewidth=1.5)
-        plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
-        plt.savefig(self.images_path + f"distances_{self.images_name}.png", dpi=1200)
-
     def draw_connections_graph(self, show=True, **kwargs):
         """
         Visualize the graph of connections between the cells of the maze.
@@ -329,18 +318,6 @@ class Maze:
     # ------------------   DIJKSTRA'S ALGORITHM    -----------------------------
     ############################################################################
 
-    def _find_random_accessible(self):
-        """
-        Find a random cell in the maze that is acessible (is a passage).
-
-        :return: tuple, (x, y) coordinates of the cell.
-        """
-        height, width = self.size
-        cell = np.random.randint(height), np.random.randint(width)
-        while not self.accessible(cell):
-            cell = np.random.randint(height), np.random.randint(width)
-        return cell
-
     def find_shortest_path(self, start_cell=None, end_cell=None, animate=False):
         """
         Apply Dijkstra's algorithm to find the distance between start and end cell (both passages in maze).
@@ -371,8 +348,30 @@ class Maze:
             # exhaust the iterator and save the last returned value
             for cv in iterator:
                 dist = cv
-            self.visualize_distances(dist, start_cell, end_cell)
+            self._visualize_distances(dist, start_cell, end_cell)
             return int(dist[end_cell])
+
+    def _find_random_accessible(self):
+        """
+        Find a random cell in the maze that is acessible (is a passage).
+
+        :return: tuple, (x, y) coordinates of the cell.
+        """
+        height, width = self.size
+        cell = np.random.randint(height), np.random.randint(width)
+        while not self.accessible(cell):
+            cell = np.random.randint(height), np.random.randint(width)
+        return cell
+
+    def _visualize_distances(self, distances, start_cell, end_cell):
+        plt.figure()
+        cmap = cm.get_cmap("plasma").copy()
+        cmap.set_under("white")
+        cmap.set_over("black")
+        plt.imshow(distances, cmap=cmap, vmin=0.5, vmax=distances[end_cell])
+        plt.plot(end_cell[1], end_cell[0], marker="x", color="black", linewidth=1.5)
+        plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
+        plt.savefig(self.images_path + f"distances_{self.images_name}.png", dpi=1200)
 
     def _dijkstra_connect_two(self, start_cell, end_cell):
         """
@@ -404,7 +403,7 @@ class Maze:
         # here first frame of the animation
         yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
         # determine accessible neighbours - their distances to
-        check_queue.extend([n for n in maze.determine_neighbours_periodic(current_cell) if self.accessible(n)])
+        check_queue.extend([n for n in self.determine_neighbours_periodic(current_cell) if self.accessible(n)])
         for n in check_queue:
             distances[n] = 1
         # here snapshot for animation
@@ -413,7 +412,7 @@ class Maze:
         while check_queue:
             current_cell = check_queue.popleft()
             # unvisited, accessible neighbours
-            neig = [n for n in maze.determine_neighbours_periodic(current_cell)
+            neig = [n for n in self.determine_neighbours_periodic(current_cell)
                     if self.accessible(n) and not visited[n]]
             for n in neig:
                 tent_dist = distances[current_cell] + 1
@@ -429,15 +428,15 @@ class Maze:
 
 class MazeAnimation:
 
-    def __init__(self, maze):
+    def __init__(self, maze_to_animate):
         """
         MazeAnimation class enables creating an animation of a specific algorithm on a Maze object.
 
-        :param maze: Maze object, a maze that we want to animate.
+        :param maze_to_animate: Maze object, a maze that we want to animate.
         """
         self.iterator = None
         self.iterator_value = None
-        self.maze = maze
+        self.maze = maze_to_animate
         self.fig, self.ax = plt.subplots()
 
     def _put_marker(self, x, y, letter, **kwargs):
@@ -517,16 +516,15 @@ class MazeAnimation:
         self._put_marker(end_cell[1], end_cell[0], "x", color="black", linewidth=1.5)
         self._put_marker(start_cell[1], start_cell[0], "o", color="black", linewidth=1.5)
         self._animate("dijkstra", cmap=cmap, vmin=0.5, vmax=999)
-        self.maze.visualize_distances(self.iterator_value, start_cell, end_cell)
+        self.maze._visualize_distances(self.iterator_value, start_cell, end_cell)
         return self.iterator_value
 
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze(20, 20, animate=True, images_path=path, images_name="new")
-    #maze.visualize(show=False)
+    maze = Maze(40, 40, images_path=path, images_name="maze")
+    maze.visualize(show=False)
     maze.breadth_first_search(animate=True)
-    #adjacency = maze.get_adjacency_matrix()
-    #maze.draw_connections_graph(show=False, with_labels=True)
-    #length = maze.find_shortest_path(animate=True)
-    #print(length)
+    adjacency = maze.get_adjacency_matrix()
+    maze.draw_connections_graph(show=False, with_labels=True)
+    length = maze.find_shortest_path(animate=True)

@@ -32,6 +32,7 @@ class MazeTestCase(unittest.TestCase):
             test_maze.get_adjacency_matrix()
             test_maze.visualize(show=False)
             test_maze.draw_connections_graph(show=False, with_labels=True)
+            test_maze.find_shortest_path(animate=animate)
 
     def test_neighbours(self):
         test_maze = Maze(20, 30)
@@ -115,6 +116,21 @@ class MazeTestCase(unittest.TestCase):
         # compare to the created one
         adj = test_maze.get_adjacency_matrix()
         np.testing.assert_array_equal(correct_adj, adj)
+
+    def test_distances(self):
+        test_maze = Maze(6, 6, algorithm="handmade1")
+        start_cell = (0, 3)
+        end_cell = (3, 1)
+        corr_dist = 7
+        dist = test_maze.find_shortest_path(start_cell, end_cell)
+        self.assertEqual(corr_dist, dist)
+        # one more example
+        start_cell = (4, 3)
+        end_cell = (5, 5)
+        corr_dist = 5
+        dist = test_maze.find_shortest_path(start_cell, end_cell)
+        self.assertEqual(corr_dist, dist)
+
 
 
 if __name__ == '__main__':
