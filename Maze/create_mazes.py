@@ -6,6 +6,8 @@ algorithm, visualized as graphs and transformed into an adjacency matrix.
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+
+import matplotlib.image
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -25,8 +27,9 @@ class Energy(ABC):
         """
         Initialize some properties of all Energy objects.
 
-        :param graph: stores cells with unique IDs, properties of energy and edges between them
-        :param energy_cutoff: cells with energy strictly below that value are accessible
+        Args:
+            graph: stores cells with unique IDs, properties of energy and edges between them
+            energy_cutoff: cells with energy strictly below that value are accessible
         """
         self.graph = graph
         self.energy_cutoff = energy_cutoff
@@ -54,19 +57,20 @@ class Energy(ABC):
 
 class Maze(Energy):
 
-    def __init__(self, size: tuple, algorithm='Prim', animate=False,
-                 images_path="./", images_name="maze"):
+    def __init__(self, size: tuple, algorithm: str = 'Prim', animate: bool = False,
+                 images_path: str = "./", images_name: str = "maze"):
         """
         Creates a maze of user-defined size. A maze is represented as a numpy array with:
-        - 1 to represent a wall (high energy)
-        - 0 to represent a hall (low energy)
-        - 2 to represent not assigned cells (should not occur in the final maze)
+            - 1 to represent a wall (high energy)
+            - 0 to represent a hall (low energy)
+            - 2 to represent not assigned cells (should not occur in the final maze)
 
-        :param size: tuple giving the dimensions of the maze
-        :param algorithm: string, maze generation algorithm, options ['handmade1', 'Prim', 'random']
-        :param animate: bool, whether an animation of the maze generation should be computed and saved
-        :param images_path: string, path where any generated images/videos will be saved
-        :param images_name: string, identifier of all images/videos generated from this maze object
+        Args:
+            size: tuple giving the dimensions of the maze
+            algorithm: string, maze generation algorithm, options ['handmade1', 'Prim', 'random']
+            animate: bool, whether an animation of the maze generation should be computed and saved
+            images_path: string, path where any generated images/videos will be saved
+            images_name: string, identifier of all images/videos generated from this maze object
         """
         super().__init__(nx.Graph(), 1)
         self.algorithm = algorithm
@@ -95,9 +99,12 @@ class Maze(Energy):
         else:
             raise AttributeError("Not a valid algorithm choice.")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         When using print() on a Maze object, it returns the string representation of self.maze.
+
+        Returns: string representation of self.maze
+
         """
         return self.maze.__str__()
 
@@ -120,7 +127,7 @@ class Maze(Energy):
     # ---------------------   PRIM'S ALGORITHM   -------------------------------
     ############################################################################
 
-    def _create_prim(self):
+    def _create_prim(self) -> Sequence:
         """
         Generate a maze using Prim's algorithm. From wiki (https://en.wikipedia.org/wiki/Maze_generation_algorithm):
         1. Start with a grid full of walls.
@@ -130,6 +137,9 @@ class Maze(Energy):
                 1. Make the wall a passage and mark the unvisited cell as part of the maze.
                 2. Add the neighboring walls of the cell to the wall list.
             2. Remove the wall from the list.
+
+        Yields:
+            An array of current maze state while constructing the maze. Used for animation, else ignored.
         """
         wall_list = []
 
@@ -181,8 +191,11 @@ class Maze(Energy):
         Get the index of the graph node from the coordinates of the cell in the maze. Works with arrays of any
         number of dimensions. The index is simply the consecutive number of the cell in the maze array.
 
-        :param cell: (int, int, ...), representing the coordinates of the cell in the maze
-        :return: the index of the corresponding node
+        Args:
+            cell: (int, int, ...), representing the coordinates of the cell in the maze
+
+        Returns:
+            the index of the corresponding node
         """
         index = cell[0]
         for i in range(1, len(cell)):
@@ -194,8 +207,11 @@ class Maze(Energy):
         Get the index of the graph node from the coordinates of the cell in the maze. Works with arrays of any
         number of dimensions. The index is simply the consecutive number of the cell in the maze array.
 
-        :param node: the index of the node
-        :return: (int, int, ...), representing the coordinates of the corresponding cell in the maze
+        Args:
+            node: the index of the node
+
+        Returns:
+            (int, int, ...), representing the coordinates of the corresponding cell in the maze
         """
         cell = np.zeros(len(self.size), dtype=int)
         for i in range(len(self.size) - 1, 0, -1):
@@ -222,7 +238,7 @@ class Maze(Energy):
             neig_cel[i] = plus_one
             yield tuple(neig_cel)
 
-    def _determine_opposite(self, central, known_hall):
+    def _determine_opposite(self, central: tuple, known_hall: tuple) -> tuple:
         """
         Determines the coordinates of the cell obtained if you start in the known_hall cell
         and jump over the central cell. E.g. if central = X, known_hall = O and opposite = ?
@@ -233,25 +249,31 @@ class Maze(Energy):
         |X|    or    |X|
         |?|          |O|
 
-        :param central: tuple, coordinates of the central cell
-        :param known_hall: tuple, coordinates of a cell next to the central cell
-        :return: tuple, coordinates of the opposite cell
+        Args:
+            central: tuple, coordinates of the central cell
+            known_hall: tuple, coordinates of a cell next to the central cell
+
+        Returns:
+            tuple, coordinates of the opposite cell
         """
-        height, width = self.size
-        if central == known_hall:
-            raise ValueError("Opposite cell nonexistent: central and known_hall are the same cell.")
-        elif central[0] == known_hall[0]:
-            return central[0], (2*central[1] - known_hall[1]) % width
-        elif central[1] == known_hall[1]:
-            return (2*central[0] - known_hall[0]) % height, central[1]
-        else:
-            raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
+        neig_cel = np.array(central)
+        for i, _ in enumerate(central):
+            if central[i] == known_hall[i]:
+                pass
+            elif abs(central[i] - known_hall[i]) == self.deltas[i] or self.size[i]:
+                if central[i] > known_hall[i]:
+                    neig_cel[i] = (neig_cel[i] + self.deltas[i]) % self.size[i]
+                else:
+                    neig_cel[i] = (neig_cel[i] - self.deltas[i]) % self.size[i]
+            else:
+                raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
+        return tuple(neig_cel)
 
     ############################################################################
     # ---------------------------   BFS    -------------------------------------
     ############################################################################
 
-    def breadth_first_search(self, animate=False):
+    def breadth_first_search(self, animate: bool = False) -> nx.Graph:
         """
         Perform a breadth-first search of the maze. This also generates a graph of connections and an
         adjacency matrix of the maze. The algorithm does this:
@@ -262,7 +284,12 @@ class Maze(Energy):
             2. Mark all its unvisited neighbours as visited
             3. Mark all its accessible neighbours as accessible and add them to the queue
 
-        :param animate: bool, whether to generate and save the animation of solving the maze
+
+        Args:
+            animate: bool, whether to generate and save the animation of solving the maze
+
+        Returns:
+            A graph of connections between nodes (cells) of the maze.
         """
         if animate:
             ma = MazeAnimation(self)
@@ -271,14 +298,27 @@ class Maze(Energy):
             # this needs to be done to exhaust the generator
             for _ in self._bfs():
                 pass
+        return self.graph
 
-    def is_accessible(self, cell):
-        return not self.maze[cell]
+    def is_accessible(self, cell: tuple) -> bool:
+        """
+        Determines whether a cell of maze is accessible
 
-    def _bfs(self):
+        Args:
+            cell: (int, int, ...) a tuple of coordinates
+
+        Returns:
+            bool, True if cell accessible, else False
+        """
+        return self.maze[cell] < self.energy_cutoff
+
+    def _bfs(self) -> Sequence:
         """
         Determine the connectivity graph of accessible states (states with value 0) in the maze. Determine
         the adjacency matrix. Yield images for animation of path searching.
+
+        Yields:
+            A numpy array with 0 = passage, 1 = wall, -1 = discovered passage
         """
         self.graph = nx.Graph()
         # for video
@@ -293,7 +333,7 @@ class Maze(Energy):
         accessible[random_cell] = 1
         # for the graph we are using index of the flattened maze as the identifier
         index_rc = self.cell_to_node(random_cell)
-        self.graph.add_node(index_rc)
+        self.graph.add_node(index_rc, energy=1)
         # for video
         yield self.maze - accessible
         # take care of the neighbours of the first random cell
@@ -302,7 +342,7 @@ class Maze(Energy):
             visited[n] = 1
             if self.is_accessible(n):
                 index_n = n[0]*width + n[1]
-                self.graph.add_node(index_n)
+                self.graph.add_node(index_n, energy=1)
                 self.graph.add_edge(index_rc, index_n)
                 accessible[n] = 1
                 check_queue.append(n)
@@ -318,7 +358,7 @@ class Maze(Energy):
                 # if accessible, add to queue
                 if self.is_accessible(n):
                     index_n = self.cell_to_node(n)
-                    self.graph.add_node(index_n)
+                    self.graph.add_node(index_n, energy=1)
                     self.graph.add_edge(index_cell, index_n)
                     accessible[n] = 1
                     check_queue.append(n)
@@ -336,12 +376,15 @@ class Maze(Energy):
     # ---------------------   PUBLIC METHODS    --------------------------------
     ############################################################################
 
-    def visualize(self, show=True):
+    def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
         """
         Visualize the Maze with black squares (walls) and white squares (halls).
 
-        :param show: bool, should the visualization be displayed
-        :return: matplotlib.image.AxesImage
+        Args:
+            show: bool, should the visualization be displayed
+
+        Returns:
+            matplotlib.image.AxesImage, the plot
         """
         ax = plt.imshow(self.maze, cmap="Greys")
         ax.axes.get_xaxis().set_visible(False)
@@ -353,12 +396,13 @@ class Maze(Energy):
             plt.close()
         return ax
 
-    def draw_connections_graph(self, show=True, **kwargs):
+    def draw_connections_graph(self, show: bool = True, **kwargs):
         """
         Visualize the graph of connections between the cells of the maze.
 
-        :param show: bool, should the visualization be displayed
-        :param kwargs: named arguments that can be passed to nx.draw_kamada_kawai(), e.g. with_labels
+        Args:
+            show: bool, should the visualization be displayed
+            **kwargs: named arguments that can be passed to nx.draw_kamada_kawai(), e.g. with_labels
         """
         if not self.graph:
             self.breadth_first_search()
@@ -371,15 +415,18 @@ class Maze(Energy):
         else:
             plt.close()
 
-    def get_adjacency_matrix(self):
+    def get_adjacency_matrix(self) -> np.ndarray:
         """
         Get (and create if not yet created) an adjacency matrix of the maze with breadth-first search.
 
-        :return: numpy array, adjacency matrix, square number the size of the number of halls
+        Returns:
+            numpy array, adjacency matrix, square number the size of the number of halls
+
+        Raises:
+            ValueError if using the wrong algorithm.
         """
         if self.algorithm == 'random':
-            print("Adjacency matrix not available for a randomly created maze.")
-            return
+            raise ValueError("Adjacency matrix not available for a randomly created maze.")
         elif not np.any(self.adj_matrix):
             self.breadth_first_search()
             return self.adj_matrix
@@ -390,16 +437,20 @@ class Maze(Energy):
     # ------------------   DIJKSTRA'S ALGORITHM    -----------------------------
     ############################################################################
 
-    def find_shortest_path(self, start_cell=None, end_cell=None, animate=False):
+    def find_shortest_path(self, start_cell: tuple = None, end_cell: tuple = None, animate: bool = False) -> nx.Graph:
         """
         Apply Dijkstra's algorithm to find the distance between start and end cell (both passages in maze).
         If start or end cell are None, random accessible cells will be selected.
 
-        :param start_cell: tuple or None, (x, y) coordinates of the cell where the path starts
-        :param end_cell: tuple or None, (x, y) coordinates of the cell where the path ends
-        :param animate: bool, whether to animate the algorithm
-        :return: int, the min number of cells to reach end cell from start cell
+        Args:
+            start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
+            end_cell: tuple or None, (int, int ..) coordinates of the cell where the path ends
+            animate: bool, whether to animate the algorithm
+
+        Returns:
+            Graph with shortest connections.
         """
+        # TODO: actually return a graph
         # if no cells provided, a random start cell
         # if cells are provided, check if they are actually passages
         if not start_cell:
@@ -423,18 +474,27 @@ class Maze(Energy):
             self._visualize_distances(dist, start_cell, end_cell)
             return int(dist[end_cell])
 
-    def _find_random_accessible(self):
+    def _find_random_accessible(self) -> tuple:
         """
         Find a random cell in the maze that is accessible (is a passage).
 
-        :return: tuple, (x, y) coordinates of the cell.
+        Returns:
+            tuple, (int, int, ...) coordinates of an accessible cell
         """
         cell = tuple([np.random.randint(dim) for dim in self.size])
         while not self.is_accessible(cell):
             cell = tuple([np.random.randint(dim) for dim in self.size])
         return cell
 
-    def _visualize_distances(self, distances, start_cell, end_cell):
+    def _visualize_distances(self, distances: np.ndarray, start_cell: tuple, end_cell: tuple):
+        """
+        Creates an image, visualizing distances calculated with Dijkstra's algorithm.
+
+        Args:
+            distances: np.ndarray, array of distances from start_cell
+            start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
+            end_cell: tuple or None, (int, int ..) coordinates of the cell where the path ends
+        """
         plt.figure()
         cmap = cm.get_cmap("plasma").copy()
         cmap.set_under("white")
@@ -446,7 +506,7 @@ class Maze(Energy):
         plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
         plt.savefig(self.images_path + f"distances_{self.images_name}.png", dpi=1200)
 
-    def _dijkstra_connect_two(self, start_cell, end_cell):
+    def _dijkstra_connect_two(self, start_cell: tuple, end_cell: tuple) -> np.ndarray:
         """
         The description of Dijkstra's algorithm from wiki (https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm):
         1. Mark all nodes unvisited.
@@ -461,9 +521,12 @@ class Maze(Energy):
             5. If end cell has been visited:
                 6. Return value of end cell.
 
-        :param start_cell: tuple, (x, y) coordinates of the cell where the path starts
-        :param end_cell: tuple, (x, y) coordinates of the cell where the path ends
-        :return: np.ndarray, an array of distances to start cell for all visited cells
+        Args:
+            start_cell: tuple, (x, y) coordinates of the cell where the path starts
+            end_cell: tuple, (x, y) coordinates of the cell where the path ends
+
+        Returns:
+            np.ndarray, an array of distances to start cell for all visited cells
         """
         # create empty objects
         visited = np.zeros(self.size, dtype=int)
@@ -501,34 +564,37 @@ class Maze(Energy):
 
 class MazeAnimation:
 
-    def __init__(self, maze_to_animate):
+    def __init__(self, maze_to_animate: Maze):
         """
         MazeAnimation class enables creating an animation of a specific algorithm on a Maze object.
 
-        :param maze_to_animate: Maze object, a maze that we want to animate.
+        Args:
+            maze_to_animate: Maze object, a maze that we want to animate.
         """
         self.iterator = None
         self.iterator_value = None
         self.maze = maze_to_animate
         self.fig, self.ax = plt.subplots()
 
-    def _put_marker(self, x, y, letter, **kwargs):
+    def _put_marker(self, x: int, y: int, letter: str, **kwargs):
         """
         Add a marker (e.g. a letter) to a position (x, y) in the whole animation.
 
-        :param x: int, line of the displayed array
-        :param y: int, column of the displayed array
-        :param letter: string, which marker to use
+        Args:
+            x: int, line of the displayed array
+            y: int, column of the displayed array
+            letter: string, which marker to use
+            **kwargs: other arguments to plt.plot()
         """
         self.ax.plot(x, y, marker=letter, **kwargs)
 
-    def _animate(self, name_addition, **kwargs):
+    def _animate(self, name_addition: str, **kwargs):
         """
         A general method for animation. Should only be called by more specific animation functions.
 
-        :param iterator: an iterator that yields numpy arrays that should be visualized
-        :param name_addition: how the gifs resulting from this animation process should be identified
-        :param kwargs: named arguments that can be passed to plt.imshow(), e.g. cmap
+        Args:
+            name_addition: how the gifs resulting from this animation process should be identified
+            **kwargs: named arguments that can be passed to plt.imshow(), e.g. cmap
         """
         height, width = self.maze.size
         self.ax = plt.imshow(next(self.iterator), animated=True, **kwargs)
@@ -572,15 +638,19 @@ class MazeAnimation:
         norm = colors.BoundaryNorm(bounds, cmap.N)
         self._animate("solving", cmap=cmap, norm=norm)
 
-    def animate_dijkstra(self, start_cell, end_cell):
+    def animate_dijkstra(self, start_cell: tuple, end_cell: tuple) -> np.ndarray:
         """
         Animate finding the connection between start_cell and end_cell (both passages the in maze).
             red = visited cells
             circle = start cell
             cross = end cell
 
-        :param start_cell: tuple, (x, y) coordinates of the start cell
-        :param end_cell: tuple, (x, y) coordinates of the end cell
+        Args:
+            start_cell: tuple, (x, y) coordinates of the start cell
+            end_cell: tuple, (x, y) coordinates of the end cell
+
+        Returns:
+            np.ndarray, the array of distances from start_cell
         """
         self.iterator = self.maze._dijkstra_connect_two(start_cell, end_cell)
         cmap = cm.get_cmap("RdBu").copy()
@@ -595,9 +665,9 @@ class MazeAnimation:
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze((20, 20), images_path=path, images_name="new", animate=False)
+    maze = Maze((20, 20), images_path=path, images_name="new", animate=True)
     maze.visualize(show=False)
-    maze.breadth_first_search(animate=False)
+    maze.breadth_first_search(animate=True)
     adjacency = maze.get_adjacency_matrix()
     maze.draw_connections_graph(show=False, with_labels=True)
     length = maze.find_shortest_path(animate=True)
