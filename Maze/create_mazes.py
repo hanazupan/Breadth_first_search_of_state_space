@@ -4,6 +4,8 @@ algorithm or a random distribution of cells. The mazes can also be solved using 
 algorithm, visualized as graphs and transformed into an adjacency matrix.
 """
 
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -13,27 +15,66 @@ from matplotlib import colors, cm
 import networkx as nx
 
 
-class Maze:
+class Energy(ABC):
+    """
+    An object with energy data saved in nodes that are connected with edges of possibly different lengths.
+    Each node has a property of energy. There is some energy cutoff that makes some cells accessible and others not.
+    """
 
-    def __init__(self, height, width, algorithm='Prim', animate=False, images_path="./", images_name="maze"):
+    def __init__(self, graph: nx.Graph, energy_cutoff: float):
+        """
+        Initialize some properties of all Energy objects.
+
+        :param graph: stores cells with unique IDs, properties of energy and edges between them
+        :param energy_cutoff: cells with energy strictly below that value are accessible
+        """
+        self.graph = graph
+        self.energy_cutoff = energy_cutoff
+
+    def get_energy(self, node: int) -> float:
+        """Given a node identifier, get or calculate its energy."""
+        return self.graph[node]["energy"]
+
+    def get_neighbours(self, node: int) -> Sequence:
+        """Given a node identifier, get identifiers of its neighbours"""
+        neig_iterator = self.graph.neighbors(node)
+        for neig in neig_iterator:
+            yield neig
+
+    def get_accessible_neighbours(self, node: int) -> Sequence:
+        """Same as get_neighbours but filters out non-accessible neighbours."""
+        for n in self.get_neighbours(node):
+            if self.is_accessible(n):
+                yield n
+
+    def is_accessible(self, node: int) -> bool:
+        """Determine whether a specific node of the graph is accessible."""
+        return self.graph[node]["energy"] < self.energy_cutoff
+
+
+class Maze(Energy):
+
+    def __init__(self, size: tuple, algorithm='Prim', animate=False,
+                 images_path="./", images_name="maze"):
         """
         Creates a maze of user-defined size. A maze is represented as a numpy array with:
         - 1 to represent a wall (high energy)
         - 0 to represent a hall (low energy)
         - 2 to represent not assigned cells (should not occur in the final maze)
 
-        :param height: int, number of rows
-        :param width: int, number of columns
+        :param size: tuple giving the dimensions of the maze
         :param algorithm: string, maze generation algorithm, options ['handmade1', 'Prim', 'random']
         :param animate: bool, whether an animation of the maze generation should be computed and saved
         :param images_path: string, path where any generated images/videos will be saved
         :param images_name: string, identifier of all images/videos generated from this maze object
         """
+        super().__init__(nx.Graph(), 1)
         self.algorithm = algorithm
-        self.size = (height, width)
+        self.size = size
+        # deltas are distances between neighbours in all directions
+        self.deltas = np.ones(len(self.size), dtype=int)
         self.maze = np.full(self.size, 2, dtype=int)
         # prepare empty objects for solving maze
-        self.graph = None
         self.adj_matrix = None
         # prepare for saving images/gifs
         self.images_path = images_path
@@ -50,7 +91,7 @@ class Maze:
                 for _ in self._create_prim():
                     pass
         elif algorithm == 'random':
-            self.maze = np.random.randint(0, 2, size=(height, width))
+            self.maze = np.random.randint(0, 2, size=self.size)
         else:
             raise AttributeError("Not a valid algorithm choice.")
 
@@ -97,19 +138,22 @@ class Maze:
             wall_list.append(cell)
 
         # pick a random cell as a starting point and turn it into a hall
-        height, width = self.size
-        random_cell = np.random.randint(height), np.random.randint(width)
+        random_cell = tuple([np.random.randint(dim) for dim in self.size])
         self.maze[random_cell] = 0
         # for video
         yield self.maze
         # add walls of the cell to the wall list (periodic boundary conditions)
-        neighbours = self.determine_neighbours_periodic(random_cell)
-        for n in neighbours:
+        for n in self.get_neighbours(random_cell):
             create_wall(n)
+        # for video:
+        yield self.maze
         # continue until you run out of walls
         while len(wall_list) > 0:
+            #print(wall_list)
             random_wall = random.choice(wall_list)
-            neighbours = self.determine_neighbours_periodic(random_wall)
+            neighbours = []
+            for n in self.get_neighbours(random_wall):
+                neighbours.append(n)
             # whether neighbours are 0, 1 or 2
             values = [self.maze[l, c] for (l, c) in neighbours]
             # select only neighbours that are halls/empty
@@ -132,23 +176,51 @@ class Maze:
         # to get the final image for animation with no unassigned cells
         yield self.maze
 
-    def determine_neighbours_periodic(self, cell):
+    def cell_to_node(self, cell: tuple) -> int:
         """
-        Given the cell (coordinate x, coordinate y) calculates the direct 4 neighbours of that cell
-        in self.maze using periodic boundary conditions.
+        Get the index of the graph node from the coordinates of the cell in the maze. Works with arrays of any
+        number of dimensions. The index is simply the consecutive number of the cell in the maze array.
 
-        :param cell: tuple (coo_x, coo_y), position of the cell whose neighbours we search for
-        :return: list, a list of tuples with coordinates of the four neighbouring cells.
+        :param cell: (int, int, ...), representing the coordinates of the cell in the maze
+        :return: the index of the corresponding node
         """
-        height, width = self.size
-        line, column = cell
-        neighbours = [
-            ((line - 1) % height, column),
-            (line, (column + 1) % width),
-            ((line + 1) % height, column),
-            (line, (column - 1) % width)
-        ]
-        return neighbours
+        index = cell[0]
+        for i in range(1, len(cell)):
+            index = index * self.size[i] + cell[i]
+        return index
+
+    def node_to_cell(self, node: int) -> tuple:
+        """
+        Get the index of the graph node from the coordinates of the cell in the maze. Works with arrays of any
+        number of dimensions. The index is simply the consecutive number of the cell in the maze array.
+
+        :param node: the index of the node
+        :return: (int, int, ...), representing the coordinates of the corresponding cell in the maze
+        """
+        cell = np.zeros(len(self.size), dtype=int)
+        for i in range(len(self.size) - 1, 0, -1):
+            cell[i] = node % self.size[i]
+            node = (node - cell[i]) // self.size[i]
+        cell[0] = node
+        return tuple(cell)
+
+    def get_neighbours(self, cell: tuple) -> Sequence:
+        """
+        Overrides getting neighbours from the graph. For a maze, it makes more sense to get neighbouring cells
+        than neighbouring nodes.
+        Args:
+            cell: tuple (int, int ...) of the length self.size - coordinates a cell
+
+        Yields:
+            tuple (int, int ...) of the length self.size - coordinates of a neighbouring cell
+        """
+        for i, coo in enumerate(cell):
+            neig_cel = np.array(cell)
+            neig_cel[i] = (cell[i] - self.deltas[i]) % self.size[i]
+            yield tuple(neig_cel)
+            plus_one = (cell[i] + self.deltas[i]) % self.size[i]
+            neig_cel[i] = plus_one
+            yield tuple(neig_cel)
 
     def _determine_opposite(self, central, known_hall):
         """
@@ -200,7 +272,7 @@ class Maze:
             for _ in self._bfs():
                 pass
 
-    def accessible(self, cell):
+    def is_accessible(self, cell):
         return not self.maze[cell]
 
     def _bfs(self):
@@ -220,15 +292,15 @@ class Maze:
         visited[random_cell] = 1
         accessible[random_cell] = 1
         # for the graph we are using index of the flattened maze as the identifier
-        index_rc = random_cell[0]*width + random_cell[1]
+        index_rc = self.cell_to_node(random_cell)
         self.graph.add_node(index_rc)
         # for video
         yield self.maze - accessible
         # take care of the neighbours of the first random cell
-        neighbours = self.determine_neighbours_periodic(random_cell)
+        neighbours = self.get_neighbours(random_cell)
         for n in neighbours:
             visited[n] = 1
-            if self.accessible(n):
+            if self.is_accessible(n):
                 index_n = n[0]*width + n[1]
                 self.graph.add_node(index_n)
                 self.graph.add_edge(index_rc, index_n)
@@ -237,15 +309,15 @@ class Maze:
         # take care of all other cells
         while len(check_queue) > 0:
             cell = check_queue.popleft()
-            index_cell = cell[0]*width + cell[1]
-            neighbours = self.determine_neighbours_periodic(cell)
+            index_cell = self.cell_to_node(cell)
+            neighbours = self.get_neighbours(cell)
             # if neighbours visited already, don't need to bother with them
             unvis_neig = [n for n in neighbours if visited[n] == 0]
             for n in unvis_neig:
                 visited[n] = 1
                 # if accessible, add to queue
-                if self.accessible(n):
-                    index_n = n[0] * width + n[1]
+                if self.is_accessible(n):
+                    index_n = self.cell_to_node(n)
                     self.graph.add_node(index_n)
                     self.graph.add_edge(index_cell, index_n)
                     accessible[n] = 1
@@ -332,11 +404,11 @@ class Maze:
         # if cells are provided, check if they are actually passages
         if not start_cell:
             start_cell = self._find_random_accessible()
-        elif not self.accessible(start_cell):
+        elif not self.is_accessible(start_cell):
             raise ValueError("Start cell must lie on a passage (white cell) in the maze.")
         if not end_cell:
             end_cell = self._find_random_accessible()
-        elif not self.accessible(end_cell):
+        elif not self.is_accessible(end_cell):
             raise ValueError("End cell must lie on a passage (white cell) in the maze.")
         # run the actual algorithm and animate if you want
         if animate:
@@ -353,14 +425,13 @@ class Maze:
 
     def _find_random_accessible(self):
         """
-        Find a random cell in the maze that is acessible (is a passage).
+        Find a random cell in the maze that is accessible (is a passage).
 
         :return: tuple, (x, y) coordinates of the cell.
         """
-        height, width = self.size
-        cell = np.random.randint(height), np.random.randint(width)
-        while not self.accessible(cell):
-            cell = np.random.randint(height), np.random.randint(width)
+        cell = tuple([np.random.randint(dim) for dim in self.size])
+        while not self.is_accessible(cell):
+            cell = tuple([np.random.randint(dim) for dim in self.size])
         return cell
 
     def _visualize_distances(self, distances, start_cell, end_cell):
@@ -405,7 +476,8 @@ class Maze:
         # here first frame of the animation
         yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
         # determine accessible neighbours - their distances to
-        check_queue.extend([n for n in self.determine_neighbours_periodic(current_cell) if self.accessible(n)])
+        for an in self.get_accessible_neighbours(current_cell):
+            check_queue.append(an)
         for n in check_queue:
             distances[n] = 1
         # here snapshot for animation
@@ -414,13 +486,12 @@ class Maze:
         while check_queue:
             current_cell = check_queue.popleft()
             # unvisited, accessible neighbours
-            neig = [n for n in self.determine_neighbours_periodic(current_cell)
-                    if self.accessible(n) and not visited[n]]
-            for n in neig:
-                tent_dist = distances[current_cell] + 1
-                if tent_dist < distances[n]:
-                    distances[n] = tent_dist
-            check_queue.extend(neig)
+            for n in self.get_accessible_neighbours(current_cell):
+                if not visited[n]:
+                    tent_dist = distances[current_cell] + 1
+                    if tent_dist < distances[n]:
+                        distances[n] = tent_dist
+                    check_queue.append(n)
             visited[current_cell] = 1
             # here snapshot for animation
             yield np.where(visited != 0, distances, self.maze * 1000) + for_plotting
@@ -524,9 +595,9 @@ class MazeAnimation:
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze(40, 40, images_path=path, images_name="new")
+    maze = Maze((20, 20), images_path=path, images_name="new", animate=False)
     maze.visualize(show=False)
-    maze.breadth_first_search(animate=True)
+    maze.breadth_first_search(animate=False)
     adjacency = maze.get_adjacency_matrix()
     maze.draw_connections_graph(show=False, with_labels=True)
     length = maze.find_shortest_path(animate=True)
