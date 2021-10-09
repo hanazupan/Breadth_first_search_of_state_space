@@ -2,6 +2,10 @@
 Maze/Images/
 Maze/*.gif
 Maze/*.png
+Maze/playground.py
+
+*.png
+*.gif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
