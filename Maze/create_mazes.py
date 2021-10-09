@@ -4,7 +4,7 @@ algorithm or a random distribution of cells. The mazes can also be solved using 
 algorithm, visualized as graphs and transformed into an adjacency matrix.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 
 import matplotlib.image
@@ -12,7 +12,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
-from collections import deque
 from matplotlib import colors, cm
 import networkx as nx
 
@@ -238,6 +237,20 @@ class Maze:
             neig_cel[i] = plus_one
             yield tuple(neig_cel)
 
+    def get_accessible_neighbours(self, cell: tuple) -> Sequence:
+        """
+        Same as get_neighbours but filters out non-accessible neighbours.
+
+        Args:
+            cell: tuple (int, int ...) of the length self.size - coordinates a cell
+
+        Yields:
+            tuple (int, int ...) of the length self.size - coordinates of an accessible neighbouring cell
+        """
+        for n in self.get_neighbours(cell):
+            if self.is_accessible(n):
+                yield n
+
     def get_energy(self, cell: tuple) -> float:
         return self.maze[cell]
 
@@ -252,6 +265,18 @@ class Maze:
             bool, True if cell accessible, else False
         """
         return self.maze[cell] < self.energy_cutoff
+
+    def find_random_accessible(self) -> tuple:
+        """
+        Find a random cell in the maze that is accessible (is a passage).
+
+        Returns:
+            tuple, (int, int, ...) coordinates of an accessible cell
+        """
+        cell = tuple([np.random.randint(dim) for dim in self.size])
+        while not self.is_accessible(cell):
+            cell = tuple([np.random.randint(dim) for dim in self.size])
+        return cell
 
     def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
         """
@@ -295,142 +320,14 @@ class Maze:
         for i, _ in enumerate(central):
             if central[i] == known_hall[i]:
                 pass
-            elif abs(central[i] - known_hall[i]) == self.deltas[i] or self.size[i]:
-                if central[i] > known_hall[i]:
-                    neig_cel[i] = (neig_cel[i] + self.deltas[i]) % self.size[i]
-                else:
-                    neig_cel[i] = (neig_cel[i] - self.deltas[i]) % self.size[i]
+            elif (central[i] + self.deltas[i]) % self.size[i] == known_hall[i]:
+                neig_cel[i] = (neig_cel[i] - self.deltas[i]) % self.size[i]
+            elif (central[i] - self.deltas[i]) % self.size[i] == known_hall[i]:
+                neig_cel[i] = (neig_cel[i] + self.deltas[i]) % self.size[i]
             else:
                 raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
+        assert tuple(neig_cel) != known_hall
         return tuple(neig_cel)
-
-    ############################################################################
-    # ------------------   DIJKSTRA'S ALGORITHM    -----------------------------
-    ############################################################################
-
-    def find_shortest_path(self, start_cell: tuple = None, end_cell: tuple = None, animate: bool = False) -> nx.Graph:
-        """
-        Apply Dijkstra's algorithm to find the distance between start and end cell (both passages in maze).
-        If start or end cell are None, random accessible cells will be selected.
-
-        Args:
-            start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
-            end_cell: tuple or None, (int, int ..) coordinates of the cell where the path ends
-            animate: bool, whether to animate the algorithm
-
-        Returns:
-            Graph with shortest connections.
-        """
-        # TODO: actually return a graph
-        # if no cells provided, a random start cell
-        # if cells are provided, check if they are actually passages
-        if not start_cell:
-            start_cell = self._find_random_accessible()
-        elif not self.is_accessible(start_cell):
-            raise ValueError("Start cell must lie on a passage (white cell) in the maze.")
-        if not end_cell:
-            end_cell = self._find_random_accessible()
-        elif not self.is_accessible(end_cell):
-            raise ValueError("End cell must lie on a passage (white cell) in the maze.")
-        # run the actual algorithm and animate if you want
-        if animate:
-            ma = MazeAnimation(self)
-            return int(ma.animate_dijkstra(start_cell, end_cell)[end_cell])
-        else:
-            iterator = self._dijkstra_connect_two(start_cell=start_cell, end_cell=end_cell)
-            dist = None
-            # exhaust the iterator and save the last returned value
-            for cv in iterator:
-                dist = cv
-            self._visualize_distances(dist, start_cell, end_cell)
-            return int(dist[end_cell])
-
-    def _find_random_accessible(self) -> tuple:
-        """
-        Find a random cell in the maze that is accessible (is a passage).
-
-        Returns:
-            tuple, (int, int, ...) coordinates of an accessible cell
-        """
-        cell = tuple([np.random.randint(dim) for dim in self.size])
-        while not self.is_accessible(cell):
-            cell = tuple([np.random.randint(dim) for dim in self.size])
-        return cell
-
-    def _visualize_distances(self, distances: np.ndarray, start_cell: tuple, end_cell: tuple):
-        """
-        Creates an image, visualizing distances calculated with Dijkstra's algorithm.
-
-        Args:
-            distances: np.ndarray, array of distances from start_cell
-            start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
-            end_cell: tuple or None, (int, int ..) coordinates of the cell where the path ends
-        """
-        plt.figure()
-        cmap = cm.get_cmap("plasma").copy()
-        cmap.set_under("white")
-        cmap.set_over("black")
-        plt.gca().axes.get_xaxis().set_visible(False)
-        plt.gca().axes.get_yaxis().set_visible(False)
-        plt.imshow(distances, cmap=cmap, vmin=0.5, vmax=distances[end_cell])
-        plt.plot(end_cell[1], end_cell[0], marker="x", color="black", linewidth=1.5)
-        plt.plot(start_cell[1], start_cell[0], marker="o", color="white", linewidth=1.5)
-        plt.savefig(self.images_path + f"distances_{self.images_name}.png", dpi=1200)
-
-    def _dijkstra_connect_two(self, start_cell: tuple, end_cell: tuple) -> np.ndarray:
-        """
-        The description of Dijkstra's algorithm from wiki (https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm):
-        1. Mark all nodes unvisited.
-        2. Set initial tentative distances: 0 for start cell, infinity for all others.
-        3. Add accessible neighbours of start cell to the queue. Set their distances to 1. Mark start cell as visited.
-        4. While queue not empty:
-            1. Set current cell to be the first element from the queue and remove from the queue
-            2. Calculate tentative distances of unvisited, accesible neighbours of the current cell.
-            3. If tentative distance < value of the neighbour:
-                1. Replace value of the neighbour with the tentative distance.
-            4. Mark current cell as visited.
-            5. If end cell has been visited:
-                6. Return value of end cell.
-
-        Args:
-            start_cell: tuple, (x, y) coordinates of the cell where the path starts
-            end_cell: tuple, (x, y) coordinates of the cell where the path ends
-
-        Returns:
-            np.ndarray, an array of distances to start cell for all visited cells
-        """
-        # create empty objects
-        visited = np.zeros(self.size, dtype=int)
-        distances = np.full(self.size, np.inf)
-        for_plotting = np.zeros(self.size, dtype=int)
-        for_plotting[start_cell] = 1
-        check_queue = deque()
-        current_cell = start_cell
-        distances[current_cell] = 0
-        # here first frame of the animation
-        yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
-        # determine accessible neighbours - their distances to
-        for an in self.get_accessible_neighbours(current_cell):
-            check_queue.append(an)
-        for n in check_queue:
-            distances[n] = 1
-        # here snapshot for animation
-        yield np.where(visited != 0, distances, self.maze*1000) + for_plotting
-        visited[current_cell] = 1
-        while check_queue:
-            current_cell = check_queue.popleft()
-            # unvisited, accessible neighbours
-            for n in self.get_accessible_neighbours(current_cell):
-                if not visited[n]:
-                    tent_dist = distances[current_cell] + 1
-                    if tent_dist < distances[n]:
-                        distances[n] = tent_dist
-                    check_queue.append(n)
-            visited[current_cell] = 1
-            # here snapshot for animation
-            yield np.where(visited != 0, distances, self.maze * 1000) + for_plotting
-            if visited[end_cell] == 1:
-                return distances
 
 
 class MazeAnimation:
@@ -501,6 +398,9 @@ class MazeAnimation:
             blue = discovered accessible cells
             white = undiscovered accessible cells
             black = walls
+
+        Args:
+            iterator: a generator of images
         """
         self.iterator = iterator
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
@@ -510,7 +410,7 @@ class MazeAnimation:
         norm = colors.BoundaryNorm(bounds, cmap.N)
         self._animate("solving", cmap=cmap, norm=norm)
 
-    def animate_dijkstra(self, start_cell: tuple, end_cell: tuple) -> np.ndarray:
+    def animate_dijkstra(self, iterator, start_cell: tuple, end_cell: tuple) -> np.ndarray:
         """
         Animate finding the connection between start_cell and end_cell (both passages the in maze).
             red = visited cells
@@ -518,20 +418,20 @@ class MazeAnimation:
             cross = end cell
 
         Args:
+            iterator: a generator of images
             start_cell: tuple, (x, y) coordinates of the start cell
             end_cell: tuple, (x, y) coordinates of the end cell
 
         Returns:
             np.ndarray, the array of distances from start_cell
         """
-        self.iterator = self.maze._dijkstra_connect_two(start_cell, end_cell)
+        self.iterator = iterator
         cmap = cm.get_cmap("RdBu").copy()
         cmap.set_under("white")
         cmap.set_over("black")
         self._put_marker(end_cell[1], end_cell[0], "x", color="black", linewidth=1.5)
         self._put_marker(start_cell[1], start_cell[0], "o", color="black", linewidth=1.5)
         self._animate("dijkstra", cmap=cmap, vmin=0.5, vmax=999)
-        self.maze._visualize_distances(self.iterator_value, start_cell, end_cell)
         return self.iterator_value
 
 
@@ -539,4 +439,3 @@ if __name__ == '__main__':
     path = "Images/"
     maze = Maze((20, 20), images_path=path, images_name="new", animate=True)
     maze.visualize(show=False)
-    #length = maze.find_shortest_path(animate=True)

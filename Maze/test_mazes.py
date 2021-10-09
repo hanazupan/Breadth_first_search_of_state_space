@@ -1,5 +1,6 @@
 import numpy as np
 from create_mazes import Maze
+from explore_mazes import BFSExplorer, DijkstraExplorer
 
 all_algorithms = ["Prim", "random"]
 
@@ -22,11 +23,16 @@ def test_run_everything():
         width = np.random.randint(6, 20)
         test_maze = Maze((height, width), algorithm='Prim', animate=animate,
                          images_name="test")
-        test_maze.breadth_first_search(animate=animate)
-        test_maze.get_adjacency_matrix()
         test_maze.visualize(show=False)
-        test_maze.draw_connections_graph(show=False, with_labels=True)
-        test_maze.find_shortest_path(animate=animate)
+        bfs_explorer = BFSExplorer(test_maze)
+        bfs_explorer.draw_connections_graph(show=False)
+        bfs_explorer.explore()
+        bfs_explorer.explore_and_animate()
+        d_explorer = DijkstraExplorer(test_maze)
+        d_explorer.explore_and_animate()
+        d_explorer.get_adjacency_matrix()
+        d_explorer.explore()
+        d_explorer.draw_connections_graph(show=False)
 
 
 def test_neighbours():
@@ -56,7 +62,7 @@ def test_opposite():
     opposite = test_maze.determine_opposite(central, known_hall)
     assert opposite == correct_opposite
     # hall below
-    known_hall = (6, 3)
+    known_hall = (0, 3)
     correct_opposite = (4, 3)
     opposite = test_maze.determine_opposite(central, known_hall)
     assert opposite == correct_opposite
@@ -111,7 +117,8 @@ def test_adjacency():
     # assert diagonally symmetrical
     assert (correct_adj == correct_adj.T).all()
     # compare to the created one
-    adj = test_maze.get_adjacency_matrix()
+    bfs_explorer = BFSExplorer(test_maze)
+    adj = bfs_explorer.get_adjacency_matrix()
     np.testing.assert_array_equal(correct_adj, adj)
 
 
@@ -120,11 +127,13 @@ def test_distances():
     start_cell = (0, 3)
     end_cell = (3, 1)
     corr_dist = 7
-    dist = test_maze.find_shortest_path(start_cell, end_cell)
+    d_explorer = DijkstraExplorer(test_maze)
+    dist = d_explorer.get_distance(start_cell, end_cell)
     assert corr_dist == dist
     # one more example
     start_cell = (4, 3)
     end_cell = (5, 5)
     corr_dist = 5
-    dist = test_maze.find_shortest_path(start_cell, end_cell)
+    d_explorer = DijkstraExplorer(test_maze)
+    dist = d_explorer.get_distance(start_cell, end_cell)
     assert corr_dist == dist
