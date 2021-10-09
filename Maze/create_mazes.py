@@ -154,13 +154,12 @@ class Maze:
         yield self.maze
         # continue until you run out of walls
         while len(wall_list) > 0:
-            #print(wall_list)
             random_wall = random.choice(wall_list)
             neighbours = []
             for n in self.get_neighbours(random_wall):
                 neighbours.append(n)
             # whether neighbours are 0, 1 or 2
-            values = [self.maze[l, c] for (l, c) in neighbours]
+            values = [self.maze[cell] for cell in neighbours]
             # select only neighbours that are halls/empty
             neig_halls = [n for n in neighbours if self.maze[n] == 0]
             neig_empty = [n for n in neighbours if self.maze[n] == 2]
@@ -338,10 +337,15 @@ class MazeAnimation:
 
         Args:
             maze_to_animate: Maze object, a maze that we want to animate.
+
+        Raises:
+            ValueError if the maze is not 2D.
         """
         self.iterator = None
         self.iterator_value = None
         self.maze = maze_to_animate
+        if len(self.maze.size) != 2:
+            raise ValueError("Animation only possible for 2D mazes.")
         self.fig, self.ax = plt.subplots()
 
     def _put_marker(self, x: int, y: int, letter: str, **kwargs):

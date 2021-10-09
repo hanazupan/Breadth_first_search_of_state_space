@@ -49,8 +49,32 @@ def test_neighbours():
         assert el in correct_neig
 
 
-def test_neighbours_multidimensional():
-    pass
+def test_multidimensional():
+    test_maze = Maze((4, 15, 3))
+    cell = (3, 5, 0)
+    # neighbours
+    corr_neig = [(0, 5, 0), (2, 5, 0), (3, 6, 0), (3, 4, 0), (3, 5, 1), (3, 5, 2)]
+    for el in test_maze.get_neighbours(cell):
+        assert el in corr_neig
+    # opposite
+    known_hall1 = (3, 5, 1)
+    corr_opposite = (3, 5, 2)
+    assert test_maze.determine_opposite(cell, known_hall1) == corr_opposite
+    known_hall2 = (3, 4, 0)
+    corr_opposite = (3, 6, 0)
+    assert test_maze.determine_opposite(cell, known_hall2) == corr_opposite
+
+
+def test_cell_node():
+    test_maze = Maze((4, 5, 3))
+    cell1 = (1, 0, 2)
+    corr_index1 = 17
+    assert test_maze.cell_to_node(cell1) == corr_index1
+    assert test_maze.node_to_cell(corr_index1) == cell1
+    cell2 = (2, 1, 2)
+    corr_index2 = 35
+    assert test_maze.cell_to_node(cell2) == corr_index2
+    assert test_maze.node_to_cell(corr_index2) == cell2
 
 
 def test_opposite():
