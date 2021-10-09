@@ -53,24 +53,24 @@ def test_opposite():
     central = (5, 3)
     known_hall = (5, 2)
     correct_opposite = (5, 4)
-    opposite = test_maze._determine_opposite(central, known_hall)
+    opposite = test_maze.determine_opposite(central, known_hall)
     assert opposite == correct_opposite
     # hall below
     known_hall = (6, 3)
     correct_opposite = (4, 3)
-    opposite = test_maze._determine_opposite(central, known_hall)
+    opposite = test_maze.determine_opposite(central, known_hall)
     assert opposite == correct_opposite
     # edge cases - hall above
     central = (0, 2)
     known_hall = (5, 2)
     correct_opposite = (1, 2)
-    opposite = test_maze._determine_opposite(central, known_hall)
+    opposite = test_maze.determine_opposite(central, known_hall)
     assert opposite == correct_opposite
     # edge cases - hall right
     central = (5, 9)
     known_hall = (5, 0)
     correct_opposite = (5, 8)
-    opposite = test_maze._determine_opposite(central, known_hall)
+    opposite = test_maze.determine_opposite(central, known_hall)
     assert opposite == correct_opposite
 
 

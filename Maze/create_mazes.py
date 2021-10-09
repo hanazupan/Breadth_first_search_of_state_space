@@ -19,6 +19,7 @@ import networkx as nx
 
 class Energy(ABC):
     """
+    NOT USED YET
     An object with energy data saved in nodes that are connected with edges of possibly different lengths.
     Each node has a property of energy. There is some energy cutoff that makes some cells accessible and others not.
     """
@@ -55,7 +56,7 @@ class Energy(ABC):
         return self.graph[node]["energy"] < self.energy_cutoff
 
 
-class Maze(Energy):
+class Maze:
 
     def __init__(self, size: tuple, algorithm: str = 'Prim', animate: bool = False,
                  images_path: str = "./", images_name: str = "maze"):
@@ -72,14 +73,13 @@ class Maze(Energy):
             images_path: string, path where any generated images/videos will be saved
             images_name: string, identifier of all images/videos generated from this maze object
         """
-        super().__init__(nx.Graph(), 1)
         self.algorithm = algorithm
         self.size = size
         # deltas are distances between neighbours in all directions
         self.deltas = np.ones(len(self.size), dtype=int)
         self.maze = np.full(self.size, 2, dtype=int)
+        self.energy_cutoff = 1
         # prepare empty objects for solving maze
-        self.adj_matrix = None
         # prepare for saving images/gifs
         self.images_path = images_path
         self.images_name = images_name
@@ -122,10 +122,6 @@ class Maze(Energy):
         self.maze[2, 3:6] = 0
         self.maze[4:6, 3] = 0
         self.maze[5, 5] = 0
-
-    ############################################################################
-    # ---------------------   PRIM'S ALGORITHM   -------------------------------
-    ############################################################################
 
     def _create_prim(self) -> Sequence:
         """
@@ -170,7 +166,7 @@ class Maze(Energy):
             neig_halls = [n for n in neighbours if self.maze[n] == 0]
             neig_empty = [n for n in neighbours if self.maze[n] == 2]
             for n in neig_halls:
-                opposite_side = self._determine_opposite(random_wall, n)
+                opposite_side = self.determine_opposite(random_wall, n)
                 # values.count(0) == 1 makes sure all halls are only lines (not thicker than 1 cell)
                 if self.maze[opposite_side] == 2 and values.count(0) == 1:
                     # make this wall a hall
@@ -185,6 +181,10 @@ class Maze(Energy):
         self.maze[self.maze == 2] = 1
         # to get the final image for animation with no unassigned cells
         yield self.maze
+
+    ############################################################################
+    # ----------------------   PUBLIC METHODS   --------------------------------
+    ############################################################################
 
     def cell_to_node(self, cell: tuple) -> int:
         """
@@ -238,7 +238,42 @@ class Maze(Energy):
             neig_cel[i] = plus_one
             yield tuple(neig_cel)
 
-    def _determine_opposite(self, central: tuple, known_hall: tuple) -> tuple:
+    def get_energy(self, cell: tuple) -> float:
+        return self.maze[cell]
+
+    def is_accessible(self, cell: tuple) -> bool:
+        """
+        Determines whether a cell of maze is accessible
+
+        Args:
+            cell: (int, int, ...) a tuple of coordinates
+
+        Returns:
+            bool, True if cell accessible, else False
+        """
+        return self.maze[cell] < self.energy_cutoff
+
+    def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
+        """
+        Visualize the Maze with black squares (walls) and white squares (halls).
+
+        Args:
+            show: bool, should the visualization be displayed
+
+        Returns:
+            matplotlib.image.AxesImage, the plot
+        """
+        ax = plt.imshow(self.maze, cmap="Greys")
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        return ax
+
+    def determine_opposite(self, central: tuple, known_hall: tuple) -> tuple:
         """
         Determines the coordinates of the cell obtained if you start in the known_hall cell
         and jump over the central cell. E.g. if central = X, known_hall = O and opposite = ?
@@ -268,170 +303,6 @@ class Maze(Energy):
             else:
                 raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
         return tuple(neig_cel)
-
-    ############################################################################
-    # ---------------------------   BFS    -------------------------------------
-    ############################################################################
-
-    def breadth_first_search(self, animate: bool = False) -> nx.Graph:
-        """
-        Perform a breadth-first search of the maze. This also generates a graph of connections and an
-        adjacency matrix of the maze. The algorithm does this:
-        1. Find a random accessible cell in the maze, mark it as visited and accessible
-        2. Add accessible neighbours of the cell to the queue
-        3. While queue not empty:
-            1. Take an element from the beginning of the queue
-            2. Mark all its unvisited neighbours as visited
-            3. Mark all its accessible neighbours as accessible and add them to the queue
-
-
-        Args:
-            animate: bool, whether to generate and save the animation of solving the maze
-
-        Returns:
-            A graph of connections between nodes (cells) of the maze.
-        """
-        if animate:
-            ma = MazeAnimation(self)
-            ma.animate_bfs()
-        else:
-            # this needs to be done to exhaust the generator
-            for _ in self._bfs():
-                pass
-        return self.graph
-
-    def is_accessible(self, cell: tuple) -> bool:
-        """
-        Determines whether a cell of maze is accessible
-
-        Args:
-            cell: (int, int, ...) a tuple of coordinates
-
-        Returns:
-            bool, True if cell accessible, else False
-        """
-        return self.maze[cell] < self.energy_cutoff
-
-    def _bfs(self) -> Sequence:
-        """
-        Determine the connectivity graph of accessible states (states with value 0) in the maze. Determine
-        the adjacency matrix. Yield images for animation of path searching.
-
-        Yields:
-            A numpy array with 0 = passage, 1 = wall, -1 = discovered passage
-        """
-        self.graph = nx.Graph()
-        # for video
-        yield self.maze
-        visited = np.zeros(self.size, dtype=int)
-        accessible = np.zeros(self.size, dtype=int)
-        check_queue = deque()
-        height, width = self.size
-        # get a random starting point that is accessible
-        random_cell = self._find_random_accessible()
-        visited[random_cell] = 1
-        accessible[random_cell] = 1
-        # for the graph we are using index of the flattened maze as the identifier
-        index_rc = self.cell_to_node(random_cell)
-        self.graph.add_node(index_rc, energy=1)
-        # for video
-        yield self.maze - accessible
-        # take care of the neighbours of the first random cell
-        neighbours = self.get_neighbours(random_cell)
-        for n in neighbours:
-            visited[n] = 1
-            if self.is_accessible(n):
-                index_n = n[0]*width + n[1]
-                self.graph.add_node(index_n, energy=1)
-                self.graph.add_edge(index_rc, index_n)
-                accessible[n] = 1
-                check_queue.append(n)
-        # take care of all other cells
-        while len(check_queue) > 0:
-            cell = check_queue.popleft()
-            index_cell = self.cell_to_node(cell)
-            neighbours = self.get_neighbours(cell)
-            # if neighbours visited already, don't need to bother with them
-            unvis_neig = [n for n in neighbours if visited[n] == 0]
-            for n in unvis_neig:
-                visited[n] = 1
-                # if accessible, add to queue
-                if self.is_accessible(n):
-                    index_n = self.cell_to_node(n)
-                    self.graph.add_node(index_n, energy=1)
-                    self.graph.add_edge(index_cell, index_n)
-                    accessible[n] = 1
-                    check_queue.append(n)
-            # for video
-            yield self.maze - accessible
-        # accessible states must be the logical inverse of the maze
-        assert np.all(np.logical_not(accessible) == self.maze)
-        # returns adjacency matrix - ensures the order to be left-right, top-bottom
-        self.adj_matrix = nx.to_numpy_matrix(self.graph,
-                                             nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
-        # the adjacency matrix must be as long as there are accessible cells in the maze
-        assert len(self.adj_matrix) == np.count_nonzero(accessible)
-
-    ############################################################################
-    # ---------------------   PUBLIC METHODS    --------------------------------
-    ############################################################################
-
-    def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
-        """
-        Visualize the Maze with black squares (walls) and white squares (halls).
-
-        Args:
-            show: bool, should the visualization be displayed
-
-        Returns:
-            matplotlib.image.AxesImage, the plot
-        """
-        ax = plt.imshow(self.maze, cmap="Greys")
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
-            plt.close()
-        return ax
-
-    def draw_connections_graph(self, show: bool = True, **kwargs):
-        """
-        Visualize the graph of connections between the cells of the maze.
-
-        Args:
-            show: bool, should the visualization be displayed
-            **kwargs: named arguments that can be passed to nx.draw_kamada_kawai(), e.g. with_labels
-        """
-        if not self.graph:
-            self.breadth_first_search()
-        plt.figure()
-        nx.draw_kamada_kawai(self.graph, **kwargs)
-        plt.savefig(self.images_path + f"graph_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        # causes MatplotlibDeprecationWarning
-        if show:
-            plt.show()
-        else:
-            plt.close()
-
-    def get_adjacency_matrix(self) -> np.ndarray:
-        """
-        Get (and create if not yet created) an adjacency matrix of the maze with breadth-first search.
-
-        Returns:
-            numpy array, adjacency matrix, square number the size of the number of halls
-
-        Raises:
-            ValueError if using the wrong algorithm.
-        """
-        if self.algorithm == 'random':
-            raise ValueError("Adjacency matrix not available for a randomly created maze.")
-        elif not np.any(self.adj_matrix):
-            self.breadth_first_search()
-            return self.adj_matrix
-        else:
-            return self.adj_matrix
 
     ############################################################################
     # ------------------   DIJKSTRA'S ALGORITHM    -----------------------------
@@ -612,6 +483,7 @@ class MazeAnimation:
                                        repeat=False, interval=10, save_count=height * width)
         writergif = animation.PillowWriter(fps=50)
         anim.save(self.maze.images_path + f"{name_addition}_{self.maze.images_name}.gif", writer=writergif)
+        plt.close()
 
     def animate_building_maze(self):
         """
@@ -623,14 +495,14 @@ class MazeAnimation:
         self.iterator = self.maze._create_prim()
         self._animate("building", cmap="Greys")
 
-    def animate_bfs(self):
+    def animate_bfs(self, iterator):
         """
         Animate solving the maze with bfa. Color map as follows:
             blue = discovered accessible cells
             white = undiscovered accessible cells
             black = walls
         """
-        self.iterator = self.maze._bfs()
+        self.iterator = iterator
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
         # 1 are the walls.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
@@ -667,7 +539,4 @@ if __name__ == '__main__':
     path = "Images/"
     maze = Maze((20, 20), images_path=path, images_name="new", animate=True)
     maze.visualize(show=False)
-    maze.breadth_first_search(animate=True)
-    adjacency = maze.get_adjacency_matrix()
-    maze.draw_connections_graph(show=False, with_labels=True)
-    length = maze.find_shortest_path(animate=True)
+    #length = maze.find_shortest_path(animate=True)
