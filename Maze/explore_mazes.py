@@ -112,7 +112,6 @@ class BFSExplorer(Explorer):
         visited = np.zeros(self.maze.size, dtype=int)
         accessible = np.zeros(self.maze.size, dtype=int)
         check_queue = deque()
-        height, width = self.maze.size
         # get a random starting point that is accessible
         random_cell = self.maze.find_random_accessible()
         visited[random_cell] = 1

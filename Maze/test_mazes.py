@@ -75,6 +75,10 @@ def test_cell_node():
     corr_index2 = 35
     assert test_maze.cell_to_node(cell2) == corr_index2
     assert test_maze.node_to_cell(corr_index2) == cell2
+    bfs_explorer = BFSExplorer(test_maze)
+    bfs_explorer.explore()
+    d_explorer = DijkstraExplorer(test_maze)
+    d_explorer.explore()
 
 
 def test_opposite():
