@@ -2,7 +2,7 @@
 Try to run, for exymple: main.py --size (40,40) --animate y --graph y --matrix y --name test --path Images/
 """
 from create_mazes import Maze
-from explore_mazes import BFSExplorer, DijkstraExplorer
+from explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 from ast import literal_eval
 import argparse
 
@@ -47,12 +47,16 @@ def create_and_explore_maze(args):
         explorer = DijkstraExplorer(maze)
         explorer.visualize_distances(show=False)
         print(f"Visualization of distances will be saved in: {args.path}distances_{args.name}.png")
+    elif args.explorer == "dfs":
+        explorer = DFSExplorer(maze)
     else:
         raise ValueError("Not a valid Explorer.")
     if animate:
         explorer.explore_and_animate()
         if args.explorer == "bfs":
-            print(f"Animation Maze exploration will be saved in: {args.path}solving_{args.name}.gif")
+            print(f"Animation Maze exploration will be saved in: {args.path}bfs_{args.name}.gif")
+        elif args.explorer == "dfs":
+            print(f"Animation Maze exploration will be saved in: {args.path}dfs_{args.name}.gif")
         else:
             print(f"Animation Maze exploration will be saved in: {args.path}dijkstra_{args.name}.gif")
     else:

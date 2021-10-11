@@ -1,6 +1,6 @@
 import numpy as np
 from create_mazes import Maze
-from explore_mazes import BFSExplorer, DijkstraExplorer
+from explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 
 all_algorithms = ["Prim", "random"]
 
@@ -28,6 +28,10 @@ def test_run_everything():
         bfs_explorer.draw_connections_graph(show=False)
         bfs_explorer.explore()
         bfs_explorer.explore_and_animate()
+        dfs_explorer = DFSExplorer(test_maze)
+        dfs_explorer.draw_connections_graph(show=False)
+        dfs_explorer.explore()
+        dfs_explorer.explore_and_animate()
         d_explorer = DijkstraExplorer(test_maze)
         d_explorer.explore_and_animate()
         d_explorer.get_adjacency_matrix()

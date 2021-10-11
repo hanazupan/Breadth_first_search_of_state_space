@@ -396,15 +396,19 @@ class MazeAnimation:
         self.iterator = self.maze._create_prim()
         self._animate("building", cmap="Greys")
 
-    def animate_bfs(self, iterator):
+    def animate_search(self, name, iterator):
         """
-        Animate solving the maze with bfa. Color map as follows:
+        Animate solving the maze with bfs or dfs algorithm. Color map as follows:
             blue = discovered accessible cells
             white = undiscovered accessible cells
             black = walls
 
         Args:
+            name: dfs or bfs, which search should be performed
             iterator: a generator of images
+
+        Raises:
+            ValueError if an inappropriate name of algorithm is provided.
         """
         self.iterator = iterator
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
@@ -412,7 +416,10 @@ class MazeAnimation:
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
         bounds = [-1.5, -0.5, 0.5, 1.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
-        self._animate("solving", cmap=cmap, norm=norm)
+        if name in ["bfs", "dfs"]:
+            self._animate(name, cmap=cmap, norm=norm)
+        else:
+            raise ValueError("Only allowed names are 'bfs', 'dfs'.")
 
     def animate_dijkstra(self, iterator, start_cell: tuple, end_cell: tuple) -> np.ndarray:
         """

@@ -96,7 +96,7 @@ class BFSExplorer(Explorer):
 
     def explore_and_animate(self) -> nx.Graph:
         ma = MazeAnimation(self.maze)
-        ma.animate_bfs(self._bfs_algorithm())
+        ma.animate_search("bfs", self._bfs_algorithm())
         return self.graph
 
     def _bfs_algorithm(self) -> Sequence:
@@ -144,6 +144,90 @@ class BFSExplorer(Explorer):
             neighbours = self.maze.get_neighbours(cell)
             # if neighbours visited already, don't need to bother with them
             unvis_neig = [n for n in neighbours if visited[n] == 0]
+            for n in unvis_neig:
+                visited[n] = 1
+                # if accessible, add to queue
+                if self.maze.is_accessible(n):
+                    index_n = self.maze.cell_to_node(n)
+                    self.graph.add_node(index_n, energy=self.maze.get_energy(n))
+                    self.graph.add_edge(index_cell, index_n)
+                    accessible[n] = 1
+                    check_queue.append(n)
+            # for video
+            yield self.maze.maze - accessible
+        # accessible states must be the logical inverse of the maze
+        assert np.all(np.logical_not(accessible) == self.maze.maze)
+        # returns adjacency matrix - ensures the order to be left-right, top-bottom
+        self.adj_matrix = nx.to_numpy_matrix(self.graph,
+                                             nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
+        # the adjacency matrix must be as long as there are accessible cells in the maze
+        assert len(self.adj_matrix) == np.count_nonzero(accessible)
+
+
+class DFSExplorer(Explorer):
+    """
+    Implements Depth-first search algorithm for mazes.
+    """
+
+    def __init__(self, maze):
+        super().__init__(maze, "dfs")
+
+    def explore(self) -> nx.Graph:
+        for _ in self._dfs_algorithm():
+            pass
+        return self.graph
+
+    def explore_and_animate(self) -> nx.Graph:
+        ma = MazeAnimation(self.maze)
+        ma.animate_search("dfs", self._dfs_algorithm())
+        return self.graph
+
+    def _dfs_algorithm(self) -> Sequence:
+        """
+        Perform a depth-first search of the maze. This also generates a graph of connections and an
+        adjacency matrix of the maze. The algorithm does this:
+        TODO: edit this
+        1. Find a random accessible cell in the maze, mark it as visited and accessible
+        2. Add accessible neighbours of the cell to the queue
+        3. While queue not empty:
+            1. Take an element from the beginning of the queue
+            2. Mark all its unvisited neighbours as visited
+            3. Mark all its accessible neighbours as accessible and add them to the queue
+
+        Yields:
+            A numpy array with 0 = undiscovered passage, 1 = wall, -1 = discovered passage
+        """
+        # for video
+        yield self.maze.maze
+        visited = np.zeros(self.maze.size, dtype=int)
+        accessible = np.zeros(self.maze.size, dtype=int)
+        check_queue = []
+        # get a random starting point that is accessible
+        random_cell = self.maze.find_random_accessible()
+        visited[random_cell] = 1
+        accessible[random_cell] = 1
+        # for the graph we are using index of the flattened maze as the identifier
+        index_rc = self.maze.cell_to_node(random_cell)
+        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell))
+        # for video
+        yield self.maze.maze - accessible
+        # take care of the neighbours of the first random cell
+        neighbours = self.maze.get_neighbours(random_cell)
+        for n in neighbours:
+            visited[n] = 1
+            index_n = self.maze.cell_to_node(n)
+            self.graph.add_node(index_n, energy=self.maze.get_energy(n))
+            self.graph.add_edge(index_rc, index_n)
+            if self.maze.is_accessible(n):
+                accessible[n] = 1
+            check_queue.append(n)
+        # take care of all other cells
+        while len(check_queue) > 0:
+            cell = check_queue.pop()
+            index_cell = self.maze.cell_to_node(cell)
+            neighbours = self.maze.get_neighbours(cell)
+            # if neighbours visited already, don't need to bother with them
+            unvis_neig = [n for n in neighbours if visited[n] == 0 and self.maze.is_accessible(n)]
             for n in unvis_neig:
                 visited[n] = 1
                 # if accessible, add to queue
@@ -336,14 +420,18 @@ class DijkstraExplorer(Explorer):
 
 if __name__ == '__main__':
     path = "Images/"
-    my_maze = Maze((12, 15), images_path=path, images_name="explore", animate=False)
+    my_maze = Maze((30, 30), images_path=path, images_name="explore", animate=False)
+    dfs_explorer = DFSExplorer(my_maze)
+    dfs_explorer.explore_and_animate()
+    dfs_explorer.draw_connections_graph(show=False, with_labels=True)
+    dfs_explorer.get_adjacency_matrix()
     bfs_explorer = BFSExplorer(my_maze)
     bfs_explorer.explore_and_animate()
-    bfs_explorer.draw_connections_graph(show=True, with_labels=True)
+    bfs_explorer.draw_connections_graph(show=False, with_labels=True)
     bfs_explorer.get_adjacency_matrix()
     dijkstra_exp = DijkstraExplorer(my_maze)
     dijkstra_exp.explore()
-    dijkstra_exp.draw_connections_graph(show=True, with_labels=True)
+    dijkstra_exp.draw_connections_graph(show=False, with_labels=True)
     dijkstra_exp.explore_and_animate()
     dijkstra_exp.visualize_distances()
     dijkstra_exp.get_adjacency_matrix()
