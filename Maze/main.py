@@ -1,8 +1,9 @@
 """
 Try to run, for exymple: main.py --size (40,40) --animate y --graph y --matrix y --name test --path Images/
 """
-from create_mazes import Maze, MazeAnimation
+from create_mazes import Maze
 from explore_mazes import BFSExplorer, DijkstraExplorer
+from ast import literal_eval
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -23,21 +24,22 @@ parser.add_argument('--matrix', metavar='m', type=str, nargs='?',
 parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
                     default='n', help='Produce maze image?')
 
+
 # TODO: finish
 def create_and_explore_maze(args):
     print(f"Maze size: {args.size}")
-    if args.animate == "y" or "yes":
+    if args.animate != "n":
         animate = True
         print(f"Animation Maze creation will be saved in: {args.path}building_{args.name}.gif")
     else:
         animate = False
     # correctly interpret a tuple for size input
-    args.size = tuple([int(x) for x in args.size.strip("(").strip(")").split(",")])
+    args.size = literal_eval(args.size)
     maze = Maze(args.size, animate=animate, images_name=args.name, images_path=args.path)
     # visualization
-    if args.visualize == "y" or "yes":
+    if args.visualize != "n":
         maze.visualize(show=False)
-        print(f"Visualization of Maze will be saved in: {args.path}maze_{args.name}.gif")
+        print(f"Visualization of Maze will be saved in: {args.path}maze_{args.name}.png")
     # exploration
     if args.explorer == "bfs":
         explorer = BFSExplorer(maze)
@@ -49,16 +51,20 @@ def create_and_explore_maze(args):
         raise ValueError("Not a valid Explorer.")
     if animate:
         explorer.explore_and_animate()
-        print(f"Animation Maze exploration will be saved in: {args.path}solving_{args.name}.gif")
+        if args.explorer == "bfs":
+            print(f"Animation Maze exploration will be saved in: {args.path}solving_{args.name}.gif")
+        else:
+            print(f"Animation Maze exploration will be saved in: {args.path}dijkstra_{args.name}.gif")
     else:
         explorer.explore()
     # graph
-    if args.graph == "y" or "yes":
-        print(f"Visualization of Graph will be saved in: {args.path}{args.explorer}_graph_{args.name}.gif")
+    if args.graph != "n":
+        print(f"Visualization of Graph will be saved in: {args.path}{args.explorer}_graph_{args.name}.png")
         explorer.draw_connections_graph(show=False, with_labels=True)
     # matrix
-    if args.matrix == "y" or "yes":
-        print(explorer.get_adjacency_matrix())
+    if args.matrix != "n":
+        print(f"The adjacency matrix will be saved in: {args.path}{args.explorer}_adj_matrix_{args.name}.npy")
+        explorer.get_adjacency_matrix(save=True)
     print("Finished.")
 
 

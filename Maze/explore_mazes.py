@@ -63,15 +63,20 @@ class Explorer(ABC):
         else:
             plt.close()
 
-    def get_adjacency_matrix(self) -> np.ndarray:
+    def get_adjacency_matrix(self, save=False) -> np.ndarray:
         """
         Get (and create if not yet created) an adjacency matrix of the maze with breadth-first search.
+
+        Args:
+            save: whether to save the produced adjacency matrix
 
         Returns:
             numpy array, adjacency matrix, square number the size of the number of halls
         """
         if not np.any(self.adj_matrix):
             self.explore()
+        if save:
+            np.save(f"{self.maze.images_path}{self.explorer_name}_adj_matrix_{self.maze.images_name}", self.adj_matrix)
         return self.adj_matrix
 
 
@@ -229,14 +234,14 @@ class DijkstraExplorer(Explorer):
         for_plotting = np.zeros(self.maze.size, dtype=int)
         for_plotting[self.start_cell] = 1
         array_to_plot = np.where(self.visited != 0, self.distances, self.maze.maze * 1000) + for_plotting
-        my_cmap = cm.get_cmap("plasma").copy()
+        my_cmap = cm.get_cmap("plasma")
         my_cmap.set_under("white")
         my_cmap.set_over("black")
         plt.gca().axes.get_xaxis().set_visible(False)
         plt.gca().axes.get_yaxis().set_visible(False)
         plt.plot(self.start_cell[1], self.start_cell[0], marker="o", color="white", linewidth=1.5)
         plt.plot(self.end_cell[1], self.end_cell[0], marker="x", color="black", linewidth=1.5)
-        plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=array_to_plot[self.end_cell])
+        plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=array_to_plot[self.end_cell]+1)
         plt.savefig(self.maze.images_path + f"distances_{self.maze.images_name}.png", dpi=1200)
         if show:
             plt.show()
