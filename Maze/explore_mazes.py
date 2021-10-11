@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Sequence
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import heapq
 
 
 class Explorer(ABC):
@@ -171,6 +172,7 @@ class DijkstraExplorer(Explorer):
         self.start_cell = None
         self.end_cell = None
         self.set_start_end_cell(start_cell, end_cell)
+        self.path = []
 
     def set_start_end_cell(self, start_cell: tuple = None, end_cell: tuple = None):
         """
@@ -234,6 +236,7 @@ class DijkstraExplorer(Explorer):
         for_plotting = np.zeros(self.maze.size, dtype=int)
         for_plotting[self.start_cell] = 1
         array_to_plot = np.where(self.visited != 0, self.distances, self.maze.maze * 1000) + for_plotting
+        max_value = np.max(array_to_plot[array_to_plot < 1000])
         my_cmap = cm.get_cmap("plasma")
         my_cmap.set_under("white")
         my_cmap.set_over("black")
@@ -241,7 +244,9 @@ class DijkstraExplorer(Explorer):
         plt.gca().axes.get_yaxis().set_visible(False)
         plt.plot(self.start_cell[1], self.start_cell[0], marker="o", color="white", linewidth=1.5)
         plt.plot(self.end_cell[1], self.end_cell[0], marker="x", color="black", linewidth=1.5)
-        plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=array_to_plot[self.end_cell]+1)
+        for x,y in self.path[1:-1]:
+            plt.plot(y, x, marker="o", color="white", markeredgecolor="k", linewidth=0.5, markersize=4)
+        plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=max_value+1)
         plt.savefig(self.maze.images_path + f"distances_{self.maze.images_name}.png", dpi=1200)
         if show:
             plt.show()
@@ -271,43 +276,74 @@ class DijkstraExplorer(Explorer):
         self.distances = np.full(self.maze.size, np.inf)
         for_plotting = np.zeros(self.maze.size, dtype=int)
         for_plotting[self.start_cell] = 1
-        check_queue = deque()
+        check_queue = []
+        # start with start cell
         current_cell = self.start_cell
+        self.graph.add_node(self.maze.cell_to_node(current_cell), energy=self.maze.get_energy(current_cell),
+                            distance=0, cell=current_cell)
         self.distances[current_cell] = 0
         # here first frame of the animation
         yield np.where(self.visited != 0, self.distances, self.maze.maze*1000) + for_plotting
         # determine accessible neighbours - their distances to
         for an in self.maze.get_accessible_neighbours(current_cell):
-            check_queue.append(an)
-        for n in check_queue:
-            self.distances[n] = 1
+            # element in the priority queue must start with priority marker, here tentative distance
+            # so we pack (tentative_dist, coordinates) in a tuple
+            self.distances[an] = 1
+            self.graph.add_node(self.maze.cell_to_node(an), energy=self.maze.get_energy(an),
+                                distance=1, cell=an)
+            self.graph.add_edge(self.maze.cell_to_node(current_cell), self.maze.cell_to_node(an))
+            priority_an = (self.distances[an], an)
+            heapq.heappush(check_queue, priority_an)
         # here snapshot for animation
         yield np.where(self.visited != 0, self.distances, self.maze.maze*1000) + for_plotting
         self.visited[current_cell] = 1
         while check_queue:
-            current_cell = check_queue.popleft()
+            priority_cell, current_cell = heapq.heappop(check_queue)
             # unvisited, accessible neighbours
             for n in self.maze.get_accessible_neighbours(current_cell):
                 if not self.visited[n]:
                     tent_dist = self.distances[current_cell] + 1
                     if tent_dist < self.distances[n]:
+                        if n in self.graph:
+                            self.graph[n]["distance"] = tent_dist
                         self.distances[n] = tent_dist
-                    check_queue.append(n)
+                    self.graph.add_node(self.maze.cell_to_node(n), energy=self.maze.get_energy(n),
+                                        distance=self.distances[n], cell=n)
+                    self.graph.add_edge(self.maze.cell_to_node(current_cell), self.maze.cell_to_node(n))
+                    priority_n = (self.distances[n], n)
+                    heapq.heappush(check_queue, priority_n)
             self.visited[current_cell] = 1
             # here snapshot for animation
             yield np.where(self.visited != 0, self.distances, self.maze.maze * 1000) + for_plotting
             if self.visited[self.end_cell] == 1:
-                return np.where(self.visited != 0, self.distances, self.maze.maze * 1000) + for_plotting
+                # create a path by going backwards: start with end cell and always decrease in distance
+                path = [self.end_cell]
+                node_distances = nx.get_node_attributes(self.graph, "distance")
+                while self.start_cell not in path:
+                    current_cell = path[-1]
+                    current_node = self.maze.cell_to_node(current_cell)
+                    connected = self.graph.neighbors(current_node)
+                    # add to the path a connected cell with distance 1 smaller than the distance of current node
+                    for el in connected:
+                        dist = node_distances[el]
+                        if dist == node_distances[current_node] - 1:
+                            path.append(self.maze.node_to_cell(el))
+                            break
+                self.path = path[::-1]
+                self.adj_matrix = nx.to_numpy_matrix(self.graph)
+                return
 
 
 if __name__ == '__main__':
     path = "Images/"
-    my_maze = Maze((15, 12), images_path=path, images_name="explore", animate=False)
+    my_maze = Maze((12, 15), images_path=path, images_name="explore", animate=False)
     bfs_explorer = BFSExplorer(my_maze)
     bfs_explorer.explore_and_animate()
-    bfs_explorer.draw_connections_graph(show=False, with_labels=True)
+    bfs_explorer.draw_connections_graph(show=True, with_labels=True)
     bfs_explorer.get_adjacency_matrix()
     dijkstra_exp = DijkstraExplorer(my_maze)
     dijkstra_exp.explore()
+    dijkstra_exp.draw_connections_graph(show=True, with_labels=True)
     dijkstra_exp.explore_and_animate()
     dijkstra_exp.visualize_distances()
+    dijkstra_exp.get_adjacency_matrix()
