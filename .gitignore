@@ -7,6 +7,9 @@ Maze/playground.py
 *.png
 *.gif
 
+!Maze/Example_images/*.png
+!Maze/Example_images/*.gif
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
