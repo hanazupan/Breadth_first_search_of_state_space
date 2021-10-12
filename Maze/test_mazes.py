@@ -32,6 +32,7 @@ def test_run_everything():
         dfs_explorer.draw_connections_graph(show=False)
         dfs_explorer.explore()
         dfs_explorer.explore_and_animate()
+        np.testing.assert_array_almost_equal(bfs_explorer.get_adjacency_matrix(), dfs_explorer.get_adjacency_matrix())
         d_explorer = DijkstraExplorer(test_maze)
         d_explorer.explore_and_animate()
         d_explorer.get_adjacency_matrix()
@@ -152,6 +153,19 @@ def test_adjacency():
     dfs_explorer = BFSExplorer(test_maze)
     adj = dfs_explorer.get_adjacency_matrix()
     np.testing.assert_array_equal(correct_adj, adj)
+
+
+def test_path():
+    test_maze = Maze((6, 6), algorithm="handmade1")
+    start_cell = (0, 3)
+    end_cell = (3, 1)
+    corr_path = [(0, 3), (0, 4), (0, 5), (0, 0), (1, 0), (2, 0), (3, 0), (3, 1)]
+    dijkstra_ex = DijkstraExplorer(test_maze)
+    assert dijkstra_ex.get_path(start_cell=start_cell, end_cell=end_cell) == corr_path
+    start_cell = (2, 3)
+    end_cell = (4, 3)
+    corr_path = [(2, 3), (2, 4), (2, 5), (2, 0), (1, 0), (0, 0), (0, 5), (0, 4), (0, 3), (5, 3), (4, 3)]
+    assert dijkstra_ex.get_path(start_cell=start_cell, end_cell=end_cell) == corr_path
 
 
 def test_distances():

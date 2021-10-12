@@ -293,9 +293,23 @@ class DijkstraExplorer(Explorer):
             the distance in number of cells
         """
         self.set_start_end_cell(start_cell, end_cell)
-        if not np.any(self.distances):
-            self.explore()
+        self.explore()
         return self.distances[self.end_cell]
+
+    def get_path(self, start_cell: tuple = None, end_cell: tuple = None) -> list:
+        """
+        Get the shortest possible path (a list of cells) between the start and end cell.
+
+        Args:
+            start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
+            end_cell: tuple or None, (int, int ..) coordinates of the cell where the path ends
+
+        Returns:
+            a list of cells starting with start_cell and ending with end_cell
+        """
+        self.set_start_end_cell(start_cell, end_cell)
+        self.explore()
+        return self.path
 
     def explore(self) -> nx.Graph:
         for _ in self._dijkstra_algorithm():
