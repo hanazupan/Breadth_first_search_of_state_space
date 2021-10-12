@@ -16,44 +16,6 @@ from matplotlib import colors, cm
 import networkx as nx
 
 
-class Energy(ABC):
-    """
-    NOT USED YET
-    An object with energy data saved in nodes that are connected with edges of possibly different lengths.
-    Each node has a property of energy. There is some energy cutoff that makes some cells accessible and others not.
-    """
-
-    def __init__(self, graph: nx.Graph, energy_cutoff: float):
-        """
-        Initialize some properties of all Energy objects.
-
-        Args:
-            graph: stores cells with unique IDs, properties of energy and edges between them
-            energy_cutoff: cells with energy strictly below that value are accessible
-        """
-        self.graph = graph
-        self.energy_cutoff = energy_cutoff
-
-    def get_energy(self, node: int) -> float:
-        """Given a node identifier, get or calculate its energy."""
-        return self.graph[node]["energy"]
-
-    def get_neighbours(self, node: int) -> Sequence:
-        """Given a node identifier, get identifiers of its neighbours"""
-        neig_iterator = self.graph.neighbors(node)
-        for neig in neig_iterator:
-            yield neig
-
-    def get_accessible_neighbours(self, node: int) -> Sequence:
-        """Same as get_neighbours but filters out non-accessible neighbours."""
-        for n in self.get_neighbours(node):
-            if self.is_accessible(n):
-                yield n
-
-    def is_accessible(self, node: int) -> bool:
-        """Determine whether a specific node of the graph is accessible."""
-        return self.graph[node]["energy"] < self.energy_cutoff
-
 
 class Maze:
 
