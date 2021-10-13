@@ -3,11 +3,11 @@ from create_mazes import Maze
 from explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 
 all_algorithms = ["Prim", "random"]
-
+img_path = "Images/"
 
 def test_init():
     for alg in all_algorithms:
-        test_maze = Maze((17, 8), algorithm=alg)
+        test_maze = Maze((17, 8), algorithm=alg, images_path=img_path)
         # shape correct
         assert test_maze.energies.shape == (17, 8)
         # only 0 and 1 in the final maze
@@ -22,7 +22,7 @@ def test_run_everything():
         height = np.random.randint(5, 15)
         width = np.random.randint(6, 20)
         test_maze = Maze((height, width), algorithm='Prim', animate=animate,
-                         images_name="test")
+                         images_name="test", images_path=img_path)
         test_maze.visualize(show=False)
         bfs_explorer = BFSExplorer(test_maze)
         bfs_explorer.draw_connections_graph(show=False)
@@ -41,7 +41,7 @@ def test_run_everything():
 
 
 def test_neighbours():
-    test_maze = Maze((20, 30))
+    test_maze = Maze((20, 30), images_path=img_path)
     # test a cell in the middle
     chosen_cell = (5, 3)
     correct_neig = [(5, 2), (5, 4), (4, 3), (6, 3)]
@@ -55,7 +55,7 @@ def test_neighbours():
 
 
 def test_multidimensional():
-    test_maze = Maze((4, 15, 3))
+    test_maze = Maze((4, 15, 3), images_path=img_path)
     cell = (3, 5, 0)
     # neighbours
     corr_neig = [(0, 5, 0), (2, 5, 0), (3, 6, 0), (3, 4, 0), (3, 5, 1), (3, 5, 2)]
@@ -71,7 +71,7 @@ def test_multidimensional():
 
 
 def test_cell_node():
-    test_maze = Maze((4, 5, 3))
+    test_maze = Maze((4, 5, 3), images_path=img_path)
     cell1 = (1, 0, 2)
     corr_index1 = 17
     assert test_maze.cell_to_node(cell1) == corr_index1
@@ -83,7 +83,7 @@ def test_cell_node():
 
 
 def test_opposite():
-    test_maze = Maze((6, 10))
+    test_maze = Maze((6, 10), images_path=img_path)
     # hall left
     central = (5, 3)
     known_hall = (5, 2)
@@ -110,7 +110,7 @@ def test_opposite():
 
 
 def test_adjacency():
-    test_maze = Maze((6, 6), algorithm="handmade1")
+    test_maze = Maze((6, 6), algorithm="handmade1", images_path=img_path)
     correct_adj = np.zeros((16, 16), dtype=int)
     correct_adj[0, 3] = 1
     correct_adj[0, 4] = 1
@@ -156,7 +156,7 @@ def test_adjacency():
 
 
 def test_path():
-    test_maze = Maze((6, 6), algorithm="handmade1")
+    test_maze = Maze((6, 6), algorithm="handmade1", images_path=img_path)
     start_cell = (0, 3)
     end_cell = (3, 1)
     corr_path = [(0, 3), (0, 4), (0, 5), (0, 0), (1, 0), (2, 0), (3, 0), (3, 1)]
@@ -169,7 +169,7 @@ def test_path():
 
 
 def test_distances():
-    test_maze = Maze((6, 6), algorithm="handmade1")
+    test_maze = Maze((6, 6), algorithm="handmade1", images_path=img_path)
     start_cell = (0, 3)
     end_cell = (3, 1)
     corr_dist = 7
