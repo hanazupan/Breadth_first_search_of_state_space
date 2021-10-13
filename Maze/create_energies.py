@@ -3,6 +3,7 @@ from explore_mazes import BFSExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
+from matplotlib import colors
 #from scipy.constants import k
 from mpl_toolkits import mplot3d  # a necessary import
 
@@ -86,12 +87,19 @@ class Energy(AbstractEnergy):
         return self.D * self.S / self.h / self.V * np.sqrt(np.exp((-energy_j + energy_i)/(k*self.T)))
 
     def _calculate_rates_matrix(self):
+        """
+        Explores the self.energies matrix using breadth-first search, t.i. starting in a random accessible
+        (energy < energy_cutoff) cell and then exploring accessible neighbours of the cell. This creates an adjacency
+        matrix. For every 1 in adj_matrix, the SqRA formula is applied to calculate the rate of adjacent cells and this
+        value is saved in the ij-position of the rates_matrix. The diagonal elements of rates_matrix are determined
+        so that the rowsum of rates_matrix = 0.
+        """
         bfs_explorer = BFSExplorer(self)
         adj_matrix = bfs_explorer.get_adjacency_matrix()
-        plt.imshow(adj_matrix, cmap="RdBu_r")
-        plt.colorbar()
-        plt.show()
         self.rates_matrix = np.zeros(adj_matrix.shape)
+        #TODO: this can definitely be more efficient. Consider using sparse matrices and/or calculating rates
+        # immediately during the exploration of the matrix.
+
         # get the adjacent elements
         for i in range(len(adj_matrix)):
             cell_i = bfs_explorer.get_cell_from_adj(i)
@@ -132,8 +140,8 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.underlying_maze):
             raise ValueError("No underlying maze present! This is only available for surfaces created from mazes.")
-        lims = dict(cmap='RdBu_r', vmin=-2, vmax=1)
-        size_x, size_y = complex(self.underlying_maze.size[0]), complex(self.underlying_maze.size[1])
+        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0), shading='auto')
+        size_x, size_y = complex(self.underlying_maze.shape[0]), complex(self.underlying_maze.shape[1])
         x_edges, y_edges = np.mgrid[-1:1:size_x, -1:1:size_y]
         ax = plt.pcolormesh(x_edges, y_edges, self.underlying_maze, **lims)
         plt.colorbar()
@@ -152,7 +160,7 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        lims = dict(cmap='RdBu_r', vmin=-2, vmax=1)
+        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0), shading='auto')
         ax = plt.pcolormesh(self.grid_x, self.grid_y, self.energies, **lims)
         plt.colorbar()
         ax.figure.savefig(self.images_path + f"energy_{self.images_name}.png", bbox_inches='tight', dpi=1200)
@@ -181,20 +189,79 @@ class Energy(AbstractEnergy):
             plt.close()
         return ax
 
+    def visualize_eigenvectors(self, show: bool = True, num: int = 3):
+        if not np.any(self.energies):
+            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
+        if not np.any(self.rates_matrix):
+            self._calculate_rates_matrix()
+        w, v = np.linalg.eig(self.rates_matrix)
+        fig, ax = plt.subplots(1, num, sharey="row")
+        xs = np.linspace(-0.5, 0.5, num=len(v[0]))
+        for i in range(num):
+            ax[i].plot(xs, v[i], "black")
+            ax[i].set_title(f"Eigenvector {i}")
+        plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+    def visualize_rates_matrix(self, show: bool = True):
+        """
+        Visualizes the array self.rates_matrix.
+
+        Raises:
+            ValueError: if there are no self.energies
+        """
+        if not np.any(self.energies):
+            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
+        if not np.any(self.rates_matrix):
+            self._calculate_rates_matrix()
+        norm = colors.TwoSlopeNorm(vcenter=0)
+        ax = plt.imshow(self.rates_matrix, cmap="RdBu_r", norm=norm)
+        plt.colorbar()
+        plt.title("Rates matrix")
+        ax.figure.savefig(self.images_path + f"rates_matrix_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+    def visualize_boltzmann(self, show: bool = True):
+        """
+        Visualizes both the energies and the Boltzmann distribution on that energy surface.
+
+        Raises:
+            ValueError: if there are no self.energies
+        """
+        if not np.any(self.energies):
+            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
+        if not np.any(self.rates_matrix):
+            self._calculate_rates_matrix()
+        fig, ax = plt.subplots(1, 2, sharey="row")
+        boltzmanns = np.exp(-self.energies/(k*self.T))
+        norm = colors.TwoSlopeNorm(vcenter=0)
+        ax[0].imshow(self.energies, cmap="RdBu_r", norm=norm)
+        ax[0].set_title("Energy")
+        ax[1].imshow(boltzmanns, cmap="RdBu_r")
+        ax[1].set_title("Boltzmann distribution")
+        plt.savefig(self.images_path + f"boltzmann_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
 
 if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
-    my_maze = Maze((10, 12))
+    my_maze = Maze((12, 15))
     my_energy.from_maze(my_maze, add_noise=True)
+    my_energy.visualize_underlying_maze()
+    #my_energy.visualize_boltzmann()
     my_energy.visualize()
-    #my_energy.visualize_underlying_maze()
-    #my_energy.visualize_3d()
-    rates_matrix = my_energy.get_rates_matix()
-    w, v = np.linalg.eig(rates_matrix)
-    plt.imshow(rates_matrix, cmap="RdBu_r")
-    plt.colorbar()
-    plt.show()
-    xs = np.linspace(-0.5, 0.5, num=len(v[0]))
-    plt.plot(xs, v[0])
-    plt.show()
+    my_energy.visualize_3d()
+    my_energy.get_rates_matix()
+    my_energy.visualize_rates_matrix()
+    my_energy.visualize_eigenvectors()
+

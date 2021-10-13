@@ -25,7 +25,6 @@ parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
                     default='n', help='Produce maze image?')
 
 
-# TODO: finish
 def create_and_explore_maze(args):
     print(f"Maze size: {args.size}")
     if args.animate != "n":

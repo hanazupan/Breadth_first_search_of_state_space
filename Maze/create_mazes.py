@@ -395,7 +395,7 @@ class MazeAnimation:
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
         # 1 are the walls.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
-        bounds = [-1.5, -0.5, 0.5, 1.5]
+        bounds = [-100.5, -99.5, 0.5, 1.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
         if name in ["bfs", "dfs"]:
             self._animate(name, cmap=cmap, norm=norm)

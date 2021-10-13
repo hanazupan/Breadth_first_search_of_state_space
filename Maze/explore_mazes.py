@@ -140,7 +140,7 @@ class BFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
-        yield self.maze.energies - accessible
+        yield self.maze.energies - 100*accessible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -168,7 +168,7 @@ class BFSExplorer(Explorer):
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
-            yield self.maze.energies - accessible
+            yield self.maze.energies - 100*accessible
         # accessible states must be the logical inverse of the maze - but only true of pure mazes (not energies)
         #assert np.all(np.logical_not(accessible) == self.maze.energies)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
@@ -224,7 +224,7 @@ class DFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
-        yield self.maze.energies - accessible
+        yield self.maze.energies - 100*accessible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -252,7 +252,7 @@ class DFSExplorer(Explorer):
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
-            yield self.maze.energies - accessible
+            yield self.maze.energies - 100*accessible
         # accessible states must be the logical inverse of the maze
         assert np.all(np.logical_not(accessible) == self.maze.energies)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
