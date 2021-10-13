@@ -289,10 +289,6 @@ class Maze(AbstractEnergy):
         # to get the final image for animation with no unassigned cells
         yield self.energies
 
-    ############################################################################
-    # ----------------------   PUBLIC METHODS   --------------------------------
-    ############################################################################
-
     def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
         """
         Visualize the Maze with black squares (walls) and white squares (halls).

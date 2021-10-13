@@ -3,8 +3,12 @@ from explore_mazes import BFSExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
-from scipy.constants import k
+#from scipy.constants import k
 from mpl_toolkits import mplot3d  # a necessary import
+
+# for now we are unitless, I will decide on k = 1
+# WARNING! REDEFINING BOLTZMANN CONSTANT!
+k = 1
 
 
 class Energy(AbstractEnergy):
@@ -21,6 +25,7 @@ class Energy(AbstractEnergy):
         # energy cutoff - let's see if it should be changed
         # will only have a value if energy created from maze
         self.underlying_maze = None
+        self.rates_matrix = None
         # in preparation
         self.grid_x = None
         self.grid_y = None
@@ -58,19 +63,9 @@ class Energy(AbstractEnergy):
         self.size = self.energies.shape
         self.deltas = np.ones(len(self.size), dtype=int)
 
-    def get_boltzmann(self, cell: tuple) -> float:
-        """
-
-        Args:
-            cell: tuple, coordinates of the cell
-
-        Returns:
-            float, the non-normalized value of the Boltzmann distribution at the energy that is in the cell.
-        """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        energy = self.energies[cell]
-        return np.exp(-energy/(k*self.T))
+    ############################################################################
+    # ------------------------   RATES MATRIX  ---------------------------------
+    ############################################################################
 
     def _calculate_rates_matrix_ij(self, cell_i: tuple, cell_j: tuple) -> float:
         """
@@ -84,9 +79,49 @@ class Energy(AbstractEnergy):
         Returns:
             float, the ij-th element of the rates matrix Q
         """
-        pi_i = self.get_boltzmann(cell_i)
-        pi_j = self.get_boltzmann(cell_j)
-        return self.D * self.S / self.h / self.V * np.sqrt(pi_j/pi_i)
+        if not np.any(self.energies):
+            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
+        energy_i = self.energies[cell_i]
+        energy_j = self.energies[cell_j]
+        return self.D * self.S / self.h / self.V * np.sqrt(np.exp((-energy_j + energy_i)/(k*self.T)))
+
+    def _calculate_rates_matrix(self):
+        bfs_explorer = BFSExplorer(self)
+        adj_matrix = bfs_explorer.get_adjacency_matrix()
+        plt.imshow(adj_matrix, cmap="RdBu_r")
+        plt.colorbar()
+        plt.show()
+        self.rates_matrix = np.zeros(adj_matrix.shape)
+        # get the adjacent elements
+        for i in range(len(adj_matrix)):
+            cell_i = bfs_explorer.get_cell_from_adj(i)
+            for j in range(len(adj_matrix)):
+                if adj_matrix[i, j] == 1:
+                    cell_j = bfs_explorer.get_cell_from_adj(j)
+                    self.rates_matrix[i, j] = self._calculate_rates_matrix_ij(cell_i, cell_j)
+        # get the i == j elements
+        for i, row in enumerate(self.rates_matrix):
+            self.rates_matrix[i, i] = - np.sum(row)
+
+    def get_rates_matix(self):
+        """
+        Get (and create if not yet created) the rate matrix of the energy surface.
+
+        Returns:
+            np.ndarray, rates matrix Q
+
+        Raises:
+            ValueError: if there are no self.energies
+        """
+        if not np.any(self.energies):
+            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
+        if not np.any(self.rates_matrix):
+            self._calculate_rates_matrix()
+        return self.rates_matrix
+
+    ############################################################################
+    # -----------------------   VISUALIZATION  ---------------------------------
+    ############################################################################
 
     def visualize_underlying_maze(self, show: bool = True):
         """
@@ -150,11 +185,16 @@ class Energy(AbstractEnergy):
 if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
-    my_maze = Maze((12, 16))
+    my_maze = Maze((10, 12))
     my_energy.from_maze(my_maze, add_noise=True)
-    #energy.visualize()
-    #energy.visualize_underlying_maze()
-    #energy.visualize_3d()
-    bfs_explorer = BFSExplorer(my_energy)
-    bfs_explorer.explore_and_animate()
-    print(bfs_explorer.get_adjacency_matrix())
+    my_energy.visualize()
+    #my_energy.visualize_underlying_maze()
+    #my_energy.visualize_3d()
+    rates_matrix = my_energy.get_rates_matix()
+    w, v = np.linalg.eig(rates_matrix)
+    plt.imshow(rates_matrix, cmap="RdBu_r")
+    plt.colorbar()
+    plt.show()
+    xs = np.linspace(-0.5, 0.5, num=len(v[0]))
+    plt.plot(xs, v[0])
+    plt.show()

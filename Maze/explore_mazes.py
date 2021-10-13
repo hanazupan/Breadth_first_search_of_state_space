@@ -80,6 +80,20 @@ class Explorer(ABC):
             np.save(f"{self.maze.images_path}{self.explorer_name}_adj_matrix_{self.maze.images_name}", self.adj_matrix)
         return self.adj_matrix
 
+    def get_cell_from_adj(self, index: int) -> tuple:
+        """
+        Yields the cell that corresponds to the first, second ... last index in the adjacency matrix.
+
+        Yields:
+            (int, int, ...) a tuple with cell coordinates
+        """
+        if not self.graph:
+            self.explore()
+        #TODO: is this inefficient? should the sorted dict be saved?
+        node_to_cell_dict = nx.get_node_attributes(self.graph, "cell")
+        list_of_cells = [v for k, v in sorted(node_to_cell_dict.items())]
+        return list_of_cells[index]
+
 
 class BFSExplorer(Explorer):
     """
@@ -124,7 +138,7 @@ class BFSExplorer(Explorer):
         accessible[random_cell] = 1
         # for the graph we are using index of the flattened maze as the identifier
         index_rc = self.maze.cell_to_node(random_cell)
-        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell))
+        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
         yield self.maze.energies - accessible
         # take care of the neighbours of the first random cell
@@ -133,7 +147,7 @@ class BFSExplorer(Explorer):
             visited[n] = 1
             if self.maze.is_accessible(n):
                 index_n = self.maze.cell_to_node(n)
-                self.graph.add_node(index_n, energy=self.maze.get_energy(n))
+                self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
                 self.graph.add_edge(index_rc, index_n)
                 accessible[n] = 1
                 check_queue.append(n)
@@ -149,7 +163,7 @@ class BFSExplorer(Explorer):
                 # if accessible, add to queue
                 if self.maze.is_accessible(n):
                     index_n = self.maze.cell_to_node(n)
-                    self.graph.add_node(index_n, energy=self.maze.get_energy(n))
+                    self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
                     self.graph.add_edge(index_cell, index_n)
                     accessible[n] = 1
                     check_queue.append(n)
@@ -208,7 +222,7 @@ class DFSExplorer(Explorer):
         accessible[random_cell] = 1
         # for the graph we are using index of the flattened maze as the identifier
         index_rc = self.maze.cell_to_node(random_cell)
-        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell))
+        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
         yield self.maze.energies - accessible
         # take care of the neighbours of the first random cell
@@ -216,7 +230,7 @@ class DFSExplorer(Explorer):
         for n in neighbours:
             visited[n] = 1
             index_n = self.maze.cell_to_node(n)
-            self.graph.add_node(index_n, energy=self.maze.get_energy(n))
+            self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
             self.graph.add_edge(index_rc, index_n)
             if self.maze.is_accessible(n):
                 accessible[n] = 1
@@ -233,7 +247,7 @@ class DFSExplorer(Explorer):
                 # if accessible, add to queue
                 if self.maze.is_accessible(n):
                     index_n = self.maze.cell_to_node(n)
-                    self.graph.add_node(index_n, energy=self.maze.get_energy(n))
+                    self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
                     self.graph.add_edge(index_cell, index_n)
                     accessible[n] = 1
                     check_queue.append(n)
@@ -434,18 +448,18 @@ class DijkstraExplorer(Explorer):
 
 if __name__ == '__main__':
     img_path = "Images/"
-    my_maze = Maze((30, 30), images_path=img_path, images_name="explore", animate=False)
-    dfs_explorer = DFSExplorer(my_maze)
-    dfs_explorer.explore_and_animate()
-    dfs_explorer.draw_connections_graph(show=False, with_labels=True)
-    dfs_explorer.get_adjacency_matrix()
+    my_maze = Maze((7, 6), images_path=img_path, images_name="explore", animate=False)
+    #dfs_explorer = DFSExplorer(my_maze)
+    #dfs_explorer.explore_and_animate()
+    #dfs_explorer.draw_connections_graph(show=False, with_labels=True)
+    #dfs_explorer.get_adjacency_matrix()
     bfs_explorer = BFSExplorer(my_maze)
-    bfs_explorer.explore_and_animate()
+    #bfs_explorer.explore_and_animate()
     bfs_explorer.draw_connections_graph(show=False, with_labels=True)
-    bfs_explorer.get_adjacency_matrix()
-    dijkstra_exp = DijkstraExplorer(my_maze)
-    dijkstra_exp.explore()
-    dijkstra_exp.draw_connections_graph(show=False, with_labels=True)
-    dijkstra_exp.explore_and_animate()
-    dijkstra_exp.visualize_distances()
-    dijkstra_exp.get_adjacency_matrix()
+    print(bfs_explorer.get_adjacency_matrix())
+    #dijkstra_exp = DijkstraExplorer(my_maze)
+    #dijkstra_exp.explore()
+    #dijkstra_exp.draw_connections_graph(show=False, with_labels=True)
+    #dijkstra_exp.explore_and_animate()
+    #dijkstra_exp.visualize_distances()
+    #dijkstra_exp.get_adjacency_matrix()
