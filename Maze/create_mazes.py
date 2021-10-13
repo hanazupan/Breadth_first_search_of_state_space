@@ -6,145 +6,40 @@ algorithm, visualized as graphs and transformed into an adjacency matrix.
 
 from abc import ABC
 from collections.abc import Sequence
-
 import matplotlib.image
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
 from matplotlib import colors, cm
-import networkx as nx
 
 
+class AbstractEnergy(ABC):
+    """
+    An object with energy data saved in nodes that are connected with edges of possibly different lengths.
+    Each node has a property of energy. There is some energy cutoff that makes some cells accessible and others not.
+    """
 
-class Maze:
-
-    def __init__(self, size: tuple, algorithm: str = 'Prim', animate: bool = False,
-                 images_path: str = "./", images_name: str = "maze"):
+    def __init__(self, energies: np.ndarray, energy_cutoff: float, deltas: np.ndarray, size: tuple,
+                 images_path: str = "./", images_name: str = "abst_energy"):
         """
-        Creates a maze of user-defined size. A maze is represented as a numpy array with:
-            - 1 to represent a wall (high energy)
-            - 0 to represent a hall (low energy)
-            - 2 to represent not assigned cells (should not occur in the final maze)
+        Initialize some properties of all Energy objects.
 
         Args:
-            size: tuple giving the dimensions of the maze
-            algorithm: string, maze generation algorithm, options ['handmade1', 'Prim', 'random']
-            animate: bool, whether an animation of the maze generation should be computed and saved
+            energies: stores an array with energies
+            energy_cutoff: cells with energy strictly below that value are accessible
+            deltas: distances between cells in all dimensions
+            size: tuple containing the size of all dimensions
             images_path: string, path where any generated images/videos will be saved
             images_name: string, identifier of all images/videos generated from this maze object
         """
-        self.algorithm = algorithm
+        self.energies = energies
+        self.deltas = deltas
         self.size = size
-        # deltas are distances between neighbours in all directions
-        self.deltas = np.ones(len(self.size), dtype=int)
-        self.maze = np.full(self.size, 2, dtype=int)
-        self.energy_cutoff = 1
-        # prepare empty objects for solving maze
+        self.energy_cutoff = energy_cutoff
         # prepare for saving images/gifs
         self.images_path = images_path
         self.images_name = images_name
-        # start the generation of a maze
-        if algorithm == 'handmade1':
-            self._create_handmade1()
-        elif algorithm == 'Prim':
-            if animate:
-                ma = MazeAnimation(self)
-                ma.animate_building_maze()
-            else:
-                # necessary to empty the generator
-                for _ in self._create_prim():
-                    pass
-        elif algorithm == 'random':
-            self.maze = np.random.randint(0, 2, size=self.size)
-        else:
-            raise AttributeError("Not a valid algorithm choice.")
-
-    def __repr__(self) -> str:
-        """
-        When using print() on a Maze object, it returns the string representation of self.maze.
-
-        Returns: string representation of self.maze
-
-        """
-        return self.maze.__str__()
-
-    def _create_handmade1(self):
-        """
-        Only for testing. Hand-pick some cells and turn them into halls.
-        Warning: ignores height and width, the size is always (6, 6)
-        """
-        self.size = (6, 6)
-        self.maze = np.full(self.size, 1, dtype=int)
-        self.maze[0:4, 0] = 0
-        self.maze[1, 1] = 0
-        self.maze[3:5, 1] = 0
-        self.maze[0, 3:6] = 0
-        self.maze[2, 3:6] = 0
-        self.maze[4:6, 3] = 0
-        self.maze[5, 5] = 0
-
-    def _create_prim(self) -> Sequence:
-        """
-        Generate a maze using Prim's algorithm. From wiki (https://en.wikipedia.org/wiki/Maze_generation_algorithm):
-        1. Start with a grid full of walls.
-        2. Pick a cell, mark it as part of the maze. Add the walls of the cell to the wall list.
-        3. While there are walls in the list:
-            1. Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
-                1. Make the wall a passage and mark the unvisited cell as part of the maze.
-                2. Add the neighboring walls of the cell to the wall list.
-            2. Remove the wall from the list.
-
-        Yields:
-            An array of current maze state while constructing the maze. Used for animation, else ignored.
-        """
-        wall_list = []
-
-        def create_wall(cell):
-            self.maze[cell] = 1
-            wall_list.append(cell)
-
-        # pick a random cell as a starting point and turn it into a hall
-        random_cell = tuple([np.random.randint(dim) for dim in self.size])
-        self.maze[random_cell] = 0
-        # for video
-        yield self.maze
-        # add walls of the cell to the wall list (periodic boundary conditions)
-        for n in self.get_neighbours(random_cell):
-            create_wall(n)
-        # for video:
-        yield self.maze
-        # continue until you run out of walls
-        while len(wall_list) > 0:
-            random_wall = random.choice(wall_list)
-            neighbours = []
-            for n in self.get_neighbours(random_wall):
-                neighbours.append(n)
-            # whether neighbours are 0, 1 or 2
-            values = [self.maze[cell] for cell in neighbours]
-            # select only neighbours that are halls/empty
-            neig_halls = [n for n in neighbours if self.maze[n] == 0]
-            neig_empty = [n for n in neighbours if self.maze[n] == 2]
-            for n in neig_halls:
-                opposite_side = self.determine_opposite(random_wall, n)
-                # values.count(0) == 1 makes sure all halls are only lines (not thicker than 1 cell)
-                if self.maze[opposite_side] == 2 and values.count(0) == 1:
-                    # make this wall a hall
-                    self.maze[random_wall] = 0
-                    # add directly neighbouring empty cells to the wall_list
-                    for w in neig_empty:
-                        create_wall(w)
-            wall_list.remove(random_wall)
-            # for video
-            yield self.maze
-        # everything unassigned becomes a wall
-        self.maze[self.maze == 2] = 1
-        # to get the final image for animation with no unassigned cells
-        yield self.maze
-
-    ############################################################################
-    # ----------------------   PUBLIC METHODS   --------------------------------
-    ############################################################################
 
     def cell_to_node(self, cell: tuple) -> int:
         """
@@ -213,7 +108,7 @@ class Maze:
                 yield n
 
     def get_energy(self, cell: tuple) -> float:
-        return self.maze[cell]
+        return self.energies[cell]
 
     def is_accessible(self, cell: tuple) -> bool:
         """
@@ -225,7 +120,7 @@ class Maze:
         Returns:
             bool, True if cell accessible, else False
         """
-        return self.maze[cell] < self.energy_cutoff
+        return self.energies[cell] < self.energy_cutoff
 
     def find_random_accessible(self) -> tuple:
         """
@@ -238,26 +133,6 @@ class Maze:
         while not self.is_accessible(cell):
             cell = tuple([np.random.randint(dim) for dim in self.size])
         return cell
-
-    def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
-        """
-        Visualize the Maze with black squares (walls) and white squares (halls).
-
-        Args:
-            show: bool, should the visualization be displayed
-
-        Returns:
-            matplotlib.image.AxesImage, the plot
-        """
-        ax = plt.imshow(self.maze, cmap="Greys")
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
-            plt.close()
-        return ax
 
     def determine_opposite(self, central: tuple, known_hall: tuple) -> tuple:
         """
@@ -291,9 +166,157 @@ class Maze:
         return tuple(neig_cel)
 
 
+class Maze(AbstractEnergy):
+
+    def __init__(self, size: tuple, algorithm: str = 'Prim',
+                 animate: bool = False, images_path: str = "./", images_name: str = "maze"):
+        """
+        Creates a maze of user-defined size. A maze is represented as a numpy array with:
+            - 1 to represent a wall (high energy)
+            - 0 to represent a hall (low energy)
+            - 2 to represent not assigned cells (should not occur in the final maze)
+
+        Args:
+            size: tuple giving the dimensions of the maze
+            algorithm: string, maze generation algorithm, options ['handmade1', 'Prim', 'random']
+            animate: bool, whether an animation of the maze generation should be computed and saved
+            images_path: string, path where any generated images/videos will be saved
+            images_name: string, identifier of all images/videos generated from this maze object
+        """
+
+        self.algorithm = algorithm
+        # deltas are distances between neighbours in all directions
+        deltas = np.ones(len(size), dtype=int)
+        cutoff = 1
+        energies = np.full(size, 2, dtype=int)
+        # super takes care of: initializing energies, energy_cutoff, deltas, size, images_path, images_name
+        super().__init__(energies, cutoff, deltas, size, images_path, images_name)
+        # start the generation of a maze
+        if algorithm == 'handmade1':
+            self._create_handmade1()
+        elif algorithm == 'Prim':
+            if animate:
+                ma = MazeAnimation(self)
+                ma.animate_building_maze()
+            else:
+                # necessary to empty the generator
+                for _ in self._create_prim():
+                    pass
+        elif algorithm == 'random':
+            self.energies = np.random.randint(0, 2, size=self.size)
+        else:
+            raise AttributeError("Not a valid algorithm choice.")
+
+    def __repr__(self) -> str:
+        """
+        When using print() on a Maze object, it returns the string representation of self.energies.
+
+        Returns: string representation of self.energies
+
+        """
+        return self.energies.__str__()
+
+    def _create_handmade1(self):
+        """
+        Only for testing. Hand-pick some cells and turn them into halls.
+        Warning: ignores height and width, the size is always (6, 6)
+        """
+        self.size = (6, 6)
+        self.energies = np.full(self.size, 1, dtype=int)
+        self.energies[0:4, 0] = 0
+        self.energies[1, 1] = 0
+        self.energies[3:5, 1] = 0
+        self.energies[0, 3:6] = 0
+        self.energies[2, 3:6] = 0
+        self.energies[4:6, 3] = 0
+        self.energies[5, 5] = 0
+
+    def _create_prim(self) -> Sequence:
+        """
+        Generate a maze using Prim's algorithm. From wiki (https://en.wikipedia.org/wiki/Maze_generation_algorithm):
+        1. Start with a grid full of walls.
+        2. Pick a cell, mark it as part of the maze. Add the walls of the cell to the wall list.
+        3. While there are walls in the list:
+            1. Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
+                1. Make the wall a passage and mark the unvisited cell as part of the maze.
+                2. Add the neighboring walls of the cell to the wall list.
+            2. Remove the wall from the list.
+
+        Yields:
+            An array of current maze state while constructing the maze. Used for animation, else ignored.
+        """
+        wall_list = []
+
+        def create_wall(cell):
+            self.energies[cell] = 1
+            wall_list.append(cell)
+
+        # pick a random cell as a starting point and turn it into a hall
+        random_cell = tuple([np.random.randint(dim) for dim in self.size])
+        self.energies[random_cell] = 0
+        # for video
+        yield self.energies
+        # add walls of the cell to the wall list (periodic boundary conditions)
+        for n in self.get_neighbours(random_cell):
+            create_wall(n)
+        # for video:
+        yield self.energies
+        # continue until you run out of walls
+        while len(wall_list) > 0:
+            random_wall = random.choice(wall_list)
+            neighbours = []
+            for n in self.get_neighbours(random_wall):
+                neighbours.append(n)
+            # whether neighbours are 0, 1 or 2
+            values = [self.energies[cell] for cell in neighbours]
+            # select only neighbours that are halls/empty
+            neig_halls = [n for n in neighbours if self.energies[n] == 0]
+            neig_empty = [n for n in neighbours if self.energies[n] == 2]
+            for n in neig_halls:
+                opposite_side = self.determine_opposite(random_wall, n)
+                # values.count(0) == 1 makes sure all halls are only lines (not thicker than 1 cell)
+                if self.energies[opposite_side] == 2 and values.count(0) == 1:
+                    # make this wall a hall
+                    self.energies[random_wall] = 0
+                    # add directly neighbouring empty cells to the wall_list
+                    for w in neig_empty:
+                        create_wall(w)
+            wall_list.remove(random_wall)
+            # for video
+            yield self.energies
+        # everything unassigned becomes a wall
+        self.energies[self.energies == 2] = 1
+        # to get the final image for animation with no unassigned cells
+        yield self.energies
+
+    ############################################################################
+    # ----------------------   PUBLIC METHODS   --------------------------------
+    ############################################################################
+
+    def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
+        """
+        Visualize the Maze with black squares (walls) and white squares (halls).
+
+        Args:
+            show: bool, should the visualization be displayed
+
+        Returns:
+            matplotlib.image.AxesImage, the plot
+        """
+        ax = plt.imshow(self.energies, cmap="Greys")
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
+        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        return ax
+
+
 class MazeAnimation:
 
-    def __init__(self, maze_to_animate: Maze):
+    def __init__(self, maze_to_animate: AbstractEnergy):
         """
         MazeAnimation class enables creating an animation of a specific algorithm on a Maze object.
 
@@ -305,8 +328,8 @@ class MazeAnimation:
         """
         self.iterator = None
         self.iterator_value = None
-        self.maze = maze_to_animate
-        if len(self.maze.size) != 2:
+        self.energies = maze_to_animate
+        if len(self.energies.size) != 2:
             raise ValueError("Animation only possible for 2D mazes.")
         self.fig, self.ax = plt.subplots()
 
@@ -330,7 +353,7 @@ class MazeAnimation:
             name_addition: how the gifs resulting from this animation process should be identified
             **kwargs: named arguments that can be passed to plt.imshow(), e.g. cmap
         """
-        height, width = self.maze.size
+        height, width = self.energies.size
         self.ax = plt.imshow(next(self.iterator), animated=True, **kwargs)
 
         def updatefig(i):
@@ -345,7 +368,7 @@ class MazeAnimation:
         anim = animation.FuncAnimation(self.fig, updatefig, blit=True, frames=self.iterator,
                                        repeat=False, interval=10, save_count=height * width)
         writergif = animation.PillowWriter(fps=50)
-        anim.save(self.maze.images_path + f"{name_addition}_{self.maze.images_name}.gif", writer=writergif)
+        anim.save(self.energies.images_path + f"{name_addition}_{self.energies.images_name}.gif", writer=writergif)
         plt.close()
 
     def animate_building_maze(self):
@@ -355,7 +378,7 @@ class MazeAnimation:
             gray = wall
             black = unassigned
         """
-        self.iterator = self.maze._create_prim()
+        self.iterator = self.energies._create_prim()
         self._animate("building", cmap="Greys")
 
     def animate_search(self, name, iterator):
@@ -411,4 +434,4 @@ class MazeAnimation:
 if __name__ == '__main__':
     path = "Images/"
     maze = Maze((20, 20), images_path=path, images_name="new", animate=True)
-    maze.visualize(show=False)
+    maze.visualize(show=True)

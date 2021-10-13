@@ -9,12 +9,12 @@ def test_init():
     for alg in all_algorithms:
         test_maze = Maze((17, 8), algorithm=alg)
         # shape correct
-        assert test_maze.maze.shape == (17, 8)
+        assert test_maze.energies.shape == (17, 8)
         # only 0 and 1 in the final maze
-        shape = test_maze.maze.shape
+        shape = test_maze.energies.shape
         for x in range(shape[0]):
             for y in range(shape[1]):
-                assert test_maze.maze[x, y] in [0, 1]
+                assert test_maze.energies[x, y] in [0, 1]
 
 
 def test_run_everything():

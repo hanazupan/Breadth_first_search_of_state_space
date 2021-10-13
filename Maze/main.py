@@ -73,5 +73,5 @@ def create_and_explore_maze(args):
 
 
 if __name__ == '__main__':
-    args = parser.parse_args()
-    create_and_explore_maze(args)
+    my_args = parser.parse_args()
+    create_and_explore_maze(my_args)

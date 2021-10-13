@@ -1,4 +1,4 @@
-from create_mazes import Maze, MazeAnimation
+from create_mazes import Maze, MazeAnimation, AbstractEnergy
 from abc import ABC, abstractmethod
 import networkx as nx
 import numpy as np
@@ -11,7 +11,7 @@ import heapq
 
 class Explorer(ABC):
 
-    def __init__(self, maze: Maze, explorer_name: str):
+    def __init__(self, energy: AbstractEnergy, explorer_name: str):
         """
         Abstract class for algorithms exploring mazes.
 
@@ -19,7 +19,7 @@ class Explorer(ABC):
             maze: the Maze object that will be explored
             explorer_name: for the purposes of saving images/gifs, each subclass will have a unique name.
         """
-        self.maze = maze
+        self.maze = energy
         self.graph = nx.Graph()
         self.adj_matrix = None
         self.explorer_name = explorer_name
@@ -114,7 +114,7 @@ class BFSExplorer(Explorer):
             A numpy array with 0 = undiscovered passage, 1 = wall, -1 = discovered passage
         """
         # for video
-        yield self.maze.maze
+        yield self.maze.energies
         visited = np.zeros(self.maze.size, dtype=int)
         accessible = np.zeros(self.maze.size, dtype=int)
         check_queue = deque()
@@ -126,7 +126,7 @@ class BFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell))
         # for video
-        yield self.maze.maze - accessible
+        yield self.maze.energies - accessible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -154,9 +154,9 @@ class BFSExplorer(Explorer):
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
-            yield self.maze.maze - accessible
-        # accessible states must be the logical inverse of the maze
-        assert np.all(np.logical_not(accessible) == self.maze.maze)
+            yield self.maze.energies - accessible
+        # accessible states must be the logical inverse of the maze - but only true of pure mazes (not energies)
+        #assert np.all(np.logical_not(accessible) == self.maze.energies)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
@@ -198,7 +198,7 @@ class DFSExplorer(Explorer):
             A numpy array with 0 = undiscovered passage, 1 = wall, -1 = discovered passage
         """
         # for video
-        yield self.maze.maze
+        yield self.maze.energies
         visited = np.zeros(self.maze.size, dtype=int)
         accessible = np.zeros(self.maze.size, dtype=int)
         check_queue = []
@@ -210,7 +210,7 @@ class DFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell))
         # for video
-        yield self.maze.maze - accessible
+        yield self.maze.energies - accessible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -238,9 +238,9 @@ class DFSExplorer(Explorer):
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
-            yield self.maze.maze - accessible
+            yield self.maze.energies - accessible
         # accessible states must be the logical inverse of the maze
-        assert np.all(np.logical_not(accessible) == self.maze.maze)
+        assert np.all(np.logical_not(accessible) == self.maze.energies)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
@@ -333,7 +333,7 @@ class DijkstraExplorer(Explorer):
                 pass
         for_plotting = np.zeros(self.maze.size, dtype=int)
         for_plotting[self.start_cell] = 1
-        array_to_plot = np.where(self.visited != 0, self.distances, self.maze.maze * 1000) + for_plotting
+        array_to_plot = np.where(self.visited != 0, self.distances, self.maze.energies * 1000) + for_plotting
         max_value = np.max(array_to_plot[array_to_plot < 1000])
         my_cmap = cm.get_cmap("plasma")
         my_cmap.set_under("white")
@@ -342,7 +342,7 @@ class DijkstraExplorer(Explorer):
         plt.gca().axes.get_yaxis().set_visible(False)
         plt.plot(self.start_cell[1], self.start_cell[0], marker="o", color="white", linewidth=1.5)
         plt.plot(self.end_cell[1], self.end_cell[0], marker="x", color="black", linewidth=1.5)
-        for x,y in self.path[1:-1]:
+        for x, y in self.path[1:-1]:
             plt.plot(y, x, marker="o", color="white", markeredgecolor="k", linewidth=0.5, markersize=4)
         plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=max_value+1)
         plt.savefig(self.maze.images_path + f"distances_{self.maze.images_name}.png", dpi=1200)
@@ -381,7 +381,7 @@ class DijkstraExplorer(Explorer):
                             distance=0, cell=current_cell)
         self.distances[current_cell] = 0
         # here first frame of the animation
-        yield np.where(self.visited != 0, self.distances, self.maze.maze*1000) + for_plotting
+        yield np.where(self.visited != 0, self.distances, self.maze.energies*1000) + for_plotting
         # determine accessible neighbours - their distances to
         for an in self.maze.get_accessible_neighbours(current_cell):
             # element in the priority queue must start with priority marker, here tentative distance
@@ -393,7 +393,7 @@ class DijkstraExplorer(Explorer):
             priority_an = (self.distances[an], an)
             heapq.heappush(check_queue, priority_an)
         # here snapshot for animation
-        yield np.where(self.visited != 0, self.distances, self.maze.maze*1000) + for_plotting
+        yield np.where(self.visited != 0, self.distances, self.maze.energies*1000) + for_plotting
         self.visited[current_cell] = 1
         while check_queue:
             priority_cell, current_cell = heapq.heappop(check_queue)
@@ -412,7 +412,7 @@ class DijkstraExplorer(Explorer):
                     heapq.heappush(check_queue, priority_n)
             self.visited[current_cell] = 1
             # here snapshot for animation
-            yield np.where(self.visited != 0, self.distances, self.maze.maze * 1000) + for_plotting
+            yield np.where(self.visited != 0, self.distances, self.maze.energies * 1000) + for_plotting
             if self.visited[self.end_cell] == 1:
                 # create a path by going backwards: start with end cell and always decrease in distance
                 path = [self.end_cell]
@@ -433,8 +433,8 @@ class DijkstraExplorer(Explorer):
 
 
 if __name__ == '__main__':
-    path = "Images/"
-    my_maze = Maze((30, 30), images_path=path, images_name="explore", animate=False)
+    img_path = "Images/"
+    my_maze = Maze((30, 30), images_path=img_path, images_name="explore", animate=False)
     dfs_explorer = DFSExplorer(my_maze)
     dfs_explorer.explore_and_animate()
     dfs_explorer.draw_connections_graph(show=False, with_labels=True)
