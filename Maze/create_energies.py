@@ -261,7 +261,16 @@ if __name__ == '__main__':
     #my_energy.visualize_boltzmann()
     my_energy.visualize()
     my_energy.visualize_3d()
-    my_energy.get_rates_matix()
+    rates_matrix = my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors()
+    # experimentation
+    # from sklearn.decomposition import PCA
+    # pca = PCA(n_components=2)
+    # principalComponents = pca.fit_transform(rates_matrix)
+    # xs = np.linspace(-0.5, 0.5, num=len(principalComponents[:, 0]))
+    # fig, ax = plt.subplots(1, 2, sharey="row")
+    # ax[0].plot(xs, principalComponents[:, 0], "black")
+    # ax[1].plot(xs, principalComponents[:, 1], "black")
+    # plt.show()
 
