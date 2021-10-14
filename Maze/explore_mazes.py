@@ -16,7 +16,7 @@ class Explorer(ABC):
         Abstract class for algorithms exploring mazes.
 
         Args:
-            maze: the Maze object that will be explored
+            energy: the AbstractEnergy object that will be explored
             explorer_name: for the purposes of saving images/gifs, each subclass will have a unique name.
         """
         self.maze = energy
@@ -58,7 +58,6 @@ class Explorer(ABC):
         nx.draw_kamada_kawai(self.graph, **kwargs)
         plt.savefig(self.maze.images_path +
                     f"{self.explorer_name}_graph_{self.maze.images_name}.png", bbox_inches='tight', dpi=1200)
-        # causes MatplotlibDeprecationWarning
         if show:
             plt.show()
         else:
@@ -125,7 +124,7 @@ class BFSExplorer(Explorer):
             3. Mark all its accessible neighbours as accessible and add them to the queue
 
         Yields:
-            A numpy array with 0 = undiscovered passage, 1 = wall, -1 = discovered passage
+            A numpy array with 0 = undiscovered passage, 1 = wall, -100 = discovered passage
         """
         # for video
         yield self.maze.energies
@@ -169,8 +168,6 @@ class BFSExplorer(Explorer):
                     check_queue.append(n)
             # for video
             yield self.maze.energies - 100*accessible
-        # accessible states must be the logical inverse of the maze - but only true of pure mazes (not energies)
-        #assert np.all(np.logical_not(accessible) == self.maze.energies)
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
@@ -200,16 +197,15 @@ class DFSExplorer(Explorer):
         """
         Perform a depth-first search of the maze. This also generates a graph of connections and an
         adjacency matrix of the maze. The algorithm does this:
-        TODO: edit this
         1. Find a random accessible cell in the maze, mark it as visited and accessible
-        2. Add accessible neighbours of the cell to the queue
+        2. Add all neighbours to the stack
         3. While queue not empty:
-            1. Take an element from the beginning of the queue
+            1. Take the last element from the stack
             2. Mark all its unvisited neighbours as visited
-            3. Mark all its accessible neighbours as accessible and add them to the queue
+            3. Mark all its accessible neighbours as accessible and add them to the stack
 
         Yields:
-            A numpy array with 0 = undiscovered passage, 1 = wall, -1 = discovered passage
+            A numpy array with 0 = undiscovered passage, 1 = wall, -100 = discovered passage
         """
         # for video
         yield self.maze.energies
@@ -241,7 +237,7 @@ class DFSExplorer(Explorer):
             index_cell = self.maze.cell_to_node(cell)
             neighbours = self.maze.get_neighbours(cell)
             # if neighbours visited already, don't need to bother with them
-            unvis_neig = [n for n in neighbours if visited[n] == 0 and self.maze.is_accessible(n)]
+            unvis_neig = [n for n in neighbours if visited[n] == 0]
             for n in unvis_neig:
                 visited[n] = 1
                 # if accessible, add to queue
@@ -349,7 +345,7 @@ class DijkstraExplorer(Explorer):
         for_plotting[self.start_cell] = 1
         array_to_plot = np.where(self.visited != 0, self.distances, self.maze.energies * 1000) + for_plotting
         max_value = np.max(array_to_plot[array_to_plot < 1000])
-        my_cmap = cm.get_cmap("plasma")
+        my_cmap = cm.get_cmap("plasma").copy()
         my_cmap.set_under("white")
         my_cmap.set_over("black")
         plt.gca().axes.get_xaxis().set_visible(False)
@@ -448,18 +444,18 @@ class DijkstraExplorer(Explorer):
 
 if __name__ == '__main__':
     img_path = "Images/"
-    my_maze = Maze((7, 6), images_path=img_path, images_name="explore", animate=False)
-    #dfs_explorer = DFSExplorer(my_maze)
-    #dfs_explorer.explore_and_animate()
-    #dfs_explorer.draw_connections_graph(show=False, with_labels=True)
-    #dfs_explorer.get_adjacency_matrix()
+    my_maze = Maze((16, 16), images_path=img_path, images_name="explore", animate=False)
+    dfs_explorer = DFSExplorer(my_maze)
+    dfs_explorer.explore_and_animate()
+    dfs_explorer.draw_connections_graph(show=False, with_labels=True)
+    dfs_explorer.get_adjacency_matrix()
     bfs_explorer = BFSExplorer(my_maze)
-    #bfs_explorer.explore_and_animate()
+    bfs_explorer.explore_and_animate()
     bfs_explorer.draw_connections_graph(show=False, with_labels=True)
-    print(bfs_explorer.get_adjacency_matrix())
-    #dijkstra_exp = DijkstraExplorer(my_maze)
-    #dijkstra_exp.explore()
-    #dijkstra_exp.draw_connections_graph(show=False, with_labels=True)
-    #dijkstra_exp.explore_and_animate()
-    #dijkstra_exp.visualize_distances()
-    #dijkstra_exp.get_adjacency_matrix()
+    bfs_explorer.get_adjacency_matrix()
+    dijkstra_exp = DijkstraExplorer(my_maze)
+    dijkstra_exp.explore()
+    dijkstra_exp.draw_connections_graph(show=False, with_labels=True)
+    dijkstra_exp.explore_and_animate()
+    dijkstra_exp.visualize_distances()
+    dijkstra_exp.get_adjacency_matrix()

@@ -418,7 +418,7 @@ class MazeAnimation:
             np.ndarray, the array of distances from start_cell
         """
         self.iterator = iterator
-        cmap = cm.get_cmap("RdBu")
+        cmap = cm.get_cmap("RdBu").copy()
         cmap.set_under("white")
         cmap.set_over("black")
         self._put_marker(end_cell[1], end_cell[0], "x", color="black", linewidth=1.5)
