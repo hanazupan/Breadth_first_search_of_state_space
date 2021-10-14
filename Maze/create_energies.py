@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors
+import networkx as nx
 #from scipy.constants import k
 from mpl_toolkits import mplot3d  # a necessary import
 
@@ -291,13 +292,16 @@ class Energy(AbstractEnergy):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not np.any(self.rates_matrix):
             self._calculate_rates_matrix()
-        fig, ax = plt.subplots(1, 2, sharey="row")
-        boltzmanns = np.exp(-self.energies/(k*self.T))
-        norm = colors.TwoSlopeNorm(vcenter=0)
-        ax[0].imshow(self.energies, cmap="RdBu_r", norm=norm)
-        ax[0].set_title("Energy")
-        ax[1].imshow(boltzmanns, cmap="RdBu_r")
-        ax[1].set_title("Boltzmann distribution")
+        bfs_explorer = BFSExplorer(self)
+        g = bfs_explorer.explore()
+        node_to_cell_dict = nx.get_node_attributes(g, "cell")
+        list_of_cells = [v for key, v in sorted(node_to_cell_dict.items())]
+        boltzmans = []
+        for cell in list_of_cells:
+            energy = self.get_energy(cell)
+            boltzmans.append(np.exp(-energy/(k*self.T)))
+        plt.plot(boltzmans, "black")
+        plt.title("Boltzmann distribution")
         plt.savefig(self.images_path + f"boltzmann_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
             plt.show()
@@ -311,7 +315,7 @@ if __name__ == '__main__':
     my_maze = Maze((12, 15))
     my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize_underlying_maze(show=False)
-    #my_energy.visualize_boltzmann()
+    my_energy.visualize_boltzmann()
     my_energy.visualize(show=False)
     my_energy.visualize_3d(show=True)
     rates_matrix = my_energy.get_rates_matix()
