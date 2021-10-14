@@ -50,7 +50,6 @@ class Energy(AbstractEnergy):
         self.energy_cutoff = 5
         self.deltas = np.ones(len(self.size), dtype=int)
 
-
     def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
         """
         A function for creating a energy surface from a 2D Maze object.
@@ -312,14 +311,9 @@ class Energy(AbstractEnergy):
         if not np.any(self.rates_matrix):
             self._calculate_rates_matrix()
         bfs_explorer = BFSExplorer(self)
-        g = bfs_explorer.explore()
-        node_to_cell_dict = nx.get_node_attributes(g, "cell")
-        list_of_cells = [v for key, v in sorted(node_to_cell_dict.items())]
-        boltzmans = []
-        for cell in list_of_cells:
-            energy = self.get_energy(cell)
-            boltzmans.append(np.exp(-energy/(k*self.T)))
-        plt.plot(boltzmans, "black")
+        list_of_cells = bfs_explorer.get_sorted_accessible_cells()
+        boltzmanns = [np.exp(-self.get_energy(cell)/(k*self.T)) for cell in list_of_cells]
+        plt.plot(boltzmanns, "black")
         plt.title("Boltzmann distribution")
         plt.savefig(self.images_path + f"boltzmann_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:

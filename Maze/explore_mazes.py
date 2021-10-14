@@ -23,6 +23,7 @@ class Explorer(ABC):
         self.graph = nx.Graph()
         self.adj_matrix = None
         self.explorer_name = explorer_name
+        self.sorted_accessible_cells = None
 
     @abstractmethod
     def explore(self) -> nx.Graph:
@@ -86,12 +87,25 @@ class Explorer(ABC):
         Yields:
             (int, int, ...) a tuple with cell coordinates
         """
-        if not self.graph:
-            self.explore()
-        #TODO: is this inefficient? should the sorted dict be saved?
-        node_to_cell_dict = nx.get_node_attributes(self.graph, "cell")
-        list_of_cells = [v for k, v in sorted(node_to_cell_dict.items())]
-        return list_of_cells[index]
+        if not np.any(self.sorted_accessible_cells):
+            if not self.graph:
+                self.explore()
+            self.get_sorted_accessible_cells()
+        return self.sorted_accessible_cells[index]
+
+    def get_sorted_accessible_cells(self) -> list:
+        """
+        Get (or generate) a list of accessible cells, sorted by their node index
+        TODO: should this be a generator?
+        Returns:
+            a list of accessible cells, sorted by their node index
+        """
+        if not np.any(self.sorted_accessible_cells):
+            if not self.graph:
+                self.explore()
+            node_to_cell_dict = nx.get_node_attributes(self.graph, "cell")
+            self.sorted_accessible_cells = [v for k, v in sorted(node_to_cell_dict.items())]
+        return self.sorted_accessible_cells
 
 
 class BFSExplorer(Explorer):
