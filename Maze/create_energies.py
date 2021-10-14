@@ -32,7 +32,7 @@ class Energy(AbstractEnergy):
 
     def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
         """
-        A function for creating a energy surface from a Maze object.
+        A function for creating a energy surface from a 2D Maze object.
 
         Args:
             maze: a Maze object that should be changed into an energy surface.
@@ -40,19 +40,24 @@ class Energy(AbstractEnergy):
             factor_grid: int, how many times more points for interpolation than in original maze
                          (note: factor_grid > 2 produces very localized min/max)
         """
-        # for now let's assume the maze to be 2D TODO: change this to enable any dimensionality
+        # interpolation only available for 2D mazes
+        if len(maze.size) != 2:
+            raise ValueError("Maze does not have the right dimensionality.")
         # sparse grid
         size_x, size_y = complex(maze.size[0]), complex(maze.size[1])
         x_edges, y_edges = np.mgrid[-1:1:size_x, -1:1:size_y]
+        # could also do that to work with any dimensionality in case the interpolation scheme also changes
+        # dense_size = tuple(np.linspace(-1, 1, num=factor_grid*ms) for ms in maze.size)
+        # grid_dense = np.meshgrid(*dense_size)
         # dense grid
         self.grid_x, self.grid_y = np.mgrid[-1:1:factor_grid*size_x, -1:1:factor_grid*size_y]
         z = maze.energies
         # change some random zeroes into -1 and -2
         if add_noise:
-            for _ in range(round(0.05*maze.size[0]*maze.size[1])):
+            for _ in range(int(0.05*np.prod(maze.size))):
                 cell = maze.find_random_accessible()
                 z[cell] = -1
-            for _ in range(round(0.01*maze.size[0]*maze.size[1])):
+            for _ in range(int(0.05*np.prod(maze.size))):
                 cell = maze.find_random_accessible()
                 z[cell] = -2
         self.underlying_maze = z
@@ -110,7 +115,7 @@ class Energy(AbstractEnergy):
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
 
-    def get_rates_matix(self):
+    def get_rates_matix(self) -> np.ndarray:
         """
         Get (and create if not yet created) the rate matrix of the energy surface.
 
@@ -207,7 +212,8 @@ class Energy(AbstractEnergy):
         ws, vs = np.linalg.eig(self.rates_matrix.T)
         # sort the eigenvectors according to value of eigenvalues
         eigenv = [(w, v) for w, v in zip(ws, vs)]
-        eigenv.sort()
+
+        eigenv.sort(reverse=True)
         fig, ax = plt.subplots(1, num, sharey="row")
         xs = np.linspace(-0.5, 0.5, num=len(eigenv))
         for i in range(num):
@@ -307,7 +313,7 @@ if __name__ == '__main__':
     my_energy.visualize_underlying_maze(show=False)
     #my_energy.visualize_boltzmann()
     my_energy.visualize(show=False)
-    my_energy.visualize_3d(show=False)
+    my_energy.visualize_3d(show=True)
     rates_matrix = my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors()
