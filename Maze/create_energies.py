@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors
+from scipy.sparse.linalg import eigs
+from scipy.sparse import csr_matrix
 import networkx as nx
 #from scipy.constants import k
 from mpl_toolkits import mplot3d  # a necessary import
@@ -232,15 +234,18 @@ class Energy(AbstractEnergy):
         if not np.any(self.rates_matrix):
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
-        ws, vs = np.linalg.eig(self.rates_matrix.T)
+        #ws, vs = np.linalg.eig(self.rates_matrix.T)
+        Q = csr_matrix(self.rates_matrix)
+        eigenval, eigenvec = eigs(Q.T, num, which='LR')
+        print(eigenvec.imag.max())
         # sort the eigenvectors according to value of eigenvalues
-        eigenv = [(w, v) for w, v in zip(ws, vs)]
-        eigenv.sort(reverse=True)
+        #eigenv = [(w, v) for w, v in zip(ws, vs)]
+       # eigenv.sort(reverse=True)
         fig, ax = plt.subplots(1, num, sharey="row")
-        xs = np.linspace(-0.5, 0.5, num=len(eigenv))
+        xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
         for i in range(num):
             # plot eigenvectors corresponding to the largest (most negative) eigenvalues
-            ax[i].plot(xs, eigenv[i][1], "black")
+            ax[i].plot(xs, eigenvec[:,i], "black")
             ax[i].set_title(f"Eigenvector {i}")
             ax[i].axes.get_xaxis().set_visible(False)
         plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
@@ -333,7 +338,7 @@ if __name__ == '__main__':
     #my_energy.from_potential()
     my_energy.from_maze(my_maze, add_noise=True)
     #my_energy.visualize_underlying_maze(show=False)
-    #my_energy.visualize_boltzmann()
+    my_energy.visualize_boltzmann()
     my_energy.visualize(show=True)
     #my_energy.visualize_3d(show=True)
     my_energy.get_rates_matix()
