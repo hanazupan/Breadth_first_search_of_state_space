@@ -31,6 +31,26 @@ class Energy(AbstractEnergy):
         self.grid_x = None
         self.grid_y = None
 
+    def from_potential(self, size=None):
+        """
+        For testing - initiate an energy surface with a 2D potential well.
+        """
+        if not size:
+            size = (12, 16)
+        self.size = size
+        size_x, size_y = complex(size[0]), complex(size[1])
+        self.grid_x, self.grid_y = np.mgrid[-2:2:size_x, -2:2:size_y]
+
+        def square_well(x, y, a=1, b=5):
+            return a*(x**2 - 1)**2 + b*(y**2 - 1)**2
+
+        xaxis = np.linspace(-2, 2, size[0])
+        yaxis = np.linspace(-2, 2, size[1])
+        self.energies = square_well(xaxis[:, None], yaxis[None, :])
+        self.energy_cutoff = 5
+        self.deltas = np.ones(len(self.size), dtype=int)
+
+
     def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
         """
         A function for creating a energy surface from a 2D Maze object.
@@ -87,8 +107,8 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        energy_i = self.energies[cell_i]
-        energy_j = self.energies[cell_j]
+        energy_i = self.get_energy(cell_i)
+        energy_j = self.get_energy(cell_j)
         return self.D * self.S / self.h / self.V * np.sqrt(np.exp((-energy_j + energy_i)/(k*self.T)))
 
     def _calculate_rates_matrix(self):
@@ -213,7 +233,6 @@ class Energy(AbstractEnergy):
         ws, vs = np.linalg.eig(self.rates_matrix.T)
         # sort the eigenvectors according to value of eigenvalues
         eigenv = [(w, v) for w, v in zip(ws, vs)]
-
         eigenv.sort(reverse=True)
         fig, ax = plt.subplots(1, num, sharey="row")
         xs = np.linspace(-0.5, 0.5, num=len(eigenv))
@@ -313,10 +332,11 @@ if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
     my_maze = Maze((12, 15))
-    my_energy.from_maze(my_maze, add_noise=True)
-    my_energy.visualize_underlying_maze(show=False)
+    my_energy.from_potential()
+    #my_energy.from_maze(my_maze, add_noise=True)
+    #my_energy.visualize_underlying_maze(show=False)
     my_energy.visualize_boltzmann()
-    my_energy.visualize(show=False)
+    my_energy.visualize(show=True)
     my_energy.visualize_3d(show=True)
     rates_matrix = my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
