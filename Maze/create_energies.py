@@ -189,17 +189,32 @@ class Energy(AbstractEnergy):
         return ax
 
     def visualize_eigenvectors(self, show: bool = True, num: int = 3):
+        """
+        Visualize the eigenvectors of rate matrix.
+
+        Args:
+            show: bool, whether to display the image
+            num: int, how many eigenvectors to display
+
+        Raises:
+            ValueError: if there are no self.energies
+        """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not np.any(self.rates_matrix):
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
-        w, v = np.linalg.eig(self.rates_matrix.T)
+        ws, vs = np.linalg.eig(self.rates_matrix.T)
+        # sort the eigenvectors according to value of eigenvalues
+        eigenv = [(w, v) for w, v in zip(ws, vs)]
+        eigenv.sort()
         fig, ax = plt.subplots(1, num, sharey="row")
-        xs = np.linspace(-0.5, 0.5, num=len(v[0]))
+        xs = np.linspace(-0.5, 0.5, num=len(eigenv))
         for i in range(num):
-            ax[i].plot(xs, v[i], "black")
+            # plot eigenvectors corresponding to the largest (most negative) eigenvalues
+            ax[i].plot(xs, eigenv[i][1], "black")
             ax[i].set_title(f"Eigenvector {i}")
+            ax[i].axes.get_xaxis().set_visible(False)
         plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
             plt.show()
@@ -207,6 +222,15 @@ class Energy(AbstractEnergy):
             plt.close()
 
     def visualize_eigenvalues(self, show: bool = True):
+        """
+        Visualize the eigenvalues of rate matrix.
+
+        Args:
+            show: bool, whether to display the image
+
+        Raises:
+            ValueError: if there are no self.energies
+        """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not np.any(self.rates_matrix):
