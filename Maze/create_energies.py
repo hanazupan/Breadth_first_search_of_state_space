@@ -84,7 +84,7 @@ class Energy(AbstractEnergy):
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
+        self.energies = np.rot90(interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck), k=3)
         self.size = self.energies.shape
         self.deltas = np.ones(len(self.size), dtype=int)
 
@@ -187,6 +187,8 @@ class Energy(AbstractEnergy):
         lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0), shading='auto')
         ax = plt.pcolormesh(self.grid_x, self.grid_y, self.energies, **lims)
         plt.colorbar()
+        ax.axes.get_xaxis().set_visible(False)
+        ax.axes.get_yaxis().set_visible(False)
         ax.figure.savefig(self.images_path + f"energy_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
             plt.show()
@@ -206,6 +208,7 @@ class Energy(AbstractEnergy):
         ax = plt.axes(projection='3d')
         ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
                         cmap='RdBu_r', edgecolor='none')
+        #ax.set_axis_off()
         ax.figure.savefig(self.images_path + f"3D_energy_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
             plt.show()
@@ -325,16 +328,17 @@ class Energy(AbstractEnergy):
 if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
-    my_maze = Maze((12, 15))
-    my_energy.from_potential()
-    #my_energy.from_maze(my_maze, add_noise=True)
+    my_maze = Maze((15, 15), images_path=img_path)
+    my_maze.visualize()
+    #my_energy.from_potential()
+    my_energy.from_maze(my_maze, add_noise=True)
     #my_energy.visualize_underlying_maze(show=False)
-    my_energy.visualize_boltzmann()
+    #my_energy.visualize_boltzmann()
     my_energy.visualize(show=True)
-    my_energy.visualize_3d(show=True)
-    rates_matrix = my_energy.get_rates_matix()
-    my_energy.visualize_rates_matrix()
+    #my_energy.visualize_3d(show=True)
+    my_energy.get_rates_matix()
+    #my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors()
-    my_energy.visualize_eigenvalues()
+    #my_energy.visualize_eigenvalues()
 
 
