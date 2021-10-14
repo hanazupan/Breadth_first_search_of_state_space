@@ -7,9 +7,8 @@ from matplotlib import colors
 #from scipy.constants import k
 from mpl_toolkits import mplot3d  # a necessary import
 
-# for now we are unitless, I will decide on k = 1
 # WARNING! REDEFINING BOLTZMANN CONSTANT!
-k = 1
+k = 0.008314463  # kjoule/mol/kelvin
 
 
 class Energy(AbstractEnergy):
@@ -194,13 +193,37 @@ class Energy(AbstractEnergy):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not np.any(self.rates_matrix):
             self._calculate_rates_matrix()
-        w, v = np.linalg.eig(self.rates_matrix)
+        # left eigenvectors and eigenvalues
+        w, v = np.linalg.eig(self.rates_matrix.T)
         fig, ax = plt.subplots(1, num, sharey="row")
         xs = np.linspace(-0.5, 0.5, num=len(v[0]))
         for i in range(num):
             ax[i].plot(xs, v[i], "black")
             ax[i].set_title(f"Eigenvector {i}")
         plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+    def visualize_eigenvalues(self, show: bool = True):
+        if not np.any(self.energies):
+            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
+        if not np.any(self.rates_matrix):
+            self._calculate_rates_matrix()
+        # left eigenvectors and eigenvalues
+        w, v = np.linalg.eig(self.rates_matrix.T)
+        w.sort()
+        w = w[::-1]
+        plt.subplots(1, 1)
+        xs = np.linspace(0, 1, num=len(w))
+        plt.scatter(xs, w, s=5, c="black")
+        for i, eigenw in enumerate(w):
+            plt.vlines(xs[i], eigenw, 0, "black", linewidth=0.5)
+        plt.hlines(0, 0, 1, "black")
+        plt.title("Eigenvalues")
+        plt.gca().axes.get_xaxis().set_visible(False)
+        plt.savefig(self.images_path + f"eigenvalues_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
             plt.show()
         else:
@@ -257,20 +280,13 @@ if __name__ == '__main__':
     my_energy = Energy(images_path=img_path)
     my_maze = Maze((12, 15))
     my_energy.from_maze(my_maze, add_noise=True)
-    my_energy.visualize_underlying_maze()
+    my_energy.visualize_underlying_maze(show=False)
     #my_energy.visualize_boltzmann()
-    my_energy.visualize()
-    my_energy.visualize_3d()
+    my_energy.visualize(show=False)
+    my_energy.visualize_3d(show=False)
     rates_matrix = my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors()
-    # experimentation
-    # from sklearn.decomposition import PCA
-    # pca = PCA(n_components=2)
-    # principalComponents = pca.fit_transform(rates_matrix)
-    # xs = np.linspace(-0.5, 0.5, num=len(principalComponents[:, 0]))
-    # fig, ax = plt.subplots(1, 2, sharey="row")
-    # ax[0].plot(xs, principalComponents[:, 0], "black")
-    # ax[1].plot(xs, principalComponents[:, 1], "black")
-    # plt.show()
+    my_energy.visualize_eigenvalues()
+
 
