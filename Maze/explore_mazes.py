@@ -93,7 +93,7 @@ class Explorer(ABC):
             self.get_sorted_accessible_cells()
         return self.sorted_accessible_cells[index]
 
-    def get_sorted_accessible_cells(self) -> list:
+    def get_sorted_accessible_cells(self) -> np.ndarray:
         """
         Get (or generate) a list of accessible cells, sorted by their node index
         TODO: should this be a generator?
