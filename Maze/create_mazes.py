@@ -169,7 +169,8 @@ class AbstractEnergy(ABC):
 class Maze(AbstractEnergy):
 
     def __init__(self, size: tuple, algorithm: str = 'Prim',
-                 animate: bool = False, images_path: str = "./", images_name: str = "maze"):
+                 animate: bool = False, images_path: str = "./", images_name: str = "maze",
+                 no_branching=False, edge_is_wall=False):
         """
         Creates a maze of user-defined size. A maze is represented as a numpy array with:
             - 1 to represent a wall (high energy)
@@ -197,10 +198,10 @@ class Maze(AbstractEnergy):
         elif algorithm == 'Prim':
             if animate:
                 ma = MazeAnimation(self)
-                ma.animate_building_maze()
+                ma.animate_building_maze(no_branching=no_branching, edge_is_wall=edge_is_wall)
             else:
                 # necessary to empty the generator
-                for _ in self._create_prim():
+                for _ in self._create_prim(no_branching=no_branching, edge_is_wall=edge_is_wall):
                     pass
         elif algorithm == 'random':
             self.energies = np.random.randint(0, 2, size=self.size)
@@ -231,7 +232,7 @@ class Maze(AbstractEnergy):
         self.energies[4:6, 3] = 0
         self.energies[5, 5] = 0
 
-    def _create_prim(self) -> Sequence:
+    def _create_prim(self, **kwargs) -> Sequence:
         """
         Generate a maze using Prim's algorithm. From wiki (https://en.wikipedia.org/wiki/Maze_generation_algorithm):
         1. Start with a grid full of walls.
@@ -252,8 +253,17 @@ class Maze(AbstractEnergy):
             wall_list.append(cell)
 
         # pick a random cell as a starting point and turn it into a hall
-        random_cell = tuple([np.random.randint(dim) for dim in self.size])
-        self.energies[random_cell] = 0
+        if kwargs["edge_is_wall"]:
+            # works only for 2D
+            self.energies[0, :] = 1
+            self.energies[-1, :] = 1
+            self.energies[:, 0] = 1
+            self.energies[:, 0] = 1
+            random_cell = tuple([np.random.randint(1, dim - 1) for dim in self.size])
+            self.energies[random_cell] = 0
+        else:
+            random_cell = tuple([np.random.randint(dim) for dim in self.size])
+            self.energies[random_cell] = 0
         # for video
         yield self.energies
         # add walls of the cell to the wall list (periodic boundary conditions)
@@ -272,10 +282,19 @@ class Maze(AbstractEnergy):
             # select only neighbours that are halls/empty
             neig_halls = [n for n in neighbours if self.energies[n] == 0]
             neig_empty = [n for n in neighbours if self.energies[n] == 2]
+            neig_wall = [n for n in neighbours if self.energies[n] == 1]
             for n in neig_halls:
                 opposite_side = self.determine_opposite(random_wall, n)
+                # possible additional conditions
+                if kwargs["no_branching"]:
+                    neig_of_neig = []
+                    for m in self.get_accessible_neighbours(n):
+                        neig_of_neig.append(m)
+                    branching_approved = len(neig_of_neig) < 2
+                else:
+                    branching_approved = True
                 # values.count(0) == 1 makes sure all halls are only lines (not thicker than 1 cell)
-                if self.energies[opposite_side] == 2 and values.count(0) == 1:
+                if self.energies[opposite_side] == 2 and values.count(0) == 1 and branching_approved:
                     # make this wall a hall
                     self.energies[random_wall] = 0
                     # add directly neighbouring empty cells to the wall_list
@@ -367,14 +386,17 @@ class MazeAnimation:
         anim.save(self.energies.images_path + f"{name_addition}_{self.energies.images_name}.gif", writer=writergif)
         plt.close()
 
-    def animate_building_maze(self):
+    def animate_building_maze(self, **kwargs):
         """
+        Args:
+            **kwargs: optional arguments to pass to _create_prim
+
         Creates an animation showing how the maze has been built. Colormap as follows:
             white = hall
             gray = wall
             black = unassigned
         """
-        self.iterator = self.energies._create_prim()
+        self.iterator = self.energies._create_prim(**kwargs)
         self._animate("building", cmap="Greys")
 
     def animate_search(self, name, iterator):
