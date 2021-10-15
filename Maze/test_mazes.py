@@ -246,7 +246,7 @@ def test_three_eigenvectors():
             i += 1
         while third_vector[i] < 0:
             i += 1
-        assert np.all(second_vector[i + 1:] > 0)
+        assert np.all(third_vector[i + 1:] > 0)
     else:
         assert np.any(third_vector > 0)
         assert third_vector[-1] < 0
@@ -255,6 +255,6 @@ def test_three_eigenvectors():
             i += 1
         while third_vector[i] > 0:
             i += 1
-        assert np.all(second_vector[i + 1:] < 0)
+        assert np.all(third_vector[i + 1:] < 0)
 
 

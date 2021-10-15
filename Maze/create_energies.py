@@ -3,7 +3,7 @@ from explore_mazes import BFSExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
-from matplotlib import colors
+from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
 from mpl_toolkits import mplot3d  # a necessary import
@@ -285,9 +285,46 @@ class Energy(AbstractEnergy):
         for i in range(num):
             # plot eigenvectors corresponding to the largest (most negative) eigenvalues
             ax[i].plot(xs, eigenvec[:, i], "black")
-            ax[i].set_title(f"Eigenvector {i}")
+            ax[i].set_title(f"Eigenvector {i+1}")
             ax[i].axes.get_xaxis().set_visible(False)
         plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+    def visualize_eigenvectors_in_maze(self, show: bool = True, num: int = 3):
+        """
+        Visualize the energy surface and the first num (default=3) eigenvectors as a 2D image in a maze.
+        Black squares mean the cells are not accessible.
+
+        Args:
+            show: bool, whether to show the image
+            num: int, how many eigenvectors of rates matrix to show
+
+        Returns:
+
+        """
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
+        cell_order = self.explorer.get_sorted_accessible_cells()
+        # sort the eigenvectors according to value of eigenvalues
+        fig, ax = plt.subplots(1, num + 1, sharey="row")
+        cmap = cm.get_cmap("RdBu").copy()
+        cmap.set_over("black")
+        cmap.set_under("black")
+        ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
+        ax[0].axes.get_xaxis().set_visible(False)
+        ax[0].axes.get_yaxis().set_visible(False)
+        ax[0].set_title("Energy surface")
+        for i in range(1, num+1):
+            array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
+            for j, cell in enumerate(cell_order):
+                array[cell] = eigenvec[j, i-1]
+            ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, i-1]), vmin=np.min(eigenvec[:, i-1]))
+            ax[i].set_title(f"Eigenvector {i}")
+            ax[i].axes.get_xaxis().set_visible(False)
+            ax[i].axes.get_yaxis().set_visible(False)
+        plt.savefig(self.images_path + f"eigenvalues_in_maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
             plt.show()
         else:
@@ -364,15 +401,16 @@ if __name__ == '__main__':
     my_energy = Energy(images_path=img_path)
     my_maze = Maze((15, 15), images_path=img_path)
     #my_maze.visualize()
-    #my_energy.from_potential()
-    my_energy.from_maze(my_maze, add_noise=True)
+    my_energy.from_potential()
+    #my_energy.from_maze(my_maze, add_noise=True)
     #my_energy.visualize_underlying_maze(show=True)
-    my_energy.visualize_boltzmann()
+    my_energy.visualize_boltzmann(show=False)
     #my_energy.visualize(show=True)
     #my_energy.visualize_3d(show=True)
     my_energy.get_rates_matix()
     #my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors()
-    my_energy.visualize_eigenvalues()
+    my_energy.visualize_eigenvectors_in_maze()
+    my_energy.visualize_eigenvalues(show=False)
 
 
