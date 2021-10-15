@@ -234,13 +234,11 @@ class Energy(AbstractEnergy):
         if not np.any(self.rates_matrix):
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
-        #ws, vs = np.linalg.eig(self.rates_matrix.T)
         Q = csr_matrix(self.rates_matrix)
         eigenval, eigenvec = eigs(Q.T, num, which='LR')
-        print(eigenvec.imag.max())
+        if eigenvec.imag.max() == 0:
+            eigenvec = eigenvec.real
         # sort the eigenvectors according to value of eigenvalues
-        #eigenv = [(w, v) for w, v in zip(ws, vs)]
-       # eigenv.sort(reverse=True)
         fig, ax = plt.subplots(1, num, sharey="row")
         xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
         for i in range(num):
@@ -334,16 +332,16 @@ if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
     my_maze = Maze((15, 15), images_path=img_path)
-    my_maze.visualize()
+    #my_maze.visualize()
     #my_energy.from_potential()
     my_energy.from_maze(my_maze, add_noise=True)
-    #my_energy.visualize_underlying_maze(show=False)
+    my_energy.visualize_underlying_maze(show=True)
     my_energy.visualize_boltzmann()
     my_energy.visualize(show=True)
-    #my_energy.visualize_3d(show=True)
+    my_energy.visualize_3d(show=True)
     my_energy.get_rates_matix()
-    #my_energy.visualize_rates_matrix()
+    my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors()
-    #my_energy.visualize_eigenvalues()
+    my_energy.visualize_eigenvalues()
 
 

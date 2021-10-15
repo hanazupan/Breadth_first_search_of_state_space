@@ -51,12 +51,12 @@ class Explorer(ABC):
 
         Args:
             show: bool, should the visualization be displayed
-            **kwargs: named arguments that can be passed to nx.draw_kamada_kawai(), e.g. with_labels
+            **kwargs: named arguments that can be passed to nx.draw(), e.g. with_labels
         """
         if not self.graph:
             self.explore()
         plt.figure()
-        nx.draw_kamada_kawai(self.graph, **kwargs)
+        nx.draw(self.graph, **kwargs)
         plt.savefig(self.maze.images_path +
                     f"{self.explorer_name}_graph_{self.maze.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
@@ -103,8 +103,8 @@ class Explorer(ABC):
         if not np.any(self.sorted_accessible_cells):
             if not self.graph:
                 self.explore()
-            node_to_cell_dict = nx.get_node_attributes(self.graph, "cell")
-            self.sorted_accessible_cells = [v for k, v in sorted(node_to_cell_dict.items())]
+            node_cells = nx.get_node_attributes(self.graph, "cell")  # dict node: cell
+            self.sorted_accessible_cells = list(node_cells.values())  # dict cell: node
         return self.sorted_accessible_cells
 
 
@@ -149,9 +149,9 @@ class BFSExplorer(Explorer):
         random_cell = self.maze.find_random_accessible()
         visited[random_cell] = 1
         accessible[random_cell] = 1
-        # for the graph we are using index of the flattened maze as the identifier
-        index_rc = self.maze.cell_to_node(random_cell)
-        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
+        # for the graph we are using running index as cells get discovered
+        node_index = 0
+        self.graph.add_node(node_index, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
         yield self.maze.energies - 100*accessible
         # take care of the neighbours of the first random cell
@@ -159,15 +159,15 @@ class BFSExplorer(Explorer):
         for n in neighbours:
             visited[n] = 1
             if self.maze.is_accessible(n):
-                index_n = self.maze.cell_to_node(n)
-                self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
-                self.graph.add_edge(index_rc, index_n)
+                node_index += 1
+                self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
+                self.graph.add_edge(node_index, 0)  # all neighbours connected to the 0-th node
                 accessible[n] = 1
                 check_queue.append(n)
         # take care of all other cells
         while len(check_queue) > 0:
             cell = check_queue.popleft()
-            index_cell = self.maze.cell_to_node(cell)
+            previous_index = node_index
             neighbours = self.maze.get_neighbours(cell)
             # if neighbours visited already, don't need to bother with them
             unvis_neig = [n for n in neighbours if visited[n] == 0]
@@ -175,16 +175,15 @@ class BFSExplorer(Explorer):
                 visited[n] = 1
                 # if accessible, add to queue
                 if self.maze.is_accessible(n):
-                    index_n = self.maze.cell_to_node(n)
-                    self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
-                    self.graph.add_edge(index_cell, index_n)
+                    node_index += 1
+                    self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
+                    self.graph.add_edge(node_index, previous_index)
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
             yield self.maze.energies - 100*accessible
         # returns adjacency matrix - ensures the order to be left-right, top-bottom
-        self.adj_matrix = nx.to_numpy_matrix(self.graph,
-                                             nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
+        self.adj_matrix = nx.to_numpy_matrix(self.graph)
         # the adjacency matrix must be as long as there are accessible cells in the maze
         assert len(self.adj_matrix) == np.count_nonzero(accessible)
 
@@ -231,24 +230,24 @@ class DFSExplorer(Explorer):
         visited[random_cell] = 1
         accessible[random_cell] = 1
         # for the graph we are using index of the flattened maze as the identifier
-        index_rc = self.maze.cell_to_node(random_cell)
-        self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
+        node_index = 0
+        self.graph.add_node(node_index, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
         yield self.maze.energies - 100*accessible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
             visited[n] = 1
-            index_n = self.maze.cell_to_node(n)
-            self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
-            self.graph.add_edge(index_rc, index_n)
             if self.maze.is_accessible(n):
+                node_index += 1
+                self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
+                self.graph.add_edge(node_index, 0)
                 accessible[n] = 1
             check_queue.append(n)
         # take care of all other cells
         while len(check_queue) > 0:
             cell = check_queue.pop()
-            index_cell = self.maze.cell_to_node(cell)
+            previous_index = node_index
             neighbours = self.maze.get_neighbours(cell)
             # if neighbours visited already, don't need to bother with them
             unvis_neig = [n for n in neighbours if visited[n] == 0]
@@ -256,18 +255,15 @@ class DFSExplorer(Explorer):
                 visited[n] = 1
                 # if accessible, add to queue
                 if self.maze.is_accessible(n):
-                    index_n = self.maze.cell_to_node(n)
-                    self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
-                    self.graph.add_edge(index_cell, index_n)
+                    node_index += 1
+                    self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
+                    self.graph.add_edge(node_index, previous_index)
                     accessible[n] = 1
                     check_queue.append(n)
             # for video
             yield self.maze.energies - 100*accessible
-        # accessible states must be the logical inverse of the maze
-        assert np.all(np.logical_not(accessible) == self.maze.energies)
-        # returns adjacency matrix - ensures the order to be left-right, top-bottom
-        self.adj_matrix = nx.to_numpy_matrix(self.graph,
-                                             nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
+        # creates adjacency matrix
+        self.adj_matrix = nx.to_numpy_matrix(self.graph)
         # the adjacency matrix must be as long as there are accessible cells in the maze
         assert len(self.adj_matrix) == np.count_nonzero(accessible)
 
@@ -304,6 +300,11 @@ class DijkstraExplorer(Explorer):
             self.end_cell = self.maze.find_random_accessible()
         elif not self.maze.is_accessible(end_cell):
             raise ValueError("End cell must lie on a passage (white cell) in the maze.")
+        # reset all properties if changing start and end cell
+        self.distances = None
+        self.path = []
+        self.graph = nx.Graph()
+        self.adj_matrix = None
 
     def get_distance(self, start_cell: tuple = None, end_cell: tuple = None) -> int:
         """
@@ -401,7 +402,8 @@ class DijkstraExplorer(Explorer):
         check_queue = []
         # start with start cell
         current_cell = self.start_cell
-        self.graph.add_node(self.maze.cell_to_node(current_cell), energy=self.maze.get_energy(current_cell),
+        node_index = 0
+        self.graph.add_node(node_index, energy=self.maze.get_energy(current_cell),
                             distance=0, cell=current_cell)
         self.distances[current_cell] = 0
         # here first frame of the animation
@@ -411,9 +413,10 @@ class DijkstraExplorer(Explorer):
             # element in the priority queue must start with priority marker, here tentative distance
             # so we pack (tentative_dist, coordinates) in a tuple
             self.distances[an] = 1
-            self.graph.add_node(self.maze.cell_to_node(an), energy=self.maze.get_energy(an),
+            node_index += 1
+            self.graph.add_node(node_index, energy=self.maze.get_energy(an),
                                 distance=1, cell=an)
-            self.graph.add_edge(self.maze.cell_to_node(current_cell), self.maze.cell_to_node(an))
+            self.graph.add_edge(node_index, 0)
             priority_an = (self.distances[an], an)
             heapq.heappush(check_queue, priority_an)
         # here snapshot for animation
@@ -421,6 +424,9 @@ class DijkstraExplorer(Explorer):
         self.visited[current_cell] = 1
         while check_queue:
             priority_cell, current_cell = heapq.heappop(check_queue)
+            node_cells = nx.get_node_attributes(self.graph, "cell")  # dict node: cell
+            cell_nodes = dict((v, k) for k, v in node_cells.items())  # dict cell: node
+            previous_index = cell_nodes[current_cell]
             # unvisited, accessible neighbours
             for n in self.maze.get_accessible_neighbours(current_cell):
                 if not self.visited[n]:
@@ -429,9 +435,10 @@ class DijkstraExplorer(Explorer):
                         if n in self.graph:
                             self.graph[n]["distance"] = tent_dist
                         self.distances[n] = tent_dist
-                    self.graph.add_node(self.maze.cell_to_node(n), energy=self.maze.get_energy(n),
+                    node_index += 1
+                    self.graph.add_node(node_index, energy=self.maze.get_energy(n),
                                         distance=self.distances[n], cell=n)
-                    self.graph.add_edge(self.maze.cell_to_node(current_cell), self.maze.cell_to_node(n))
+                    self.graph.add_edge(node_index, previous_index)
                     priority_n = (self.distances[n], n)
                     heapq.heappush(check_queue, priority_n)
             self.visited[current_cell] = 1
@@ -440,16 +447,18 @@ class DijkstraExplorer(Explorer):
             if self.visited[self.end_cell] == 1:
                 # create a path by going backwards: start with end cell and always decrease in distance
                 path = [self.end_cell]
-                node_distances = nx.get_node_attributes(self.graph, "distance")
+                node_distances = nx.get_node_attributes(self.graph, "distance")  # dict node: distance
+                node_cells = nx.get_node_attributes(self.graph, "cell")   # dict node: cell
+                cell_nodes = dict((v, k) for k, v in node_cells.items())  # dict cell: node
                 while self.start_cell not in path:
                     current_cell = path[-1]
-                    current_node = self.maze.cell_to_node(current_cell)
+                    current_node = cell_nodes[current_cell]
                     connected = self.graph.neighbors(current_node)
                     # add to the path a connected cell with distance 1 smaller than the distance of current node
                     for el in connected:
                         dist = node_distances[el]
                         if dist == node_distances[current_node] - 1:
-                            path.append(self.maze.node_to_cell(el))
+                            path.append(node_cells[el])
                             break
                 self.path = path[::-1]
                 self.adj_matrix = nx.to_numpy_matrix(self.graph)
@@ -473,3 +482,4 @@ if __name__ == '__main__':
     dijkstra_exp.explore_and_animate()
     dijkstra_exp.visualize_distances()
     dijkstra_exp.get_adjacency_matrix()
+    dijkstra_exp.get_distance()
