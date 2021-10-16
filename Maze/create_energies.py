@@ -122,19 +122,16 @@ class Energy(AbstractEnergy):
         self.explorer = BFSExplorer(self)
         adj_matrix = self.explorer.get_adjacency_matrix()
         self.rates_matrix = np.zeros(adj_matrix.shape)
-        #TODO: this can definitely be more efficient. Consider using sparse matrices and/or calculating rates
-        # immediately during the exploration of the matrix.
-
         # get the adjacent elements
-        for i in range(len(adj_matrix)):
-            cell_i = self.explorer.get_cell_from_adj(i)
-            for j in range(len(adj_matrix)):
-                if adj_matrix[i, j] == 1:
-                    cell_j = self.explorer.get_cell_from_adj(j)
-                    self.rates_matrix[i, j] = self._calculate_rates_matrix_ij(cell_i, cell_j)
+        rows, cols = adj_matrix.nonzero()
+        for r, c in zip(rows, cols):
+            cell_i = self.explorer.get_cell_from_adj(r)
+            cell_j = self.explorer.get_cell_from_adj(c)
+            self.rates_matrix[r, c] = self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
+        self.rates_matrix = csr_matrix(self.rates_matrix)
 
     def get_rates_matix(self) -> np.ndarray:
         """
@@ -148,7 +145,7 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        if not np.any(self.rates_matrix):
+        if not self.explorer:
             self._calculate_rates_matrix()
         return self.rates_matrix
 
@@ -169,7 +166,7 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        if not np.any(self.rates_matrix):
+        if not self.explorer:
             self._calculate_rates_matrix()
         list_of_cells = self.explorer.get_sorted_accessible_cells()
         boltzmanns = np.array([np.exp(-self.get_energy(cell) / (k * self.T)) for cell in list_of_cells])
@@ -190,12 +187,10 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        if not np.any(self.rates_matrix):
+        if not self.explorer:
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
-        # TODO: change this when you work with sparse matrices from the start
-        Q = csr_matrix(self.rates_matrix)
-        eigenval, eigenvec = eigs(Q.T, num, which='LR')
+        eigenval, eigenvec = eigs(self.rates_matrix.T, num, which='LR')
         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
             eigenvec = eigenvec.real
             eigenval = eigenval.real
@@ -338,9 +333,9 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        if not np.any(self.rates_matrix):
+        if not self.explorer:
             self._calculate_rates_matrix()
-        num = len(self.rates_matrix) - 2
+        num = self.rates_matrix.shape[0] - 2
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
         # left eigenvectors and eigenvalues
         plt.subplots(1, 1)
@@ -366,10 +361,10 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        if not np.any(self.rates_matrix):
+        if not self.explorer:
             self._calculate_rates_matrix()
         norm = colors.TwoSlopeNorm(vcenter=0)
-        ax = plt.imshow(self.rates_matrix, cmap="RdBu_r", norm=norm)
+        ax = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
         plt.colorbar()
         plt.title("Rates matrix")
         ax.figure.savefig(self.images_path + f"rates_matrix_{self.images_name}.png", bbox_inches='tight', dpi=1200)
@@ -381,9 +376,6 @@ class Energy(AbstractEnergy):
     def visualize_boltzmann(self, show: bool = True):
         """
         Visualizes both the energies and the Boltzmann distribution on that energy surface.
-
-        Raises:
-            ValueError: if there are no self.energies
         """
         boltzmanns = self.get_boltzmann()
         plt.plot(boltzmanns, "black")
@@ -402,12 +394,12 @@ if __name__ == '__main__':
     my_maze.visualize()
     #my_energy.from_potential()
     my_energy.from_maze(my_maze, add_noise=True)
-    #my_energy.visualize_underlying_maze(show=True)
+    my_energy.visualize_underlying_maze(show=True)
     my_energy.visualize_boltzmann(show=False)
-    #my_energy.visualize(show=True)
-    #my_energy.visualize_3d(show=True)
+    my_energy.visualize(show=True)
+    my_energy.visualize_3d(show=True)
     my_energy.get_rates_matix()
-    #my_energy.visualize_rates_matrix()
+    my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors(num=6)
     my_energy.visualize_eigenvectors_in_maze(num=6)
     my_energy.visualize_eigenvalues(show=False)

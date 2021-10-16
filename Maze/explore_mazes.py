@@ -7,6 +7,7 @@ from collections.abc import Sequence
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import heapq
+from scipy.sparse import csr_matrix
 
 
 class Explorer(ABC):
@@ -64,7 +65,7 @@ class Explorer(ABC):
         else:
             plt.close()
 
-    def get_adjacency_matrix(self, save=False) -> np.ndarray:
+    def get_adjacency_matrix(self, save=False) -> csr_matrix:
         """
         Get (and create if not yet created) an adjacency matrix of the maze with breadth-first search.
 
@@ -74,7 +75,7 @@ class Explorer(ABC):
         Returns:
             numpy array, adjacency matrix, square number the size of the number of halls
         """
-        if not np.any(self.adj_matrix):
+        if not self.graph:
             self.explore()
         if save:
             np.save(f"{self.maze.images_path}{self.explorer_name}_adj_matrix_{self.maze.images_name}", self.adj_matrix)
@@ -182,10 +183,10 @@ class BFSExplorer(Explorer):
                     check_queue.append(n)
             # for video
             yield self.maze.energies - 100*accessible
-        # returns adjacency matrix - ensures the order to be left-right, top-bottom
-        self.adj_matrix = nx.to_numpy_matrix(self.graph)
+        # returns adjacency matrix
+        self.adj_matrix = csr_matrix(nx.to_numpy_matrix(self.graph))
         # the adjacency matrix must be as long as there are accessible cells in the maze
-        assert len(self.adj_matrix) == np.count_nonzero(accessible)
+        assert self.adj_matrix.shape[0] == np.count_nonzero(accessible)
 
 
 class DFSExplorer(Explorer):
@@ -263,9 +264,9 @@ class DFSExplorer(Explorer):
             # for video
             yield self.maze.energies - 100*accessible
         # creates adjacency matrix
-        self.adj_matrix = nx.to_numpy_matrix(self.graph)
+        self.adj_matrix = csr_matrix(nx.to_numpy_matrix(self.graph))
         # the adjacency matrix must be as long as there are accessible cells in the maze
-        assert len(self.adj_matrix) == np.count_nonzero(accessible)
+        assert self.adj_matrix.shape[0] == np.count_nonzero(accessible)
 
 
 class DijkstraExplorer(Explorer):
@@ -461,7 +462,7 @@ class DijkstraExplorer(Explorer):
                             path.append(node_cells[el])
                             break
                 self.path = path[::-1]
-                self.adj_matrix = nx.to_numpy_matrix(self.graph)
+                self.adj_matrix = csr_matrix(nx.to_numpy_matrix(self.graph))
                 return
 
 
