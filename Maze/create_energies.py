@@ -78,14 +78,14 @@ class Energy(AbstractEnergy):
             for _ in range(int(0.05*np.prod(maze.size))):
                 cell = maze.find_random_accessible()
                 z[cell] = -1
-            for _ in range(int(0.05*np.prod(maze.size))):
+            for _ in range(int(0.04*np.prod(maze.size))):
                 cell = maze.find_random_accessible()
                 z[cell] = -2
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.energies = np.rot90(interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck), k=3)
+        self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.deltas = np.ones(len(self.size), dtype=int)
 
@@ -213,10 +213,8 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.underlying_maze):
             raise ValueError("No underlying maze present! This is only available for surfaces created from mazes.")
-        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0), shading='auto')
-        size_x, size_y = complex(self.underlying_maze.shape[0]), complex(self.underlying_maze.shape[1])
-        x_edges, y_edges = np.mgrid[-1:1:size_x, -1:1:size_y]
-        ax = plt.pcolormesh(x_edges, y_edges, self.underlying_maze, **lims)
+        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+        ax = plt.imshow(self.underlying_maze, **lims)
         plt.colorbar()
         ax.figure.savefig(self.images_path + f"underlying_maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         if show:
@@ -233,8 +231,8 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0), shading='auto')
-        ax = plt.pcolormesh(self.grid_x, self.grid_y, self.energies, **lims)
+        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+        ax = plt.imshow(self.energies, **lims)
         plt.colorbar()
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
@@ -390,7 +388,7 @@ class Energy(AbstractEnergy):
 if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
-    my_maze = Maze((30, 30), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
+    my_maze = Maze((15, 24), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
     my_maze.visualize()
     #my_energy.from_potential()
     my_energy.from_maze(my_maze, add_noise=True)
