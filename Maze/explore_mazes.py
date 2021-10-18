@@ -46,12 +46,11 @@ class Explorer(ABC):
             and with property of energy. Edges between nodes suggests which cells are neighbours.
         """
 
-    def draw_connections_graph(self, show: bool = True, **kwargs):
+    def draw_connections_graph(self, **kwargs):
         """
         Visualize the graph of connections between the cells of the maze.
 
         Args:
-            show: bool, should the visualization be displayed
             **kwargs: named arguments that can be passed to nx.draw(), e.g. with_labels
         """
         if not self.graph:
@@ -60,10 +59,7 @@ class Explorer(ABC):
         nx.draw(self.graph, **kwargs)
         plt.savefig(self.maze.images_path +
                     f"{self.explorer_name}_graph_{self.maze.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
-            plt.close()
+        plt.close()
 
     def get_adjacency_matrix(self, save=False) -> csr_matrix:
         """
@@ -347,34 +343,27 @@ class DijkstraExplorer(Explorer):
         ma.animate_dijkstra(self._dijkstra_algorithm(), self.start_cell, self.end_cell)
         return self.graph
 
-    def visualize_distances(self, show: bool = True):
+    def visualize_distances(self):
         """
         Creates an image, visualizing distances calculated with Dijkstra's algorithm.
-
-        Arg:
-            show: whether to show the image
         """
         if not np.any(self.distances):
             for _ in self.explore():
                 pass
-        for_plotting = np.zeros(self.maze.size, dtype=int)
-        for_plotting[self.start_cell] = 1
-        array_to_plot = np.where(self.visited != 0, self.distances, self.maze.energies * 1000) + for_plotting
-        max_value = np.max(array_to_plot[array_to_plot < 1000])
-        my_cmap = cm.get_cmap("plasma").copy()
-        my_cmap.set_under("white")
-        my_cmap.set_over("black")
-        plt.gca().axes.get_xaxis().set_visible(False)
-        plt.gca().axes.get_yaxis().set_visible(False)
-        plt.plot(self.start_cell[1], self.start_cell[0], marker="o", color="white", linewidth=1.5)
-        plt.plot(self.end_cell[1], self.end_cell[0], marker="x", color="black", linewidth=1.5)
-        for x, y in self.path[1:-1]:
-            plt.plot(y, x, marker="o", color="white", markeredgecolor="k", linewidth=0.5, markersize=4)
-        plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=max_value+1)
-        plt.savefig(self.maze.images_path + f"distances_{self.maze.images_name}.png", dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+            for_plotting = np.zeros(self.maze.size, dtype=int)
+            for_plotting[self.start_cell] = 1
+            array_to_plot = np.where(self.visited != 0, self.distances, self.maze.energies * 1000) + for_plotting
+            max_value = np.max(array_to_plot[array_to_plot < 1000])
+            my_cmap = cm.get_cmap("plasma").copy()
+            my_cmap.set_under("white")
+            my_cmap.set_over("black")
+            plt.plot(self.start_cell[1], self.start_cell[0], marker="o", color="white", linewidth=1.5)
+            plt.plot(self.end_cell[1], self.end_cell[0], marker="x", color="black", linewidth=1.5)
+            for x, y in self.path[1:-1]:
+                plt.plot(y, x, marker="o", color="white", markeredgecolor="k", linewidth=0.5, markersize=4)
+            plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=max_value+1)
+            plt.savefig(self.maze.images_path + f"distances_{self.maze.images_name}.png", dpi=1200)
             plt.close()
 
     def _dijkstra_algorithm(self) -> Sequence:
@@ -471,15 +460,15 @@ if __name__ == '__main__':
     my_maze = Maze((16, 16), images_path=img_path, images_name="explore", animate=False)
     dfs_explorer = DFSExplorer(my_maze)
     dfs_explorer.explore_and_animate()
-    dfs_explorer.draw_connections_graph(show=False, with_labels=True)
+    dfs_explorer.draw_connections_graph(with_labels=True)
     dfs_explorer.get_adjacency_matrix()
     bfs_explorer = BFSExplorer(my_maze)
     bfs_explorer.explore_and_animate()
-    bfs_explorer.draw_connections_graph(show=False, with_labels=True)
+    bfs_explorer.draw_connections_graph(with_labels=True)
     bfs_explorer.get_adjacency_matrix()
     dijkstra_exp = DijkstraExplorer(my_maze)
     dijkstra_exp.explore()
-    dijkstra_exp.draw_connections_graph(show=False, with_labels=True)
+    dijkstra_exp.draw_connections_graph(with_labels=True)
     dijkstra_exp.explore_and_animate()
     dijkstra_exp.visualize_distances()
     dijkstra_exp.get_adjacency_matrix()

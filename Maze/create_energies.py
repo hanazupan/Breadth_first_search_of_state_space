@@ -6,10 +6,15 @@ from scipy import interpolate
 from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
+from mpl_toolkits import axes_grid1
 from mpl_toolkits import mplot3d  # a necessary import
 
 # DEFINING BOLTZMANN CONSTANT
 k = 0.008314463  # kJ/mol/K
+
+DIM_LANDSCAPE = (7.25, 4.45)
+DIM_PORTRAIT = (3.45, 4.45)
+DIM_SQUARE = (4.45, 4.45)
 
 
 class Energy(AbstractEnergy):
@@ -204,7 +209,19 @@ class Energy(AbstractEnergy):
     # -----------------------   VISUALIZATION  ---------------------------------
     ############################################################################
 
-    def visualize_underlying_maze(self, show: bool = True):
+    def _add_colorbar(self, fig, ax, im):
+        """
+        Add a colorbar to the image.
+
+        Args:
+            ax: Axis
+            fig: Figure
+            im: a colorful plot, eg imshow
+        """
+        im_ratio = self.size[0] / self.size[1]
+        fig.colorbar(im, ax=ax, fraction=0.05 * im_ratio, pad=0.04)
+
+    def visualize_underlying_maze(self):
         """
         Visualization of the maze (with eventually added noise) from which the Energy object was created.
 
@@ -213,16 +230,15 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.underlying_maze):
             raise ValueError("No underlying maze present! This is only available for surfaces created from mazes.")
-        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
-        ax = plt.imshow(self.underlying_maze, **lims)
-        plt.colorbar()
-        ax.figure.savefig(self.images_path + f"underlying_maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+            lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+            fig, ax = plt.subplots(1, 1)
+            im = plt.imshow(self.underlying_maze, **lims)
+            self._add_colorbar(fig, ax, im)
+            ax.figure.savefig(self.images_path + f"underlying_maze_{self.images_name}.png")
             plt.close()
 
-    def visualize(self, show: bool = True):
+    def visualize(self):
         """
         Visualizes the array self.energies.
 
@@ -231,19 +247,16 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
-        ax = plt.imshow(self.energies, **lims)
-        plt.colorbar()
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-        ax.figure.savefig(self.images_path + f"energy_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+            lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+            fig, ax = plt.subplots(1, 1)
+            im = plt.imshow(self.energies, **lims)
+            self._add_colorbar(fig, ax, im)
+            ax.figure.savefig(self.images_path + f"energy_{self.images_name}.png")
             plt.close()
-        return ax
+            return ax
 
-    def visualize_3d(self, show: bool = True):
+    def visualize_3d(self):
         """
         Visualizes the array self.energies in 3D.
 
@@ -252,41 +265,36 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        ax = plt.axes(projection='3d')
-        ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
-                        cmap='RdBu_r', edgecolor='none')
-        #ax.set_axis_off()
-        ax.figure.savefig(self.images_path + f"3D_energy_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context('../Stylesheets/not_animation.mplstyle'):
+            ax = plt.axes(projection='3d')
+            ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
+                            cmap='RdBu_r', edgecolor='none')
+            ax.figure.savefig(self.images_path + f"3D_energy_{self.images_name}.png")
             plt.close()
-        return ax
+            return ax
 
-    def visualize_eigenvectors(self, show: bool = True, num: int = 3):
+    def visualize_eigenvectors(self, num: int = 3):
         """
         Visualize the eigenvectors of rate matrix.
 
         Args:
-            show: bool, whether to display the image
             num: int, how many eigenvectors to display
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
         # sort the eigenvectors according to value of eigenvalues
-        fig, ax = plt.subplots(1, num, sharey="row")
-        xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
-        for i in range(num):
-            # plot eigenvectors corresponding to the largest (most negative) eigenvalues
-            ax[i].plot(xs, eigenvec[:, i], "black")
-            ax[i].set_title(f"Eigenvector {i+1}", fontsize=7)
-            ax[i].axes.get_xaxis().set_visible(False)
-        plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context('../Stylesheets/not_animation.mplstyle'):
+            full_width = DIM_LANDSCAPE[0]
+            fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
+            xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
+            for i in range(num):
+                # plot eigenvectors corresponding to the largest (most negative) eigenvalues
+                ax[i].plot(xs, eigenvec[:, i])
+                ax[i].set_title(f"Eigenvector {i+1}", fontsize=7)
+                ax[i].axes.get_xaxis().set_visible(False)
+            plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
             plt.close()
 
-    def visualize_eigenvectors_in_maze(self, show: bool = True, num: int = 3):
+    def visualize_eigenvectors_in_maze(self, num: int = 3):
         """
         Visualize the energy surface and the first num (default=3) eigenvectors as a 2D image in a maze.
         Black squares mean the cells are not accessible.
@@ -300,29 +308,24 @@ class Energy(AbstractEnergy):
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
         cell_order = self.explorer.get_sorted_accessible_cells()
-        fig, ax = plt.subplots(1, num + 1, sharey="row")
-        cmap = cm.get_cmap("RdBu").copy()
-        cmap.set_over("black")
-        cmap.set_under("black")
-        ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
-        ax[0].axes.get_xaxis().set_visible(False)
-        ax[0].axes.get_yaxis().set_visible(False)
-        ax[0].set_title("Energy surface", fontsize=7)
-        for i in range(1, num+1):
-            array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
-            for j, cell in enumerate(cell_order):
-                array[cell] = eigenvec[j, i-1]
-            ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, i-1]), vmin=np.min(eigenvec[:, i-1]))
-            ax[i].set_title(f"Eigenvector {i}", fontsize=7)
-            ax[i].axes.get_xaxis().set_visible(False)
-            ax[i].axes.get_yaxis().set_visible(False)
-        plt.savefig(self.images_path + f"eigenvalues_in_maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/not_animation.mplstyle', '../Stylesheets/maze_style.mplstyle']):
+            full_width = DIM_LANDSCAPE[0]
+            fig, ax = plt.subplots(1, num + 1, sharey="row", figsize=(full_width, full_width/(num+1)))
+            cmap = cm.get_cmap("RdBu").copy()
+            cmap.set_over("black")
+            cmap.set_under("black")
+            ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
+            ax[0].set_title("Energy surface", fontsize=7)
+            for i in range(1, num+1):
+                array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
+                for j, cell in enumerate(cell_order):
+                    array[cell] = eigenvec[j, i-1]
+                ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, i-1]), vmin=np.min(eigenvec[:, i-1]))
+                ax[i].set_title(f"Eigenvector {i}", fontsize=7)
+            plt.savefig(self.images_path + f"eigenvalues_in_maze_{self.images_name}.png")
             plt.close()
 
-    def visualize_eigenvalues(self, show: bool = True):
+    def visualize_eigenvalues(self):
         """
         Visualize the eigenvalues of rate matrix.
 
@@ -335,22 +338,19 @@ class Energy(AbstractEnergy):
             self._calculate_rates_matrix()
         num = self.rates_matrix.shape[0] - 2
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
-        # left eigenvectors and eigenvalues
-        plt.subplots(1, 1)
-        xs = np.linspace(0, 1, num=num)
-        plt.scatter(xs, eigenval, s=5, c="black")
-        for i, eigenw in enumerate(eigenval):
-            plt.vlines(xs[i], eigenw, 0, "black", linewidth=0.5)
-        plt.hlines(0, 0, 1, "black")
-        plt.title("Eigenvalues")
-        plt.gca().axes.get_xaxis().set_visible(False)
-        plt.savefig(self.images_path + f"eigenvalues_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/not_animation.mplstyle']):
+            plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
+            xs = np.linspace(0, 1, num=num)
+            plt.scatter(xs, eigenval, s=5, c="black")
+            for i, eigenw in enumerate(eigenval):
+                plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
+            plt.hlines(0, 0, 1)
+            plt.title("Eigenvalues")
+            plt.gca().axes.get_xaxis().set_visible(False)
+            plt.savefig(self.images_path + f"eigenvalues_{self.images_name}.png")
             plt.close()
 
-    def visualize_rates_matrix(self, show: bool = True):
+    def visualize_rates_matrix(self):
         """
         Visualizes the array self.rates_matrix.
 
@@ -361,27 +361,27 @@ class Energy(AbstractEnergy):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
-        norm = colors.TwoSlopeNorm(vcenter=0)
-        ax = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
-        plt.colorbar()
-        plt.title("Rates matrix")
-        ax.figure.savefig(self.images_path + f"rates_matrix_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+            norm = colors.TwoSlopeNorm(vcenter=0)
+            fig, ax = plt.subplots(1, 1, figsize=DIM_SQUARE)
+            im = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
+            self._add_colorbar(fig, ax, im)
+            ax.set_title("Rates matrix")
+            fig.savefig(self.images_path + f"rates_matrix_{self.images_name}.png")
             plt.close()
 
-    def visualize_boltzmann(self, show: bool = True):
+    def visualize_boltzmann(self):
         """
         Visualizes both the energies and the Boltzmann distribution on that energy surface.
         """
         boltzmanns = self.get_boltzmann()
-        plt.plot(boltzmanns, "black")
-        plt.title("Boltzmann distribution")
-        plt.savefig(self.images_path + f"boltzmann_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/not_animation.mplstyle']):
+            fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
+            ax.plot(boltzmanns)
+            ax.set_xlabel("Accessible cell index")
+            ax.set_ylabel("Relative cell population")
+            ax.set_title("Boltzmann distribution")
+            fig.savefig(self.images_path + f"boltzmann_{self.images_name}.png")
             plt.close()
 
 
@@ -392,14 +392,14 @@ if __name__ == '__main__':
     my_maze.visualize()
     #my_energy.from_potential()
     my_energy.from_maze(my_maze, add_noise=True)
-    my_energy.visualize_underlying_maze(show=True)
-    my_energy.visualize_boltzmann(show=False)
-    my_energy.visualize(show=True)
-    my_energy.visualize_3d(show=True)
+    my_energy.visualize_underlying_maze()
+    my_energy.visualize_boltzmann()
+    my_energy.visualize()
+    my_energy.visualize_3d()
     my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors(num=6)
     my_energy.visualize_eigenvectors_in_maze(num=6)
-    my_energy.visualize_eigenvalues(show=False)
+    my_energy.visualize_eigenvalues()
 
 

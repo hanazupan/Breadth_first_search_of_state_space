@@ -24,20 +24,20 @@ def test_run_everything():
         width = np.random.randint(6, 20)
         test_maze = Maze((height, width), algorithm='Prim', animate=animate,
                          images_name="test", images_path=img_path)
-        test_maze.visualize(show=False)
+        test_maze.visualize()
         bfs_explorer = BFSExplorer(test_maze)
-        bfs_explorer.draw_connections_graph(show=False)
+        bfs_explorer.draw_connections_graph()
         bfs_explorer.explore()
         bfs_explorer.explore_and_animate()
         dfs_explorer = DFSExplorer(test_maze)
-        dfs_explorer.draw_connections_graph(show=False)
+        dfs_explorer.draw_connections_graph()
         dfs_explorer.explore()
         dfs_explorer.explore_and_animate()
         d_explorer = DijkstraExplorer(test_maze)
         d_explorer.explore_and_animate()
         d_explorer.get_adjacency_matrix()
         d_explorer.explore()
-        d_explorer.draw_connections_graph(show=False)
+        d_explorer.draw_connections_graph()
 
 
 def test_neighbours():

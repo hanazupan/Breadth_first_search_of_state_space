@@ -201,7 +201,7 @@ class Maze(AbstractEnergy):
                 ma.animate_building_maze(no_branching=no_branching, edge_is_wall=edge_is_wall)
             else:
                 # necessary to empty the generator
-                for _ in self._create_prim(no_branching=no_branching, edge_is_wall=edge_is_wall):
+                for _ in self.create_prim(no_branching=no_branching, edge_is_wall=edge_is_wall):
                     pass
         elif algorithm == 'random':
             self.energies = np.random.randint(0, 2, size=self.size)
@@ -232,7 +232,7 @@ class Maze(AbstractEnergy):
         self.energies[4:6, 3] = 0
         self.energies[5, 5] = 0
 
-    def _create_prim(self, **kwargs) -> Sequence:
+    def create_prim(self, **kwargs) -> Sequence:
         """
         Generate a maze using Prim's algorithm. From wiki (https://en.wikipedia.org/wiki/Maze_generation_algorithm):
         1. Start with a grid full of walls.
@@ -282,7 +282,6 @@ class Maze(AbstractEnergy):
             # select only neighbours that are halls/empty
             neig_halls = [n for n in neighbours if self.energies[n] == 0]
             neig_empty = [n for n in neighbours if self.energies[n] == 2]
-            neig_wall = [n for n in neighbours if self.energies[n] == 1]
             for n in neig_halls:
                 opposite_side = self.determine_opposite(random_wall, n)
                 # possible additional conditions
@@ -308,25 +307,18 @@ class Maze(AbstractEnergy):
         # to get the final image for animation with no unassigned cells
         yield self.energies
 
-    def visualize(self, show: bool = True) -> matplotlib.image.AxesImage:
+    def visualize(self) -> matplotlib.image.AxesImage:
         """
         Visualize the Maze with black squares (walls) and white squares (halls).
-
-        Args:
-            show: bool, should the visualization be displayed
 
         Returns:
             matplotlib.image.AxesImage, the plot
         """
-        ax = plt.imshow(self.energies, cmap="Greys")
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-        ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        if show:
-            plt.show()
-        else:
+        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+            ax = plt.imshow(self.energies, cmap="Greys")
+            ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png")
             plt.close()
-        return ax
+            return ax
 
 
 class MazeAnimation:
@@ -346,7 +338,8 @@ class MazeAnimation:
         self.energies = maze_to_animate
         if len(self.energies.size) != 2:
             raise ValueError("Animation only possible for 2D mazes.")
-        self.fig, self.ax = plt.subplots()
+        with plt.style.context('../Stylesheets/maze_style.mplstyle'):
+            self.fig, self.ax = plt.subplots()
 
     def _put_marker(self, x: int, y: int, letter: str, **kwargs):
         """
@@ -376,8 +369,6 @@ class MazeAnimation:
             self.ax.set_array(i)
             return self.ax,
 
-        self.ax.axes.get_xaxis().set_visible(False)
-        self.ax.axes.get_yaxis().set_visible(False)
         # blit=True to only redraw the parts of the animation that have changed (speeds up the generation)
         # interval determines how fast the video when played (not saved)
         anim = animation.FuncAnimation(self.fig, updatefig, blit=True, frames=self.iterator,
@@ -389,14 +380,14 @@ class MazeAnimation:
     def animate_building_maze(self, **kwargs):
         """
         Args:
-            **kwargs: optional arguments to pass to _create_prim
+            **kwargs: optional arguments to pass to create_prim
 
         Creates an animation showing how the maze has been built. Colormap as follows:
             white = hall
             gray = wall
             black = unassigned
         """
-        self.iterator = self.energies._create_prim(**kwargs)
+        self.iterator = self.energies.create_prim(**kwargs)
         self._animate("building", cmap="Greys")
 
     def animate_search(self, name, iterator):
@@ -451,5 +442,5 @@ class MazeAnimation:
 
 if __name__ == '__main__':
     path = "Images/"
-    maze = Maze((20, 20), images_path=path, images_name="new", animate=True)
-    maze.visualize(show=True)
+    maze = Maze((20, 20), images_path=path, images_name="style", animate=True)
+    maze.visualize()
