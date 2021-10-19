@@ -1,16 +1,15 @@
-from create_mazes import Maze, AbstractEnergy
-from explore_mazes import BFSExplorer
+from .create_mazes import Maze, AbstractEnergy
+from .explore_mazes import BFSExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
-from mpl_toolkits import axes_grid1
 from mpl_toolkits import mplot3d  # a necessary import
 
 # DEFINING BOLTZMANN CONSTANT
-k = 0.008314463  # kJ/mol/K
+kB = 0.008314463  # kJ/mol/K
 
 DIM_LANDSCAPE = (7.25, 4.45)
 DIM_PORTRAIT = (3.45, 4.45)
@@ -36,6 +35,7 @@ class Energy(AbstractEnergy):
         self.grid_x = None
         self.grid_y = None
         self.explorer = None
+        self.spline = None
 
     def from_potential(self, size=None):
         """
@@ -91,6 +91,7 @@ class Energy(AbstractEnergy):
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
+        self.spline = tck
         self.size = self.energies.shape
         self.deltas = np.ones(len(self.size), dtype=int)
 
@@ -114,7 +115,7 @@ class Energy(AbstractEnergy):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         energy_i = self.get_energy(cell_i)
         energy_j = self.get_energy(cell_j)
-        return self.D * self.S / self.h / self.V * np.sqrt(np.exp((-energy_j + energy_i)/(k*self.T)))
+        return self.D * self.S / self.h / self.V * np.sqrt(np.exp((-energy_j + energy_i)/(kB*self.T)))
 
     def _calculate_rates_matrix(self):
         """
@@ -158,6 +159,11 @@ class Energy(AbstractEnergy):
     # --------------------------   GETTERS  -----------------------------------
     ############################################################################
 
+    def get_spline(self):
+        if not np.any(self.energies):
+            raise ValueError("No splines present! The interpolation never occured.")
+        return self.spline
+
     def get_boltzmann(self) -> np.ndarray:
         """
         Obtain a Boltzmann distribution for all accessible cells (ordered as nodes in the graph, meaning in the
@@ -174,7 +180,7 @@ class Energy(AbstractEnergy):
         if not self.explorer:
             self._calculate_rates_matrix()
         list_of_cells = self.explorer.get_sorted_accessible_cells()
-        boltzmanns = np.array([np.exp(-self.get_energy(cell) / (k * self.T)) for cell in list_of_cells])
+        boltzmanns = np.array([np.exp(-self.get_energy(cell) / (kB * self.T)) for cell in list_of_cells])
         return boltzmanns
 
     def get_eigenval_eigenvec(self, num: int = 10) -> tuple:
@@ -322,7 +328,7 @@ class Energy(AbstractEnergy):
                     array[cell] = eigenvec[j, i-1]
                 ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, i-1]), vmin=np.min(eigenvec[:, i-1]))
                 ax[i].set_title(f"Eigenvector {i}", fontsize=7)
-            plt.savefig(self.images_path + f"eigenvalues_in_maze_{self.images_name}.png")
+            plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")
             plt.close()
 
     def visualize_eigenvalues(self):
@@ -388,7 +394,7 @@ class Energy(AbstractEnergy):
 if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path)
-    my_maze = Maze((15, 24), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
+    my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
     my_maze.visualize()
     #my_energy.from_potential()
     my_energy.from_maze(my_maze, add_noise=True)

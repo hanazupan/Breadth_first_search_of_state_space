@@ -1,0 +1,3 @@
+axes.prop_cycle : cycler(color="black")
+figure.dpi : 1200
+figure.constrained_layout.use : True

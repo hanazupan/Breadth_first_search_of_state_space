@@ -1,0 +1,18 @@
+# have splines but no labels and ticks
+axes.grid : False
+axes.spines.left : True
+axes.spines.right : True
+axes.spines.bottom : True
+axes.spines.top : True
+xtick.top : False
+xtick.bottom : False
+ytick.left : False
+ytick.right : False
+xtick.labeltop : False
+xtick.labelbottom : False
+ytick.labelleft : False
+ytick.labelright : False
+
+
+# tight_layout
+figure.constrained_layout.use : True

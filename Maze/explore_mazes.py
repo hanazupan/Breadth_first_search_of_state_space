@@ -1,4 +1,4 @@
-from create_mazes import Maze, MazeAnimation, AbstractEnergy
+from .create_mazes import Maze, MazeAnimation, AbstractEnergy
 from abc import ABC, abstractmethod
 import networkx as nx
 import numpy as np
