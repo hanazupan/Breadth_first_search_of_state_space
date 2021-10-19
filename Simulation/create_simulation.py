@@ -56,17 +56,22 @@ class Simulation:
             self.dt = dt
         if N:
             self.N = N
+        self.histogram = np.zeros(self.energy.size)
         x_n = 2*np.random.random() - 1    # random between (-1, 1)
         y_n = 2*np.random.random() - 1    # random between (-1, 1)
         self._add_to_hist((x_n, y_n))
         for n in tqdm(range(self.N)):
-            if n % 1000 == 0:
-                # start a new trajectory every 1000 steps
-                x_n = 2 * np.random.random() - 1  # random between (-1, 1)
-                y_n = 2 * np.random.random() - 1  # random between (-1, 1)
+            # if n % 1000 == 0:
+            #     # start a new trajectory every 1000 steps
+            #     x_n = 2 * np.random.random() - 1  # random between (-1, 1)
+            #     y_n = 2 * np.random.random() - 1  # random between (-1, 1)
             x_n, y_n = self._euler_maruyama(x_n, y_n)
-            x_n = math.modf(x_n)[0]    # only keep the decimal - periodic boundaries
-            y_n = math.modf(y_n)[0]    # only keep the decimal - periodic boundaries
+            # calculate the correct x, y with periodic boundaries
+            dist_x_n = (abs(x_n) + 1) // 2
+            x_n = x_n - np.sign(x_n)*2*dist_x_n
+            dist_y_n = (abs(y_n) + 1) // 2
+            y_n = y_n - np.sign(y_n) * 2 * dist_y_n
+            # histogram
             self._add_to_hist((x_n, y_n))
 
     def _euler_maruyama(self, x_n, y_n) -> tuple:
@@ -110,8 +115,8 @@ if __name__ == '__main__':
     my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    my_simulation = Simulation(my_energy, images_path=img_path, m=100)
-    my_simulation.integrate(N=int(1e7), dt=0.001)
+    my_simulation = Simulation(my_energy, images_path=img_path, m=10)
+    my_simulation.integrate(N=int(1e8), dt=0.005)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
 
