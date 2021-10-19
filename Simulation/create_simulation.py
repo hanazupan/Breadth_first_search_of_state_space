@@ -29,8 +29,10 @@ class Simulation:
         self.D = kB*self.T/self.m/self.friction
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
+        print(self.energy.energies.shape, self.histogram.shape)
         self.step_x = 2/self.histogram.shape[0]
         self.step_y = 2/self.histogram.shape[1]
+        print(self.step_x, self.step_y)
 
     def gradient(self, x_n, y_n) -> float:
         """
@@ -60,6 +62,8 @@ class Simulation:
         x_n = 2*np.random.random() - 1    # random between (-1, 1)
         y_n = 2*np.random.random() - 1    # random between (-1, 1)
         self._add_to_hist((x_n, y_n))
+        traj_x = np.zeros(N)
+        traj_y = np.zeros(N)
         for n in tqdm(range(self.N)):
             # if n % 1000 == 0:
             #     # start a new trajectory every 1000 steps
@@ -73,13 +77,23 @@ class Simulation:
             y_n = y_n - np.sign(y_n) * 2 * dist_y_n
             # histogram
             self._add_to_hist((x_n, y_n))
+            # trajectory
+            traj_x[n] = x_n
+            traj_y[n] = y_n
+        fig, ax = plt.subplots(1, 1, figsize=(8, 10))
+        plt.scatter(traj_y, traj_x, marker="o", c="black")
+        plt.gca().invert_yaxis()
+        plt.savefig(self.images_path + f"traj_{self.images_name}.png")
+        plt.close()
 
     def _euler_maruyama(self, x_n, y_n) -> tuple:
-        dV = self.gradient(x_n, y_n)
+        #dV = self.gradient(x_n, y_n)
+        dV_dx = bisplev(x_n, y_n, self.spline, dx=1)
+        dV_dy = bisplev(x_n, y_n, self.spline, dy=1)
         eta_x = np.random.normal()
-        x_n = x_n - dV * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x * np.sqrt(self.dt)
+        x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x * np.sqrt(self.dt)
         eta_y = np.random.normal()
-        y_n = y_n - dV * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y * np.sqrt(self.dt)
+        y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y * np.sqrt(self.dt)
         return x_n, y_n
 
     def _add_to_hist(self, point):
@@ -111,12 +125,12 @@ class Simulation:
 if __name__ == '__main__':
     img_path = "Images/"
     my_energy = Energy(images_path=img_path, images_name="sim")
-    my_maze = Maze((12, 15), images_path=img_path, no_branching=True, edge_is_wall=True, animate=False)
+    my_maze = Maze((5, 4), images_path=img_path, no_branching=True, edge_is_wall=True, animate=False)
     my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    my_simulation = Simulation(my_energy, images_path=img_path, m=10)
-    my_simulation.integrate(N=int(1e8), dt=0.005)
+    my_simulation = Simulation(my_energy, images_path=img_path, m=1000)
+    my_simulation.integrate(N=int(100000), dt=0.01)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
 
