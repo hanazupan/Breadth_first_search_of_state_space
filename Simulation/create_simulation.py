@@ -29,24 +29,12 @@ class Simulation:
         self.D = kB*self.T/self.m/self.friction
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
-        print(self.energy.energies.shape, self.histogram.shape)
+        self.traj_x = None
+        self.traj_y = None
         self.step_x = 2/self.histogram.shape[0]
         self.step_y = 2/self.histogram.shape[1]
-        print(self.step_x, self.step_y)
 
-    def gradient(self, x_n, y_n) -> float:
-        """
-        Obtain the first derivatives of the spline interpolation in the point (x_n, y_n).
-        Args:
-            x_n:
-            y_n:
-
-        Returns:
-
-        """
-        return bisplev(x_n, y_n, self.spline, dx=1, dy=1)
-
-    def integrate(self, dt: float = None, N: int = None):
+    def integrate(self, dt: float = None, N: int = None, save_trajectory = False):
         """
         Implement the Euler–Maruyama method for integration of the trajectory.
 
@@ -61,33 +49,23 @@ class Simulation:
         self.histogram = np.zeros(self.energy.size)
         x_n = 2*np.random.random() - 1    # random between (-1, 1)
         y_n = 2*np.random.random() - 1    # random between (-1, 1)
-        self._add_to_hist((x_n, y_n))
-        traj_x = np.zeros(N)
-        traj_y = np.zeros(N)
+        cell = self._point_to_cell((x_n, y_n))
+        self.histogram[cell] += 1
+        if save_trajectory:
+            self.traj_x = np.zeros(N)
+            self.traj_y = np.zeros(N)
         for n in tqdm(range(self.N)):
-            # if n % 1000 == 0:
-            #     # start a new trajectory every 1000 steps
-            #     x_n = 2 * np.random.random() - 1  # random between (-1, 1)
-            #     y_n = 2 * np.random.random() - 1  # random between (-1, 1)
             x_n, y_n = self._euler_maruyama(x_n, y_n)
-            # calculate the correct x, y with periodic boundaries
-            dist_x_n = (abs(x_n) + 1) // 2
-            x_n = x_n - np.sign(x_n)*2*dist_x_n
-            dist_y_n = (abs(y_n) + 1) // 2
-            y_n = y_n - np.sign(y_n) * 2 * dist_y_n
             # histogram
-            self._add_to_hist((x_n, y_n))
+            x_n, y_n = self._point_within_bound((x_n, y_n))
+            cell = self._point_to_cell((x_n, y_n))
+            self.histogram[cell] += 1
             # trajectory
-            traj_x[n] = x_n
-            traj_y[n] = y_n
-        fig, ax = plt.subplots(1, 1, figsize=(8, 10))
-        plt.scatter(traj_y, traj_x, marker="o", c="black")
-        plt.gca().invert_yaxis()
-        plt.savefig(self.images_path + f"traj_{self.images_name}.png")
-        plt.close()
+            if save_trajectory:
+                self.traj_x[n] = x_n
+                self.traj_y[n] = y_n
 
     def _euler_maruyama(self, x_n, y_n) -> tuple:
-        #dV = self.gradient(x_n, y_n)
         dV_dx = bisplev(x_n, y_n, self.spline, dx=1)
         dV_dy = bisplev(x_n, y_n, self.spline, dy=1)
         eta_x = np.random.normal()
@@ -96,10 +74,20 @@ class Simulation:
         y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y * np.sqrt(self.dt)
         return x_n, y_n
 
-    def _add_to_hist(self, point):
+    def _point_within_bound(self, point):
         x_n, y_n = point
-        cell = int((x_n + 1)//self.step_x), int((y_n + 1)//self.step_y)
-        self.histogram[cell] += 1
+        # calculate the corrected x, y between (-1, 1) with help of periodic boundaries
+        dist_x_n = (abs(x_n) + 1) // 2
+        x_n = x_n - np.sign(x_n) * 2 * dist_x_n
+        dist_y_n = (abs(y_n) + 1) // 2
+        y_n = y_n - np.sign(y_n) * 2 * dist_y_n
+        return x_n, y_n
+
+    def _point_to_cell(self, point):
+        x_n, y_n = point
+        # determine the cell of the histogram
+        cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
+        return cell
 
     def visualize_hist_2D(self):
         fig, ax = plt.subplots(1, 1)
@@ -121,17 +109,39 @@ class Simulation:
             fig.savefig(self.images_path + f"sim_boltzmann_{self.images_name}.png")
             plt.close()
 
+    def visualize_population_per_energy(self):
+        x_len, y_len = self.energy.size
+        energies = []
+        population = []
+        for x in range(x_len):
+            for y in range(y_len):
+                cell = (x, y)
+                energies.append(self.energy.get_energy(cell))
+                population.append(self.histogram[cell])
+        plt.scatter(energies, population, marker="o", color="black")
+        plt.savefig(self.images_path + f"population_per_energy_{self.images_name}.png")
+        plt.close()
+
+    def visualize_trajectory(self):
+        fig, ax = plt.subplots(1, 1, figsize=(8, 10))
+        plt.scatter(self.traj_y, self.traj_x, marker="o", c="black")
+        plt.gca().invert_yaxis()
+        plt.savefig(self.images_path + f"traj_{self.images_name}.png")
+        plt.close()
+
 
 if __name__ == '__main__':
     img_path = "Images/"
-    my_energy = Energy(images_path=img_path, images_name="sim")
+    my_energy = Energy(images_path=img_path, images_name="energy")
     my_maze = Maze((5, 4), images_path=img_path, no_branching=True, edge_is_wall=True, animate=False)
     my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    my_simulation = Simulation(my_energy, images_path=img_path, m=1000)
-    my_simulation.integrate(N=int(100000), dt=0.01)
+    my_simulation = Simulation(my_energy, images_path=img_path)
+    my_simulation.integrate(N=int(1e7), dt=0.001)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
+    my_simulation.visualize_population_per_energy()
+    my_simulation.visualize_trajectory()
 
 
