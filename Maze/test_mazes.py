@@ -1,7 +1,7 @@
 import numpy as np
-from create_mazes import Maze
-from explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
-from create_energies import Energy
+from .create_mazes import Maze
+from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
+from .create_energies import Energy
 
 all_algorithms = ["Prim", "random"]
 img_path = "Images/"

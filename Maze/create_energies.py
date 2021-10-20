@@ -20,7 +20,7 @@ class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy"):
         # for now assume uniform, square cells so that geom. parameters = 1 and also diffusion coeff is 1
-        super().__init__(None, 0.5, None, None, images_path, images_name)
+        super().__init__(None, 5, None, None, images_path, images_name)
         self.D = 1
         self.h = 1
         self.S = 1
@@ -77,7 +77,7 @@ class Energy(AbstractEnergy):
         # grid_dense = np.meshgrid(*dense_size)
         # dense grid
         self.grid_x, self.grid_y = np.mgrid[-1:1:factor_grid*size_x, -1:1:factor_grid*size_y]
-        z = maze.energies
+        z = maze.energies * 10
         # change some random zeroes into -1 and -2
         if add_noise:
             for _ in range(int(0.05*np.prod(maze.size))):
@@ -236,7 +236,7 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.underlying_maze):
             raise ValueError("No underlying maze present! This is only available for surfaces created from mazes.")
-        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
             fig, ax = plt.subplots(1, 1)
             im = plt.imshow(self.underlying_maze, **lims)
@@ -253,7 +253,7 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
             fig, ax = plt.subplots(1, 1)
             im = plt.imshow(self.energies, **lims)
@@ -271,7 +271,7 @@ class Energy(AbstractEnergy):
         """
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
-        with plt.style.context('../Stylesheets/not_animation.mplstyle'):
+        with plt.style.context('Stylesheets/not_animation.mplstyle'):
             ax = plt.axes(projection='3d')
             ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
                             cmap='RdBu_r', edgecolor='none')
@@ -288,7 +288,7 @@ class Energy(AbstractEnergy):
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
         # sort the eigenvectors according to value of eigenvalues
-        with plt.style.context('../Stylesheets/not_animation.mplstyle'):
+        with plt.style.context('Stylesheets/not_animation.mplstyle'):
             full_width = DIM_LANDSCAPE[0]
             fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
             xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
@@ -314,7 +314,7 @@ class Energy(AbstractEnergy):
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
         cell_order = self.explorer.get_sorted_accessible_cells()
-        with plt.style.context(['../Stylesheets/not_animation.mplstyle', '../Stylesheets/maze_style.mplstyle']):
+        with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
             fig, ax = plt.subplots(1, num + 1, sharey="row", figsize=(full_width, full_width/(num+1)))
             cmap = cm.get_cmap("RdBu").copy()
@@ -326,7 +326,7 @@ class Energy(AbstractEnergy):
                 array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
                 for j, cell in enumerate(cell_order):
                     array[cell] = eigenvec[j, i-1]
-                ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, i-1]), vmin=np.min(eigenvec[:, i-1]))
+                ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, :num+1]), vmin=np.min(eigenvec[:, :num+1]))
                 ax[i].set_title(f"Eigenvector {i}", fontsize=7)
             plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")
             plt.close()
@@ -344,7 +344,7 @@ class Energy(AbstractEnergy):
             self._calculate_rates_matrix()
         num = self.rates_matrix.shape[0] - 2
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
-        with plt.style.context(['../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
             xs = np.linspace(0, 1, num=num)
             plt.scatter(xs, eigenval, s=5, c="black")
@@ -367,7 +367,7 @@ class Energy(AbstractEnergy):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
-        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             norm = colors.TwoSlopeNorm(vcenter=0)
             fig, ax = plt.subplots(1, 1, figsize=DIM_SQUARE)
             im = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
@@ -381,7 +381,7 @@ class Energy(AbstractEnergy):
         Visualizes both the energies and the Boltzmann distribution on that energy surface.
         """
         boltzmanns = self.get_boltzmann()
-        with plt.style.context(['../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
             ax.plot(boltzmanns)
             ax.set_xlabel("Accessible cell index")
@@ -392,7 +392,7 @@ class Energy(AbstractEnergy):
 
 
 if __name__ == '__main__':
-    img_path = "Images/"
+    img_path = "Maze/Images/"
     my_energy = Energy(images_path=img_path)
     my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
     my_maze.visualize()

@@ -314,7 +314,7 @@ class Maze(AbstractEnergy):
         Returns:
             matplotlib.image.AxesImage, the plot
         """
-        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             ax = plt.imshow(self.energies, cmap="Greys")
             ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png")
             plt.close()
@@ -338,7 +338,7 @@ class MazeAnimation:
         self.energies = maze_to_animate
         if len(self.energies.size) != 2:
             raise ValueError("Animation only possible for 2D mazes.")
-        with plt.style.context('../Stylesheets/maze_style.mplstyle'):
+        with plt.style.context('Stylesheets/maze_style.mplstyle'):
             self.fig, self.ax = plt.subplots()
 
     def _put_marker(self, x: int, y: int, letter: str, **kwargs):
@@ -441,6 +441,6 @@ class MazeAnimation:
 
 
 if __name__ == '__main__':
-    path = "Images/"
+    path = "Maze/Images/"
     maze = Maze((20, 20), images_path=path, images_name="style", animate=True)
     maze.visualize()

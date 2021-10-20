@@ -350,7 +350,7 @@ class DijkstraExplorer(Explorer):
         if not np.any(self.distances):
             for _ in self.explore():
                 pass
-        with plt.style.context(['../Stylesheets/maze_style.mplstyle', '../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             for_plotting = np.zeros(self.maze.size, dtype=int)
             for_plotting[self.start_cell] = 1
             array_to_plot = np.where(self.visited != 0, self.distances, self.maze.energies * 1000) + for_plotting
@@ -456,7 +456,7 @@ class DijkstraExplorer(Explorer):
 
 
 if __name__ == '__main__':
-    img_path = "Images/"
+    img_path = "Maze/Images/"
     my_maze = Maze((16, 16), images_path=img_path, images_name="explore", animate=False)
     dfs_explorer = DFSExplorer(my_maze)
     dfs_explorer.explore_and_animate()

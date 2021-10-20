@@ -1,5 +1,3 @@
-import sys
-sys.path.append("..")
 from Maze.create_energies import Energy
 from Maze.create_mazes import Maze
 from scipy.interpolate import bisplev
@@ -7,7 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from matplotlib import cm
-import math
+from scipy.sparse.linalg import eigs
+from scipy.sparse import csr_matrix
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
@@ -55,6 +54,9 @@ class Simulation:
             self.traj_x = np.zeros(N)
             self.traj_y = np.zeros(N)
         for n in tqdm(range(self.N)):
+            if n % 1000 == 0:
+                x_n = 2 * np.random.random() - 1  # random between (-1, 1)
+                y_n = 2 * np.random.random() - 1  # random between (-1, 1)
             x_n, y_n = self._euler_maruyama(x_n, y_n)
             # histogram
             x_n, y_n = self._point_within_bound((x_n, y_n))
@@ -64,6 +66,8 @@ class Simulation:
             if save_trajectory:
                 self.traj_x[n] = x_n
                 self.traj_y[n] = y_n
+        # normalizing the histogram
+        self.histogram = self.histogram / self.N
 
     def _euler_maruyama(self, x_n, y_n) -> tuple:
         dV_dx = bisplev(x_n, y_n, self.spline, dx=1)
@@ -89,6 +93,45 @@ class Simulation:
         cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
         return cell
 
+    def _cell_to_index(self, cell):
+        index = cell[0]
+        for i in range(1, len(cell)):
+            index = index * self.histogram.shape[i] + cell[i]
+        return index
+
+    def get_transitions_matrix(self, tau_array = np.array([10, 20, 50, 100, 200, 500])):
+        if not np.any(self.traj_x):
+            raise ValueError("No trajectories found! Check if using the setting save_trajectory=False.")
+        all_cells = len(self.histogram.flatten())
+        transition_matrices = np.zeros(shape=(len(tau_array), all_cells, all_cells))
+        for tau_i, tau in enumerate(tau_array):
+            filtered_traj_x = self.traj_x[::tau]
+            filtered_traj_y = self.traj_x[::tau]
+            previous_cell = self._point_to_cell((self.traj_x[0], self.traj_y[0]))
+            for x,y in zip(filtered_traj_x[1:], filtered_traj_y[1:]):
+                cell = self._point_to_cell((x, y))
+                i = self._cell_to_index(previous_cell)
+                j = self._cell_to_index(cell)
+                transition_matrices[tau_i, i, j] += 1
+        transition_matrices = csr_matrix(transition_matrices / transition_matrices.sum(axis=-1, keepdims=True))
+        eigenval, eigenvec = eigs(transition_matrices[3], 6, which='LR')
+        if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
+            eigenvec = eigenvec.real
+            eigenval = eigenval.real
+        # sort eigenvectors according to their eigenvalues
+        idx = eigenval.argsort()[::-1]
+        eigenval = eigenval[idx]
+        eigenvec = eigenvec[:, idx]
+        fig, ax = plt.subplots(1, 6, sharey="row")
+        xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
+        for i in range(6):
+            # plot eigenvectors corresponding to the largest (most negative) eigenvalues
+            ax[i].plot(xs, eigenvec[:, i])
+            ax[i].set_title(f"Eigenvector {i + 1}", fontsize=7)
+            ax[i].axes.get_xaxis().set_visible(False)
+        plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        plt.close()
+
     def visualize_hist_2D(self):
         fig, ax = plt.subplots(1, 1)
         cmap = cm.get_cmap("RdBu").copy()
@@ -100,7 +143,7 @@ class Simulation:
     def visualize_sim_Boltzmann(self):
         list_of_cells = self.energy.explorer.get_sorted_accessible_cells()
         boltzmanns = np.array([self.histogram[cell] for cell in list_of_cells])
-        with plt.style.context(['../Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, 1)
             ax.plot(boltzmanns)
             ax.set_xlabel("Accessible cell index")
@@ -131,17 +174,18 @@ class Simulation:
 
 
 if __name__ == '__main__':
-    img_path = "Images/"
+    img_path = "Simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy")
-    my_maze = Maze((5, 4), images_path=img_path, no_branching=True, edge_is_wall=True, animate=False)
+    my_maze = Maze((6, 7), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
     my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
     my_simulation = Simulation(my_energy, images_path=img_path)
-    my_simulation.integrate(N=int(1e7), dt=0.001)
+    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     my_simulation.visualize_trajectory()
+    my_simulation.get_transitions_matrix()
 
 
