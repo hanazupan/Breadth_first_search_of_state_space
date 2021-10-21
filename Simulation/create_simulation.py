@@ -113,14 +113,18 @@ class Simulation:
                 i = self._cell_to_index(previous_cell)
                 j = self._cell_to_index(cell)
                 transition_matrices[tau_i, i, j] += 1
-        transition_matrices = csr_matrix(transition_matrices / transition_matrices.sum(axis=-1, keepdims=True))
-        eigenval, eigenvec = eigs(transition_matrices[3], 6, which='LR')
+        sums = transition_matrices.sum(axis=-1, keepdims=True)
+        sums[sums == 0] = 1
+        #transition_matrices = transition_matrices / sums
+        print(transition_matrices[0, 0, 0])
+        eigenval, eigenvec = eigs(transition_matrices[3].T, len(transition_matrices[0]) - 2, which='LR')
         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
             eigenvec = eigenvec.real
             eigenval = eigenval.real
         # sort eigenvectors according to their eigenvalues
         idx = eigenval.argsort()[::-1]
         eigenval = eigenval[idx]
+        print(eigenval)
         eigenvec = eigenvec[:, idx]
         fig, ax = plt.subplots(1, 6, sharey="row")
         xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
