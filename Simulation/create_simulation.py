@@ -4,8 +4,9 @@ from scipy.interpolate import bisplev
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from matplotlib import cm
+from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
+from scipy.linalg import lu, eig, lu_factor
 from scipy.sparse import csr_matrix
 
 # DEFINING BOLTZMANN CONSTANT
@@ -33,13 +34,14 @@ class Simulation:
         self.step_x = 2/self.histogram.shape[0]
         self.step_y = 2/self.histogram.shape[1]
 
-    def integrate(self, dt: float = None, N: int = None, save_trajectory = False):
+    def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False):
         """
         Implement the Euler–Maruyama method for integration of the trajectory.
 
         Args:
             dt: float, time step
             N: int, number of time steps
+            save_trajectory: bool, should the trajectory be saved (True needed for MSM analysis)
         """
         if dt:
             self.dt = dt
@@ -108,31 +110,42 @@ class Simulation:
             filtered_traj_x = self.traj_x[::tau]
             filtered_traj_y = self.traj_x[::tau]
             previous_cell = self._point_to_cell((self.traj_x[0], self.traj_y[0]))
-            for x,y in zip(filtered_traj_x[1:], filtered_traj_y[1:]):
+            for x, y in zip(filtered_traj_x[1:], filtered_traj_y[1:]):
                 cell = self._point_to_cell((x, y))
                 i = self._cell_to_index(previous_cell)
                 j = self._cell_to_index(cell)
                 transition_matrices[tau_i, i, j] += 1
+                previous_cell = cell
         sums = transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
-        #transition_matrices = transition_matrices / sums
-        print(transition_matrices[0, 0, 0])
-        eigenval, eigenvec = eigs(transition_matrices[3].T, len(transition_matrices[0]) - 2, which='LR')
-        if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
-            eigenvec = eigenvec.real
-            eigenval = eigenval.real
-        # sort eigenvectors according to their eigenvalues
-        idx = eigenval.argsort()[::-1]
-        eigenval = eigenval[idx]
-        print(eigenval)
-        eigenvec = eigenvec[:, idx]
+        transition_matrices = transition_matrices / sums
         fig, ax = plt.subplots(1, 6, sharey="row")
-        xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
-        for i in range(6):
-            # plot eigenvectors corresponding to the largest (most negative) eigenvalues
-            ax[i].plot(xs, eigenvec[:, i])
-            ax[i].set_title(f"Eigenvector {i + 1}", fontsize=7)
+        vmax = np.max(transition_matrices)
+        vmin = np.min(transition_matrices)
+        for i, tm in enumerate(transition_matrices):
+            ax[i].imshow(tm, cmap="RdBu_r", vmin=vmin, vmax=vmax)
             ax[i].axes.get_xaxis().set_visible(False)
+            ax[i].axes.get_yaxis().set_visible(False)
+        plt.savefig(self.images_path + f"trans_mat_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        plt.close()
+        num_eigv = 6
+        fig, ax = plt.subplots(len(tau_array), num_eigv, sharey="row")
+        xs = np.linspace(-0.5, 0.5, num=len(transition_matrices[0]))
+        for i, tm in enumerate(transition_matrices):
+            eigenval, eigenvec = eigs(tm.T, num_eigv, which='LR')
+            if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
+                eigenvec = eigenvec.real
+                eigenval = eigenval.real
+            # sort eigenvectors according to their eigenvalues
+            idx = eigenval.argsort()[::-1]
+            eigenval = eigenval[idx]
+            print(eigenval)
+            eigenvec = eigenvec[:, idx]
+            for j in range(num_eigv):
+                # plot eigenvectors corresponding to the largest (most negative) eigenvalues
+                ax[i][j].plot(xs, eigenvec[:, j])
+                #ax[i][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
+                ax[i][j].axes.get_xaxis().set_visible(False)
         plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
@@ -180,12 +193,15 @@ class Simulation:
 if __name__ == '__main__':
     img_path = "Simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy")
-    my_maze = Maze((6, 7), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
+    my_maze = Maze((5, 4), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
     my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6)
+    for eigv in e_eigval:
+        print(np.exp(eigv*10))
     my_simulation = Simulation(my_energy, images_path=img_path)
-    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
