@@ -185,41 +185,51 @@ class Simulation:
         Returns:
             (eigenval, eigenvec) a tuple of eigenvalues and eigenvectors, first num_eigv given for all tau-s
         """
-        tau_eigenvals = np.zeros((len(self.tau_array, num_eigv)))
-        tau_eigenvec = np.zeros((num_eigv,))
+        tau_eigenvals = np.zeros((len(self.tau_array), num_eigv))
+        tau_eigenvec = np.zeros((len(self.tau_array), len(self.transition_matrices[0]), num_eigv))
         # TODO: do this
-        for i, tm in enumerate(self.transition_matrices):
-            eigenval, eigenvec = eigs(csr_matrix(tm.T), num_eigv, which='LR')
+        for i, tau in enumerate(self.tau_array):
+            tm = self.transition_matrices[i].T
+            eigenval, eigenvec = eigs(csr_matrix(tm), num_eigv, which='LR')
             if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
                 eigenvec = eigenvec.real
                 eigenval = eigenval.real
             # sort eigenvectors according to their eigenvalues
             idx = eigenval.argsort()[::-1]
             eigenval = eigenval[idx]
-            tau_eigenvals[:, i] = eigenval.real
+            tau_eigenvals[i] = eigenval.real
             eigenvec = eigenvec[:, idx]
+            tau_eigenvec[i] = eigenvec
         return tau_eigenvals, tau_eigenvec
 
     def visualize_eigenvec(self, num_eigv: int = 6):
         tau_eigenvals, tau_eigenvec = self.get_eigenvec_eigenval(num_eigv=num_eigv)
         fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row")
-        fig2, ax2 = plt.subplots(1, 1)
         xs = np.linspace(-0.5, 0.5, num=len(self.transition_matrices[0]))
-        for i, tm in enumerate(self.transition_matrices):
-            # plot eigenvalues as implied timescales
+        for i, tau in enumerate(self.tau_array):
             for j in range(num_eigv):
-                # plot eigenvectors corresponding to the largest (most negative) eigenvalues
-                ax[i][j].plot(xs, eigenvec[:, j])
-                #ax[i][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
+                ax[i][j].plot(xs, tau_eigenvec[i, :, j])
+                ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
+                ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
         fig.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         print("tau eigenvals ", tau_eigenvals)
-        for i in range(1, len(tau_eigenvals)):
-            ax2.plot(self.tau_array, -self.tau_array / np.log(np.abs(tau_eigenvals[i])), label=f"eigenvalue {i}")
+
+        return self.transition_matrices
+
+    def visualize_its(self, num_eigv: int = 6):
+        tau_eigenvals, tau_eigenvec = self.get_eigenvec_eigenval(num_eigv=num_eigv)
+        tau_eigenvals = tau_eigenvals.T
+        fig2, ax2 = plt.subplots(1, 1)
+        colors = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
+        for j in range(1, num_eigv):
+            tau_filter = self.tau_array
+            to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
+            ax2.plot(tau_filter, to_plot,
+                    label=f"eigenval {j}", color=colors[j])
         ax2.legend()
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
-        return self.transition_matrices
 
     ############################################################################
     # ------------------------   VISUALIZATION  --------------------------------
@@ -314,12 +324,14 @@ if __name__ == '__main__':
         print(f"{m}. Energy timescale 1/e^(100*lambda) ", 1/np.exp(eigv*100))
     my_simulation = Simulation(my_energy, images_path=img_path)
     #TODO: do a test for different td
-    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix()
     my_simulation.visualize_transition_matrices()
+    my_simulation.visualize_eigenvec()
+    my_simulation.visualize_its()
 
 
