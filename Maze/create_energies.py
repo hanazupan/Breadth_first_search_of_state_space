@@ -45,15 +45,15 @@ class Energy(AbstractEnergy):
             size = (12, 16)
         self.size = size
         size_x, size_y = complex(size[0]), complex(size[1])
-        self.grid_x, self.grid_y = np.mgrid[-2:2:size_x, -2:2:size_y]
+        self.grid_x, self.grid_y = np.mgrid[-1:1:size_x, -1:1:size_y]
 
-        def square_well(x, y, a=10, b=5):
-            return a*(x**2 - 1)**2 + b*(y**2 - 1)**2
+        def square_well(x, y, a=5, b=10):
+            return a*(x**2 - 0.3)**2 + b*(y**2 - 0.5)**2
 
-        self.dV_dx = lambda x: 4*10*x*(x**2 - 1)
-        self.dV_dy = lambda y: 4*5*y*(y**2 - 1)
-        xaxis = np.linspace(-2, 2, size[0])
-        yaxis = np.linspace(-2, 2, size[1])
+        self.dV_dx = lambda x: 4*5*x*(x**2 - 0.3)
+        self.dV_dy = lambda y: 4*10*y*(y**2 - 0.5)
+        xaxis = np.linspace(-1, 1, size[0])
+        yaxis = np.linspace(-1, 1, size[1])
         self.energies = square_well(xaxis[:, None], yaxis[None, :])
         self.energy_cutoff = 5
         self.deltas = np.ones(len(self.size), dtype=int)
@@ -256,7 +256,7 @@ class Energy(AbstractEnergy):
         if not np.any(self.energies):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
-            lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+            lims = dict(cmap='RdBu_r')
             fig, ax = plt.subplots(1, 1)
             im = plt.imshow(self.energies, **lims)
             self._add_colorbar(fig, ax, im)

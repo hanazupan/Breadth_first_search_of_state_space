@@ -11,6 +11,10 @@ from scipy.sparse import csr_matrix
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
 
+DIM_LANDSCAPE = (7.25, 4.45)
+DIM_PORTRAIT = (3.45, 4.45)
+DIM_SQUARE = (4.45, 4.45)
+
 
 class Simulation:
 
@@ -217,11 +221,14 @@ class Simulation:
             num_eigv: number of eigenvectors to visualize
         """
         tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv)
-        fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row")
+        full_width = DIM_LANDSCAPE[0]
+        fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row",
+                               figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
         xs = np.linspace(-0.5, 0.5, num=len(self.transition_matrices[0]))
         for i, tau in enumerate(self.tau_array):
             for j in range(num_eigv):
                 ax[i][j].plot(xs, tau_eigenvec[i, :, j])
+                ax[i][j].set_ylim(-0.5, 0.5)
                 ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
@@ -271,9 +278,9 @@ class Simulation:
         Plot the histogram of the simulation. Should correspond to the 2D Boltzmann distribution of the energy
         surface.
         """
-        fig, ax = plt.subplots(1, 1)
-        cmap = cm.get_cmap("RdBu").copy()
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
+            fig, ax = plt.subplots(1, 1)
+            cmap = cm.get_cmap("RdBu").copy()
             im = plt.imshow(self.histogram, cmap=cmap)
             fig.colorbar(im, ax=ax)
             ax.figure.savefig(self.images_path + f"hist_2D_{self.images_name}.png")
@@ -328,14 +335,14 @@ if __name__ == '__main__':
     img_path = "Simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy")
     my_maze = Maze((5, 4), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    my_energy.from_potential(size=(19, 19))
+    my_energy.from_potential(size=(30, 30))
     #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6)
-    for m, eigv in enumerate(e_eigval):
-        print(f"{m}. Energy timescale - 1/lambda ", - 1/eigv)
-    my_simulation = Simulation(my_energy, images_path=img_path, m=100)
+    # e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6)
+    # for m, eigv in enumerate(e_eigval):
+    #     print(f"{m}. Energy timescale - 1/lambda ", - 1/eigv)
+    my_simulation = Simulation(my_energy, images_path=img_path, m=1)
     #TODO: do a test for different dt
     my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
@@ -343,11 +350,11 @@ if __name__ == '__main__':
     my_simulation.visualize_population_per_energy()
     my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix()
-    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec()
-    for tau_i, tau in enumerate(my_simulation.tau_array):
-        print(f"---- tau = {tau} -----")
-        for m, eigv in enumerate(s_eigval[tau_i]):
-            print(f"{m}. Simulation timescale - tau/ln(|sigma|) ", - tau / np.log(np.abs(eigv)))
+    # s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec()
+    # for tau_i, tau in enumerate(my_simulation.tau_array):
+    #     print(f"---- tau = {tau} -----")
+    #     for m, eigv in enumerate(s_eigval[tau_i]):
+    #         print(f"{m}. Simulation timescale - tau/ln(|sigma|) ", - tau / np.log(np.abs(eigv)))
     my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec()
     my_simulation.visualize_its()
