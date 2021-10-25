@@ -47,9 +47,11 @@ class Energy(AbstractEnergy):
         size_x, size_y = complex(size[0]), complex(size[1])
         self.grid_x, self.grid_y = np.mgrid[-2:2:size_x, -2:2:size_y]
 
-        def square_well(x, y, a=1, b=5):
+        def square_well(x, y, a=10, b=5):
             return a*(x**2 - 1)**2 + b*(y**2 - 1)**2
 
+        self.dV_dx = lambda x: 4*10*x*(x**2 - 1)
+        self.dV_dy = lambda y: 4*5*y*(y**2 - 1)
         xaxis = np.linspace(-2, 2, size[0])
         yaxis = np.linspace(-2, 2, size[1])
         self.energies = square_well(xaxis[:, None], yaxis[None, :])

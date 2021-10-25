@@ -87,9 +87,12 @@ class Simulation:
         Returns: tuple (x_n, y_n), the integrated new trajectory points (not necessarily between -1 and 1)
 
         """
-        # TODO: implement for energy surfaces that are not splines
-        dV_dx = bisplev(x_n, y_n, self.spline, dx=1)
-        dV_dy = bisplev(x_n, y_n, self.spline, dy=1)
+        if self.spline:
+            dV_dx = bisplev(x_n, y_n, self.spline, dx=1)
+            dV_dy = bisplev(x_n, y_n, self.spline, dy=1)
+        else:
+            dV_dx = self.energy.dV_dx(x_n)
+            dV_dy = self.energy.dV_dy(y_n)
         eta_x = np.random.normal()
         x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x * np.sqrt(self.dt)
         eta_y = np.random.normal()
@@ -178,8 +181,9 @@ class Simulation:
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
         self.transition_matrices = self.transition_matrices / sums
+        return self.transition_matrices
 
-    def get_eigenvec_eigenval(self, num_eigv: int = 6) -> tuple:
+    def get_eigenval_eigenvec(self, num_eigv: int = 6) -> tuple:
         """
         Obtain eigenvectors and eigenvalues of the transition matrices.
         Returns:
@@ -202,8 +206,17 @@ class Simulation:
             tau_eigenvec[i] = eigenvec
         return tau_eigenvals, tau_eigenvec
 
+    ############################################################################
+    # ------------------------   VISUALIZATION  --------------------------------
+    ############################################################################
+
     def visualize_eigenvec(self, num_eigv: int = 6):
-        tau_eigenvals, tau_eigenvec = self.get_eigenvec_eigenval(num_eigv=num_eigv)
+        """
+        Visualize first num_eiv of the transitions matrix for all tau-s in the self.tau_array
+        Args:
+            num_eigv: number of eigenvectors to visualize
+        """
+        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv)
         fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row")
         xs = np.linspace(-0.5, 0.5, num=len(self.transition_matrices[0]))
         for i, tau in enumerate(self.tau_array):
@@ -213,12 +226,16 @@ class Simulation:
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
         fig.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        print("tau eigenvals ", tau_eigenvals)
-
-        return self.transition_matrices
+        plt.close()
 
     def visualize_its(self, num_eigv: int = 6):
-        tau_eigenvals, tau_eigenvec = self.get_eigenvec_eigenval(num_eigv=num_eigv)
+        """
+        Plot iterative timescales.
+
+        Args:
+            num_eigv: how many eigenvalues/timescales to plot
+        """
+        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv)
         tau_eigenvals = tau_eigenvals.T
         fig2, ax2 = plt.subplots(1, 1)
         colors = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
@@ -226,14 +243,10 @@ class Simulation:
             tau_filter = self.tau_array
             to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(tau_filter, to_plot,
-                    label=f"eigenval {j}", color=colors[j])
+                    label=f"its {j}", color=colors[j])
         ax2.legend()
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
-
-    ############################################################################
-    # ------------------------   VISUALIZATION  --------------------------------
-    ############################################################################
 
     def visualize_transition_matrices(self):
         """
@@ -315,21 +328,26 @@ if __name__ == '__main__':
     img_path = "Simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy")
     my_maze = Maze((5, 4), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    #my_energy.from_potential()
-    my_energy.from_maze(my_maze, add_noise=True)
+    my_energy.from_potential(size=(19, 19))
+    #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6)
     for m, eigv in enumerate(e_eigval):
-        print(f"{m}. Energy timescale 1/e^(100*lambda) ", 1/np.exp(eigv*100))
-    my_simulation = Simulation(my_energy, images_path=img_path)
-    #TODO: do a test for different td
-    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
+        print(f"{m}. Energy timescale - 1/lambda ", - 1/eigv)
+    my_simulation = Simulation(my_energy, images_path=img_path, m=100)
+    #TODO: do a test for different dt
+    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix()
+    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec()
+    for tau_i, tau in enumerate(my_simulation.tau_array):
+        print(f"---- tau = {tau} -----")
+        for m, eigv in enumerate(s_eigval[tau_i]):
+            print(f"{m}. Simulation timescale - tau/ln(|sigma|) ", - tau / np.log(np.abs(eigv)))
     my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec()
     my_simulation.visualize_its()
