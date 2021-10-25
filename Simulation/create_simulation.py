@@ -7,6 +7,7 @@ from tqdm import tqdm
 from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
+from itertools import islice
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
@@ -168,19 +169,30 @@ class Simulation:
             self.tau_array = tau_array
         if not np.any(self.traj_x):
             raise ValueError("No trajectories found! Check if using the setting save_trajectory=False.")
+
+        def window(seq, n):
+            """Sliding window width tau from seq.  From old itertools recipes."""
+            it = iter(seq)
+            result = tuple(islice(it, n))
+            if len(result) == n:
+                yield result
+            for elem in it:
+                result = result[1:] + (elem,)
+                yield result
+
         all_cells = len(self.histogram.flatten())
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
-            # TODO: make this better - a moving window!
-            filtered_traj_x = self.traj_x[::tau]
-            filtered_traj_y = self.traj_x[::tau]
-            previous_cell = self._point_to_cell((self.traj_x[0], self.traj_y[0]))
-            for x, y in zip(filtered_traj_x[1:], filtered_traj_y[1:]):
-                cell = self._point_to_cell((x, y))
-                i = self._cell_to_index(previous_cell)
-                j = self._cell_to_index(cell)
+            window_x = window(self.traj_x, tau)
+            window_y = window(self.traj_y, tau)
+            for w_x, w_y in zip(window_x, window_y):
+                start_cell = self._point_to_cell((w_x[0], w_y[0]))
+                end_cell = self._point_to_cell((w_x[1], w_y[1]))
+                i = self._cell_to_index(start_cell)
+                j = self._cell_to_index(end_cell)
                 self.transition_matrices[tau_i, i, j] += 1
-                previous_cell = cell
+                # enforce detailed balance
+                self.transition_matrices[tau_i, j, i] += 1
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
@@ -198,7 +210,7 @@ class Simulation:
         # TODO: do this
         for i, tau in enumerate(self.tau_array):
             tm = self.transition_matrices[i].T
-            eigenval, eigenvec = eigs(csr_matrix(tm), num_eigv, which='LR')
+            eigenval, eigenvec = eigs(tm, num_eigv, which='LR')
             if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
                 eigenvec = eigenvec.real
                 eigenval = eigenval.real
@@ -224,14 +236,18 @@ class Simulation:
         full_width = DIM_LANDSCAPE[0]
         fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row",
                                figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
-        xs = np.linspace(-0.5, 0.5, num=len(self.transition_matrices[0]))
+        vmin = np.min(tau_eigenvec)
+        vmax = np.max(tau_eigenvec)
         for i, tau in enumerate(self.tau_array):
             for j in range(num_eigv):
-                ax[i][j].plot(xs, tau_eigenvec[i, :, j])
-                ax[i][j].set_ylim(-0.5, 0.5)
+                to_plot = tau_eigenvec[i, :, j]
+                to_plot = to_plot.reshape(self.energy.size)
+                ax[i][j].imshow(to_plot, cmap="RdBu_r", vmin=vmin, vmax=vmax)
                 ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
+                ax[i][j].set_yticklabels([])
+                #ax[i][j].axes.get_yaxis().set_visible(False)
         fig.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
@@ -249,8 +265,7 @@ class Simulation:
         for j in range(1, num_eigv):
             tau_filter = self.tau_array
             to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
-            ax2.plot(tau_filter, to_plot,
-                    label=f"its {j}", color=colors[j])
+            ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
         ax2.legend()
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
@@ -339,9 +354,8 @@ if __name__ == '__main__':
     #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    # e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6)
-    # for m, eigv in enumerate(e_eigval):
-    #     print(f"{m}. Energy timescale - 1/lambda ", - 1/eigv)
+    my_energy.visualize_eigenvectors(num=6)
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6)
     my_simulation = Simulation(my_energy, images_path=img_path, m=1)
     #TODO: do a test for different dt
     my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
@@ -350,13 +364,14 @@ if __name__ == '__main__':
     my_simulation.visualize_population_per_energy()
     my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix()
-    # s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec()
-    # for tau_i, tau in enumerate(my_simulation.tau_array):
-    #     print(f"---- tau = {tau} -----")
-    #     for m, eigv in enumerate(s_eigval[tau_i]):
-    #         print(f"{m}. Simulation timescale - tau/ln(|sigma|) ", - tau / np.log(np.abs(eigv)))
+    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec()
+    for tau_i, tau in enumerate(my_simulation.tau_array):
+        print(f"---- tau = {tau} -----")
+        for m, eigv in enumerate(s_eigval[tau_i]):
+            print(f"{m}. Energy -1/lambda ", -1/e_eigval[m])
+            print(f"{m}. Simulation -tau/ln(sigma) ", -tau/np.log(eigv))
     my_simulation.visualize_transition_matrices()
-    my_simulation.visualize_eigenvec()
+    my_simulation.visualize_eigenvec(8)
     my_simulation.visualize_its()
 
 
