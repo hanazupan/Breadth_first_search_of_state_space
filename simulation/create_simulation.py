@@ -1,5 +1,5 @@
-from Maze.create_energies import Energy
-from Maze.create_mazes import Maze
+from maze.create_energies import Energy
+from maze.create_mazes import Maze
 from scipy.interpolate import bisplev
 import numpy as np
 import matplotlib.pyplot as plt
@@ -281,7 +281,7 @@ class Simulation:
         """
         if not np.any(self.transition_matrices):
             self.get_transitions_matrix()
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
         vmax = np.max(self.transition_matrices)
         vmin = np.min(self.transition_matrices)
@@ -298,7 +298,7 @@ class Simulation:
         Plot the histogram of the simulation. Should correspond to the 2D Boltzmann distribution of the energy
         surface.
         """
-        with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
+        with plt.style.context(['stylesheets/not_animation.mplstyle', 'stylesheets/maze_style.mplstyle']):
             fig, ax = plt.subplots(1, 1)
             cmap = cm.get_cmap("RdBu").copy()
             im = plt.imshow(self.histogram, cmap=cmap)
@@ -313,7 +313,7 @@ class Simulation:
         """
         list_of_cells = self.energy.explorer.get_sorted_accessible_cells()
         boltzmanns = np.array([self.histogram[cell] for cell in list_of_cells])
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, 1)
             ax.plot(boltzmanns)
             ax.set_xlabel("Accessible cell index")
@@ -334,7 +334,7 @@ class Simulation:
                 cell = (x, y)
                 energies.append(self.energy.get_energy(cell))
                 population.append(self.histogram[cell])
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['stylesheets/not_animation.mplstyle']):
             plt.hist(energies, weights=population, histtype='step')
             plt.savefig(self.images_path + f"population_per_energy_{self.images_name}.png")
             plt.close()
@@ -343,7 +343,7 @@ class Simulation:
         """
         Plot the points visited by the trajectory.
         """
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+        with plt.style.context(['stylesheets/not_animation.mplstyle']):
             plt.subplots(1, 1, figsize=(8, 10))
             plt.scatter(self.traj_y, self.traj_x, marker="o", c="black", s=1)
             plt.gca().invert_yaxis()
@@ -352,7 +352,7 @@ class Simulation:
 
 
 if __name__ == '__main__':
-    img_path = "Simulation/Images/"
+    img_path = "simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy")
     my_maze = Maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
     #my_energy.from_potential(size=(30, 30))

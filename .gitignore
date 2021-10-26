@@ -1,14 +1,14 @@
 # Images
-Maze/Images/
-Maze/*.gif
-Maze/*.png
-Maze/playground.py
+maze/Images/
+maze/*.gif
+maze/*.png
+maze/playground.py
 
 *.png
 *.gif
 
-!Maze/Example_images/*.png
-!Maze/Example_images/*.gif
+!maze/Example_images/*.png
+!maze/Example_images/*.gif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
