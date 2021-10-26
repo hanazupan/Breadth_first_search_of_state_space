@@ -185,7 +185,7 @@ class Energy(AbstractEnergy):
         boltzmanns = np.array([np.exp(-self.get_energy(cell) / (kB * self.T)) for cell in list_of_cells])
         return boltzmanns
 
-    def get_eigenval_eigenvec(self, num: int = 10) -> tuple:
+    def get_eigenval_eigenvec(self, num: int = 10, **kwargs) -> tuple:
         """
         Obtain num (default 10) eigenvalues and eigenvectors of the rates matrix.
 
@@ -203,7 +203,7 @@ class Energy(AbstractEnergy):
         if not self.explorer:
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
-        eigenval, eigenvec = eigs(self.rates_matrix.T, num, which='LR')
+        eigenval, eigenvec = eigs(self.rates_matrix.T, num, **kwargs)
         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
             eigenvec = eigenvec.real
             eigenval = eigenval.real
@@ -288,7 +288,7 @@ class Energy(AbstractEnergy):
         Args:
             num: int, how many eigenvectors to display
         """
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LM")
         # sort the eigenvectors according to value of eigenvalues
         with plt.style.context('Stylesheets/not_animation.mplstyle'):
             full_width = DIM_LANDSCAPE[0]
@@ -314,7 +314,7 @@ class Energy(AbstractEnergy):
         Returns:
 
         """
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LM")
         cell_order = self.explorer.get_sorted_accessible_cells()
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
