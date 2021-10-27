@@ -28,7 +28,7 @@ class Energy(AbstractEnergy):
         self.T = 293  # 293K <==> 20°C
         self.m = m
         self.friction = friction
-        self.D = kB *self.T / self.m / self.friction
+        self.D = kB * self.T / self.m / self.friction
         # energy cutoff - let's see if it should be changed
         # will only have a value if energy created from maze
         self.underlying_maze = None
@@ -39,14 +39,12 @@ class Energy(AbstractEnergy):
         self.explorer = None
         self.spline = None
 
-    def from_potential(self, size=None):
+    def from_potential(self, size=(12, 16)):
         """
         For testing - initiate an energy surface with a 2D potential well.
         """
-        if not size:
-            size = (12, 16)
         self.size = size
-        size_x, size_y = complex(size[0]), complex(size[1])
+        size_x, size_y = complex(self.size[0]), complex(self.size[1])
         self.grid_x, self.grid_y = np.mgrid[-1:1:size_x, -1:1:size_y]
 
         def square_well(x, y, a=5, b=10):
@@ -54,26 +52,31 @@ class Energy(AbstractEnergy):
 
         self.dV_dx = lambda x: 4*5*x*(x**2 - 0.3)
         self.dV_dy = lambda y: 4*10*y*(y**2 - 0.5)
-        xaxis = np.linspace(-1, 1, size[0])
-        yaxis = np.linspace(-1, 1, size[1])
+        cell_step_x = 2 / self.size[0]
+        cell_step_y = 2 / self.size[1]
+        xaxis = np.linspace(-1 + cell_step_x/2, 1 - cell_step_x/2, self.size[0])
+        yaxis = np.linspace(-1 + cell_step_y/2, 1 - cell_step_y/2, self.size[1])
         self.energies = square_well(xaxis[:, None], yaxis[None, :])
         self.energy_cutoff = 3
         self.deltas = np.ones(len(self.size), dtype=int)
-        #self.pbc = False
+        self.pbc = False
+        self.h = cell_step_x
+        self.S = cell_step_x
+        self.V = cell_step_x**2
 
     def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
         """
-        A function for creating a energy surface from a 2D Maze object.
+        A function for creating a energy surface from a 2D maze object.
 
         Args:
-            maze: a Maze object that should be changed into an energy surface.
+            maze: a maze object that should be changed into an energy surface.
             add_noise: boolean, if False, the maze is not changed, if True, some of 0s in the maze -> -1 or -2
             factor_grid: int, how many times more points for interpolation than in original maze
                          (note: factor_grid > 2 produces very localized min/max)
         """
         # interpolation only available for 2D mazes
         if len(maze.size) != 2:
-            raise ValueError("Maze does not have the right dimensionality.")
+            raise ValueError("maze does not have the right dimensionality.")
         # sparse grid
         size_x, size_y = complex(maze.size[0]), complex(maze.size[1])
         x_edges, y_edges = np.mgrid[-1:1:size_x, -1:1:size_y]
@@ -120,7 +123,7 @@ class Energy(AbstractEnergy):
             raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         energy_i = self.get_energy(cell_i)
         energy_j = self.get_energy(cell_j)
-        return self.D * self.S / self.h / self.V * np.sqrt(np.exp((-energy_j + energy_i)/(kB*self.T)))
+        return self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.T)))
 
     def _calculate_rates_matrix(self):
         """
@@ -397,11 +400,11 @@ class Energy(AbstractEnergy):
 
 
 if __name__ == '__main__':
-    img_path = "Maze/Images/"
+    img_path = "maze/Images/"
     my_energy = Energy(images_path=img_path)
-    #my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
+    #my_maze = maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
     #my_maze.visualize()
-    my_energy.from_potential(size=(14, 17))
+    my_energy.from_potential(size=(10, 10))
     #my_energy.from_maze(my_maze, add_noise=True)
     #my_energy.visualize_underlying_maze()
     #my_energy.visualize_boltzmann()

@@ -455,7 +455,7 @@ class DijkstraExplorer(Explorer):
 
 
 if __name__ == '__main__':
-    img_path = "Maze/Images/"
+    img_path = "maze/Images/"
     my_maze = Maze((16, 16), images_path=img_path, images_name="explore", animate=False)
     dfs_explorer = DFSExplorer(my_maze)
     dfs_explorer.explore_and_animate()

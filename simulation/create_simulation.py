@@ -1,5 +1,5 @@
-from Maze.create_energies import Energy
-from Maze.create_mazes import Maze
+from maze.create_energies import Energy
+from maze.create_mazes import Maze
 from scipy.interpolate import bisplev
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,6 +33,7 @@ class Simulation:
         self.D = kB*self.T/self.m/self.friction
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
+        self.outside_hist = 0
         self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 70, 100, 150, 200])
         self.traj_x = None
         self.traj_y = None
@@ -72,15 +73,20 @@ class Simulation:
                 y_n = 2 * np.random.random() - 1                # random between (-1, 1)
             # integrate the trajectory one step and increase the histogram count
             x_n, y_n = self._euler_maruyama(x_n, y_n)
-            x_n, y_n = self._point_within_bound((x_n, y_n))
+            if self.energy.pbc:
+                x_n, y_n = self._point_within_bound((x_n, y_n))
             cell = self._point_to_cell((x_n, y_n))
-            self.histogram[cell] += 1
+            try:
+                self.histogram[cell] += 1
+            except IndexError:
+                # if not using periodic boundaries, points can land outside the histogram
+                self.outside_hist += 1
             # if applicable, save trajectory
             if save_trajectory:
                 self.traj_x[n] = x_n
                 self.traj_y[n] = y_n
         # normalizing the histogram
-        self.histogram = self.histogram / self.N
+        self.histogram = self.histogram / np.sum(self.histogram)
 
     def _euler_maruyama(self, x_n: float, y_n: float) -> tuple:
         """
@@ -132,8 +138,6 @@ class Simulation:
         Returns:
             tuple (row, column) in which cell of the histogram this point lands
         """
-        # changing to an equivalent point within the original energy surface (-1, 1)
-        point = self._point_within_bound(point)
         x_n, y_n = point
         # determine the cell of the histogram
         cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
@@ -193,9 +197,13 @@ class Simulation:
                 end_cell = self._point_to_cell((w_x[1], w_y[1]))
                 i = self._cell_to_index(start_cell)
                 j = self._cell_to_index(end_cell)
-                self.transition_matrices[tau_i, i, j] += 1
-                # enforce detailed balance
-                self.transition_matrices[tau_i, j, i] += 1
+                try:
+                    self.transition_matrices[tau_i, i, j] += 1
+                    # enforce detailed balance
+                    self.transition_matrices[tau_i, j, i] += 1
+                except IndexError:
+                    if self.energy.pbc:
+                        raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
@@ -234,7 +242,7 @@ class Simulation:
         Args:
             num_eigv: number of eigenvectors to visualize
         """
-        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv)
+        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, which="LM")
         full_width = DIM_LANDSCAPE[0]
         fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row",
                                figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
@@ -268,9 +276,9 @@ class Simulation:
             tau_filter = self.tau_array
             to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
-        if np.any(rates_eigenvalues):
-           for j in range(1, len(rates_eigenvalues)):
-               ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
+        # if np.any(rates_eigenvalues):
+        #    for j in range(1, len(rates_eigenvalues)):
+        #        ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
         ax2.legend()
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
@@ -352,23 +360,23 @@ class Simulation:
 
 
 if __name__ == '__main__':
-    img_path = "Simulation/Images/"
+    img_path = "simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy", m=1, friction=10)
-    my_maze = Maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
+    #my_maze = maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
     my_energy.from_potential(size=(30, 30))
     #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    my_energy.visualize_eigenvectors(num=6)
-    my_energy.visualize_eigenvectors_in_maze(num=6)
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR")
+    my_energy.visualize_eigenvectors(num=6, which="SM")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="SM")
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SM")
+    print("ITS energies ", -1/e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, m=my_energy.m, friction=my_energy.friction)
     #TODO: do a test for different dt
     my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
-    my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix()
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8)
     my_simulation.visualize_transition_matrices()

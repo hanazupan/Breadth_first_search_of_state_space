@@ -1,8 +1,8 @@
 # Images
-Maze/Images/
+maze/Images/
 Maze/*.gif
 Maze/*.png
-Maze/playground.py
+maze/playground.py
 
 *.png
 *.gif

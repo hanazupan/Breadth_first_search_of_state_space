@@ -1,5 +1,5 @@
 """
-In this file, class Maze is introduced and mazes of different sizes can be created using Prim's
+In this file, class maze is introduced and mazes of different sizes can be created using Prim's
 algorithm or a random distribution of cells. The mazes can also be solved using breadth-first search
 algorithm, visualized as graphs and transformed into an adjacency matrix.
 """
@@ -214,7 +214,7 @@ class Maze(AbstractEnergy):
 
     def __repr__(self) -> str:
         """
-        When using print() on a Maze object, it returns the string representation of self.energies.
+        When using print() on a maze object, it returns the string representation of self.energies.
 
         Returns: string representation of self.energies
 
@@ -313,7 +313,7 @@ class Maze(AbstractEnergy):
 
     def visualize(self) -> matplotlib.image.AxesImage:
         """
-        Visualize the Maze with black squares (walls) and white squares (halls).
+        Visualize the maze with black squares (walls) and white squares (halls).
 
         Returns:
             matplotlib.image.AxesImage, the plot
@@ -329,10 +329,10 @@ class MazeAnimation:
 
     def __init__(self, maze_to_animate: AbstractEnergy):
         """
-        MazeAnimation class enables creating an animation of a specific algorithm on a Maze object.
+        MazeAnimation class enables creating an animation of a specific algorithm on a maze object.
 
         Args:
-            maze_to_animate: Maze object, a maze that we want to animate.
+            maze_to_animate: maze object, a maze that we want to animate.
 
         Raises:
             ValueError if the maze is not 2D.
@@ -445,6 +445,6 @@ class MazeAnimation:
 
 
 if __name__ == '__main__':
-    path = "Maze/Images/"
+    path = "maze/Images/"
     maze = Maze((20, 20), images_path=path, images_name="style", animate=True)
     maze.visualize()
