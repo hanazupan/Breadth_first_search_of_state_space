@@ -18,15 +18,17 @@ DIM_SQUARE = (4.45, 4.45)
 
 class Energy(AbstractEnergy):
 
-    def __init__(self, images_path: str = "./", images_name: str = "energy"):
+    def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10):
         # for now assume uniform, square cells so that geom. parameters = 1 and also diffusion coeff is 1
         super().__init__(None, 5, None, None, images_path, images_name)
-        self.D = 1
         self.h = 1
         self.S = 1
         self.V = 1
         # and let´s assume room temperature (does that make sense?)
         self.T = 293  # 293K <==> 20°C
+        self.m = m
+        self.friction = friction
+        self.D = kB *self.T / self.m / self.friction
         # energy cutoff - let's see if it should be changed
         # will only have a value if energy created from maze
         self.underlying_maze = None
@@ -55,8 +57,9 @@ class Energy(AbstractEnergy):
         xaxis = np.linspace(-1, 1, size[0])
         yaxis = np.linspace(-1, 1, size[1])
         self.energies = square_well(xaxis[:, None], yaxis[None, :])
-        self.energy_cutoff = 5
+        self.energy_cutoff = 3
         self.deltas = np.ones(len(self.size), dtype=int)
+        #self.pbc = False
 
     def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
         """
@@ -281,14 +284,14 @@ class Energy(AbstractEnergy):
             plt.close()
             return ax
 
-    def visualize_eigenvectors(self, num: int = 3):
+    def visualize_eigenvectors(self, num: int = 3, **kwargs):
         """
         Visualize the eigenvectors of rate matrix.
 
         Args:
             num: int, how many eigenvectors to display
         """
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LM")
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
         # sort the eigenvectors according to value of eigenvalues
         with plt.style.context('Stylesheets/not_animation.mplstyle'):
             full_width = DIM_LANDSCAPE[0]
@@ -302,7 +305,7 @@ class Energy(AbstractEnergy):
             plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
             plt.close()
 
-    def visualize_eigenvectors_in_maze(self, num: int = 3):
+    def visualize_eigenvectors_in_maze(self, num: int = 3, **kwargs):
         """
         Visualize the energy surface and the first num (default=3) eigenvectors as a 2D image in a maze.
         Black squares mean the cells are not accessible.
@@ -314,7 +317,7 @@ class Energy(AbstractEnergy):
         Returns:
 
         """
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LM")
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
         cell_order = self.explorer.get_sorted_accessible_cells()
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
@@ -396,18 +399,18 @@ class Energy(AbstractEnergy):
 if __name__ == '__main__':
     img_path = "Maze/Images/"
     my_energy = Energy(images_path=img_path)
-    my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
-    my_maze.visualize()
-    #my_energy.from_potential()
-    my_energy.from_maze(my_maze, add_noise=True)
-    my_energy.visualize_underlying_maze()
-    my_energy.visualize_boltzmann()
+    #my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
+    #my_maze.visualize()
+    my_energy.from_potential(size=(14, 17))
+    #my_energy.from_maze(my_maze, add_noise=True)
+    #my_energy.visualize_underlying_maze()
+    #my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_3d()
-    my_energy.get_rates_matix()
+    #my_energy.visualize_3d()
+    #my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors(num=6)
-    my_energy.visualize_eigenvectors_in_maze(num=6)
-    my_energy.visualize_eigenvalues()
+    my_energy.visualize_eigenvectors(num=6, which="SM")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="SM")
+    #my_energy.visualize_eigenvalues()
 
 

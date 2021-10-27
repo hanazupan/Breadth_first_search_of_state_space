@@ -37,6 +37,7 @@ class AbstractEnergy(ABC):
         self.deltas = deltas
         self.size = size
         self.energy_cutoff = energy_cutoff
+        self.pbc = True  # whether to use periodic boundary conditions
         # prepare for saving images/gifs
         self.images_path = images_path
         self.images_name = images_name
@@ -88,10 +89,13 @@ class AbstractEnergy(ABC):
         for i, coo in enumerate(cell):
             neig_cel = np.array(cell)
             neig_cel[i] = (cell[i] - self.deltas[i]) % self.size[i]
-            yield tuple(neig_cel)
+            # if no periodic boundaries, there is no -1 neighbour
+            if self.pbc or coo != 0:
+                yield tuple(neig_cel)
             plus_one = (cell[i] + self.deltas[i]) % self.size[i]
             neig_cel[i] = plus_one
-            yield tuple(neig_cel)
+            if self.pbc or coo != self.size[i] - 1:
+                yield tuple(neig_cel)
 
     def get_accessible_neighbours(self, cell: tuple) -> Sequence:
         """
@@ -408,7 +412,7 @@ class MazeAnimation:
         # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
         # 1 are the walls.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
-        bounds = [-100.5, -99.5, 0.5, 1.5]
+        bounds = [-100.5, -99.5, 9.5, 10.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
         if name in ["bfs", "dfs"]:
             self._animate(name, cmap=cmap, norm=norm)

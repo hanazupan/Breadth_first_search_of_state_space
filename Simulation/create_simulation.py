@@ -268,9 +268,9 @@ class Simulation:
             tau_filter = self.tau_array
             to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
-        #if np.any(rates_eigenvalues):
-        #    for j in range(1, len(rates_eigenvalues)):
-        #        ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
+        if np.any(rates_eigenvalues):
+           for j in range(1, len(rates_eigenvalues)):
+               ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
         ax2.legend()
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
@@ -353,18 +353,18 @@ class Simulation:
 
 if __name__ == '__main__':
     img_path = "Simulation/Images/"
-    my_energy = Energy(images_path=img_path, images_name="energy")
+    my_energy = Energy(images_path=img_path, images_name="energy", m=1, friction=10)
     my_maze = Maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    #my_energy.from_potential(size=(30, 30))
-    my_energy.from_maze(my_maze, add_noise=True)
+    my_energy.from_potential(size=(30, 30))
+    #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
     my_energy.visualize_eigenvectors(num=6)
     my_energy.visualize_eigenvectors_in_maze(num=6)
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SM")
-    my_simulation = Simulation(my_energy, images_path=img_path, m=1, friction=20)
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR")
+    my_simulation = Simulation(my_energy, images_path=img_path, m=my_energy.m, friction=my_energy.friction)
     #TODO: do a test for different dt
-    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()

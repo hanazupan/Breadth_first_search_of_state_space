@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Created with matplotlib (https://matplotlib.org/) -->
+<svg height="252.48pt" version="1.1" viewBox="0 0 371.52 252.48" width="371.52pt" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <style type="text/css">
+*{stroke-linecap:butt;stroke-linejoin:round;}
+  </style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 252.48 
+L 371.52 252.48 
+L 371.52 -0 
+L 0 -0 
+z
+" style="fill:#ffffff;"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 7.2 245.28 
+L 364.32 245.28 
+L 364.32 7.2 
+L 7.2 7.2 
+z
+" style="fill:#ffffff;"/>
+   </g>
+   <g clip-path="url(#pe3de68b3d8)">
+    <image height="238.32" id="image2748c411a5" transform="scale(1 -1)translate(0 -238.32)" width="357.84" x="7.2" xlink:href="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAAfEAAAFLCAYAAADGY7VuAAAABHNCSVQICAgIfAhkiAAAB7lJREFUeJzt3UEOK7cRQMGRoftfWVkIyDe8DNtQP6bqAMIMydEDV/36fD6f59Dr9Tr9iWOnr3HDO8C/YeLbuOH75A/7+bXhP/uvXz8AAPC/EXEAiBJxAIgScQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCIet8ynH2DDQPiT/dz4h0mztTpczjXd9nwbTHHfn5N/E+5iQNAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0DU67NgsKvZz3vcMk+cOb7PPW75Pm85Uxv+p9zEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASDqfctw9lMTw92t5R4Te3F6Jjach4lzfcu3ccN+8sfEufy1iTPlJg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRr88NQ1n5r1tmHpv9zN/d8jd1ei63zHb3fX5tOJdu4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQ9TYg/mtiuPuG99hgYi1veIYJt5ypDftxupYT77BhHW5xw1pOfN9u4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABD1/vUD3MR827nfMKN+7jdObTgTG9Zhwi3rsOH7OrXhf2piP93EASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASDq/esHeJ6ZwegbhtRveIYNQ+o3rMMtTtdyYj83nAln6i4TZ2qDDd+nmzgARIk4AESJOABEiTgARIk4AESJOABEiTgARIk4AESJOABEiTgARIk4AESJOABEiTgARIk4AESJOABEjcwTv2HW7w3v8Dw75ttO2LAfW9bixIZ1nHDDXtxkw37ccrZPuYkDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQNTreZ7fT3cfsGFI/akNQ+5vWMfnuWctN7zHLU73w17M8T8zx00cAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJen1umsx+aGO6+YSk3DKmfWIcN73GDDWdywi3n4XQ/tvxPbdiPDWu5gZs4AESJOABEiTgARIk4AESJOABEiTgARIk4AESJOABEiTgARIk4AESJOABEiTgARIk4AESJOABEiTgARL03zKe9Za7rLe9xasM6bJijvWEdJtzyHszZ8H1tsKF9buIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAEPX+9QM8z44B8xPD2U9tWIcJG9Zy4hlu2Y8NTtfSfs7Z8H1OuGE/J97BTRwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiXs/zHA803TArmBk3zOjdYsO5vmU/N6zlhA3/lRvOxC37eco8cQD4PybiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAECXiABAl4gAQJeIAEPX+9QNMOR2uvmFI/cSA+A02rCVzJvbzhrN9wztMueEbn9jPDevgJg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRIg4AUSIOAFEiDgBRK+aJm9M7Z8N82wnOxNct+3lqw+xnc9V32bCWG57BTRwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAol7P8xxPNT8djP56vU4fYYUNA+I32LCfE3ux4T348m3t4tuYMXGu3cQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEgSsQBIErEASBKxAEg6vUxqHeNiRm9Zrt/3XKsN+zHLbPZfRtfG76NDWu5YR0muIkDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQJSIA0CUiANAlIgDQNTrMzAZfcOAd+4ycCyPnZ7rDe9wC/8xcybOpf3Yw00cAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokQcAKJEHACiRBwAokbmibPHhhnYE7OGT5/DvGP+yV/dHhv+IzaYWAc3cQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCIEnEAiBJxAIgScQCI+g++F2uU+S6biwAAAABJRU5ErkJggg==" y="-6.96"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 7.2 245.28 
+L 7.2 7.2 
+" style="fill:none;stroke:#000000;stroke-linecap:square;stroke-linejoin:miter;stroke-width:0.8;"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 364.32 245.28 
+L 364.32 7.2 
+" style="fill:none;stroke:#000000;stroke-linecap:square;stroke-linejoin:miter;stroke-width:0.8;"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 7.2 245.28 
+L 364.32 245.28 
+" style="fill:none;stroke:#000000;stroke-linecap:square;stroke-linejoin:miter;stroke-width:0.8;"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 7.2 7.2 
+L 364.32 7.2 
+" style="fill:none;stroke:#000000;stroke-linecap:square;stroke-linejoin:miter;stroke-width:0.8;"/>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pe3de68b3d8">
+   <rect height="238.08" width="357.12" x="7.2" y="7.2"/>
+  </clipPath>
+ </defs>
+</svg>

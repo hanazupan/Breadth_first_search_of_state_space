@@ -93,7 +93,6 @@ class Explorer(ABC):
     def get_sorted_accessible_cells(self) -> list:
         """
         Get (or generate) a list of accessible cells, sorted by their node index
-        TODO: should this be a generator?
         Returns:
             a list of accessible cells, sorted by their node index
         """
