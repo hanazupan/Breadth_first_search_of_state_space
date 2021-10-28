@@ -44,20 +44,24 @@ class Energy(AbstractEnergy):
         For testing - initiate an energy surface with a 2D potential well.
         """
         self.size = size
+        cell_step_x = 2 / self.size[0]
+        cell_step_y = 2 / self.size[1]
+        start_x = -1 + cell_step_x/2
+        end_x = 1 - cell_step_x/2
+        start_y = -1 + cell_step_y / 2
+        end_y = 1 - cell_step_y / 2
         size_x, size_y = complex(self.size[0]), complex(self.size[1])
-        self.grid_x, self.grid_y = np.mgrid[-1:1:size_x, -1:1:size_y]
+        self.grid_x, self.grid_y = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
 
         def square_well(x, y, a=5, b=10):
             return a*(x**2 - 0.3)**2 + b*(y**2 - 0.5)**2
 
         self.dV_dx = lambda x: 4*5*x*(x**2 - 0.3)
         self.dV_dy = lambda y: 4*10*y*(y**2 - 0.5)
-        cell_step_x = 2 / self.size[0]
-        cell_step_y = 2 / self.size[1]
-        xaxis = np.linspace(-1 + cell_step_x/2, 1 - cell_step_x/2, self.size[0])
-        yaxis = np.linspace(-1 + cell_step_y/2, 1 - cell_step_y/2, self.size[1])
-        self.energies = square_well(xaxis[:, None], yaxis[None, :])
-        self.energy_cutoff = 3
+        xaxis = np.linspace(start_x, end_x, self.size[0])
+        yaxis = np.linspace(start_y, end_y, self.size[1])
+        self.energies = square_well(xaxis[None, :], yaxis[:, None])
+        self.energy_cutoff = 10
         self.deltas = np.ones(len(self.size), dtype=int)
         self.pbc = False
         self.h = cell_step_x
@@ -139,12 +143,14 @@ class Energy(AbstractEnergy):
         # get the adjacent elements
         rows, cols = adj_matrix.nonzero()
         for r, c in zip(rows, cols):
-            cell_i = self.explorer.get_cell_from_adj(r)
-            cell_j = self.explorer.get_cell_from_adj(c)
+            cell_i = self.node_to_cell(r)
+            cell_j = self.node_to_cell(c)
             self.rates_matrix[r, c] = self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
+        luca_q = np.genfromtxt("simulation/Q.txt")
+        #np.testing.assert_allclose(luca_q, self.rates_matrix)
         self.rates_matrix = csr_matrix(self.rates_matrix)
 
     def get_rates_matix(self) -> np.ndarray:
@@ -321,7 +327,7 @@ class Energy(AbstractEnergy):
 
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
-        cell_order = self.explorer.get_sorted_accessible_cells()
+        #cell_order = self.explorer.get_sorted_accessible_cells()
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
             fig, ax = plt.subplots(1, num + 1, sharey="row", figsize=(full_width, full_width/(num+1)))
@@ -332,8 +338,11 @@ class Energy(AbstractEnergy):
             ax[0].set_title("Energy surface", fontsize=7)
             for i in range(1, num+1):
                 array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
-                for j, cell in enumerate(cell_order):
-                    array[cell] = eigenvec[j, i-1]
+                index = 0
+                for j in range(self.size[0]):
+                    for k in range(self.size[1]):
+                        array[j, k] = eigenvec[index, i-1]
+                        index += 1
                 ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, :num+1]), vmin=np.min(eigenvec[:, :num+1]))
                 ax[i].set_title(f"Eigenvector {i}", fontsize=7)
             plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")

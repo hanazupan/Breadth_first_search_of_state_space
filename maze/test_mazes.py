@@ -4,7 +4,7 @@ from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 from .create_energies import Energy
 
 all_algorithms = ["Prim", "random"]
-img_path = "Images/"
+img_path = "Maze/Images/"
 
 def test_init():
     for alg in all_algorithms:
@@ -147,15 +147,17 @@ def test_adjacency():
     assert (correct_adj == correct_adj.T).all()
     # compare to the created one
     bfs_explorer = BFSExplorer(test_maze)
-    adj_bfs = bfs_explorer.get_adjacency_matrix().toarray()
+    adj = bfs_explorer.get_adjacency_matrix()
+    np.testing.assert_array_equal(correct_adj, adj)
+    #adj_bfs = bfs_explorer.get_adjacency_matrix().toarray()
     # the rows may have different ordering, but they must have the same rows
-    for row in adj_bfs:
-        assert row in correct_adj
+    #for row in adj_bfs:
+    #    assert row in correct_adj
     # depth-first search should behave in the same way
-    dfs_explorer = BFSExplorer(test_maze)
-    adj_dfs = dfs_explorer.get_adjacency_matrix().toarray()
-    for row in adj_dfs:
-        assert row in correct_adj
+    #dfs_explorer = BFSExplorer(test_maze)
+    #adj_dfs = dfs_explorer.get_adjacency_matrix().toarray()
+    #for row in adj_dfs:
+    #    assert row in correct_adj
 
 
 def test_path():

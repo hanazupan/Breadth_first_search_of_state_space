@@ -8,6 +8,7 @@ from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
 import itertools as it
+import scipy
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
@@ -34,7 +35,7 @@ class Simulation:
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 70, 100, 150, 200])
+        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 60])
         self.traj_x = None
         self.traj_y = None
         self.transition_matrices = None
@@ -236,13 +237,13 @@ class Simulation:
     # ------------------------   VISUALIZATION  --------------------------------
     ############################################################################
 
-    def visualize_eigenvec(self, num_eigv: int = 6):
+    def visualize_eigenvec(self, num_eigv: int = 6, **kwargs):
         """
         Visualize first num_eiv of the transitions matrix for all tau-s in the self.tau_array
         Args:
             num_eigv: number of eigenvectors to visualize
         """
-        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, which="LM")
+        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
         full_width = DIM_LANDSCAPE[0]
         fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row",
                                figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
@@ -261,14 +262,14 @@ class Simulation:
         fig.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
-    def visualize_its(self, num_eigv: int = 6, rates_eigenvalues=None):
+    def visualize_its(self, num_eigv: int = 6, rates_eigenvalues=None, **kwargs):
         """
         Plot iterative timescales.
 
         Args:
             num_eigv: how many eigenvalues/timescales to plot
         """
-        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, which="LM")
+        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
         tau_eigenvals = tau_eigenvals.T
         fig2, ax2 = plt.subplots(1, 1)
         colors = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
@@ -276,9 +277,9 @@ class Simulation:
             tau_filter = self.tau_array
             to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
-        # if np.any(rates_eigenvalues):
-        #    for j in range(1, len(rates_eigenvalues)):
-        #        ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
+        if np.any(rates_eigenvalues):
+           for j in range(1, len(rates_eigenvalues)):
+               ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
         ax2.legend()
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
@@ -363,14 +364,17 @@ if __name__ == '__main__':
     img_path = "simulation/Images/"
     my_energy = Energy(images_path=img_path, images_name="energy", m=1, friction=10)
     #my_maze = maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    my_energy.from_potential(size=(30, 30))
+    my_energy.from_potential(size=(10, 10))
     #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
-    my_energy.visualize_eigenvectors(num=6, which="SM")
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SM")
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SM")
+    my_energy.visualize_eigenvectors(num=6, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    my_energy.visualize_eigenvalues()
+    my_energy.visualize_rates_matrix()
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
     print("ITS energies ", -1/e_eigval)
+    print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, m=my_energy.m, friction=my_energy.friction)
     #TODO: do a test for different dt
     my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
@@ -378,9 +382,9 @@ if __name__ == '__main__':
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     my_simulation.get_transitions_matrix()
-    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8)
+    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="SR")
     my_simulation.visualize_transition_matrices()
-    my_simulation.visualize_eigenvec(8)
-    my_simulation.visualize_its(num_eigv=8, rates_eigenvalues=e_eigval)
+    my_simulation.visualize_eigenvec(8, which="LR")
+    my_simulation.visualize_its(num_eigv=8, which="SR", rates_eigenvalues=e_eigval)
 
 
