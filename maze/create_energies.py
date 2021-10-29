@@ -1,5 +1,5 @@
 from .create_mazes import Maze, AbstractEnergy
-from .explore_mazes import BFSExplorer
+from .explore_mazes import BFSExplorer, DFSExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
@@ -43,7 +43,7 @@ class Energy(AbstractEnergy):
         """
         For testing - initiate an energy surface with a 2D potential well.
         """
-        self.size = size
+        self.size = size[::-1]
         cell_step_x = 2 / self.size[0]
         cell_step_y = 2 / self.size[1]
         start_x = -1 + cell_step_x/2
@@ -58,15 +58,13 @@ class Energy(AbstractEnergy):
 
         self.dV_dx = lambda x: 4*5*x*(x**2 - 0.3)
         self.dV_dy = lambda y: 4*10*y*(y**2 - 0.5)
-        xaxis = np.linspace(start_x, end_x, self.size[0])
-        yaxis = np.linspace(start_y, end_y, self.size[1])
-        self.energies = square_well(xaxis[None, :], yaxis[:, None])
+        self.energies = square_well(self.grid_y, self.grid_x)
         self.energy_cutoff = 10
         self.deltas = np.ones(len(self.size), dtype=int)
         self.pbc = False
         self.h = cell_step_x
-        self.S = cell_step_x
-        self.V = cell_step_x**2
+        self.S = cell_step_y
+        self.V = cell_step_x*cell_step_y
 
     def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
         """
@@ -103,6 +101,7 @@ class Energy(AbstractEnergy):
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
+        self.energy_cutoff = 5
         self.spline = tck
         self.size = self.energies.shape
         self.deltas = np.ones(len(self.size), dtype=int)
@@ -138,6 +137,9 @@ class Energy(AbstractEnergy):
         so that the rowsum of rates_matrix = 0.
         """
         self.explorer = BFSExplorer(self)
+        self.explorer.explore_and_animate()
+        ex_d = DFSExplorer(self)
+        ex_d.explore_and_animate()
         adj_matrix = self.explorer.get_adjacency_matrix()
         self.rates_matrix = np.zeros(adj_matrix.shape)
         # get the adjacent elements
@@ -406,9 +408,9 @@ class Energy(AbstractEnergy):
 
 
 if __name__ == '__main__':
-    img_path = "maze/Images/"
+    img_path = "images/"
     my_energy = Energy(images_path=img_path)
-    #my_maze = maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
+    my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
     #my_maze.visualize()
     my_energy.from_potential(size=(10, 10))
     #my_energy.from_maze(my_maze, add_noise=True)

@@ -394,7 +394,7 @@ class MazeAnimation:
         self.iterator = self.energies.create_prim(**kwargs)
         self._animate("building", cmap="Greys")
 
-    def animate_search(self, name, iterator):
+    def animate_search(self, name, iterator, cutoff):
         """
         Animate solving the maze with bfs or dfs algorithm. Color map as follows:
             blue = discovered accessible cells
@@ -409,10 +409,10 @@ class MazeAnimation:
             ValueError if an inappropriate name of algorithm is provided.
         """
         self.iterator = iterator
-        # self-defined color map: -1 are halls that have been discovered and are blue; 0 undiscovered halls,
-        # 1 are the walls.
+        # self-defined color map: blue are halls that have been discovered and are negative; 0 undiscovered halls,
+        # above cutoff are the walls, which are black.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
-        bounds = [-100.5, -99.5, 9.5, 10.5]
+        bounds = [-200, -100 + cutoff, cutoff, cutoff + 100]
         norm = colors.BoundaryNorm(bounds, cmap.N)
         if name in ["bfs", "dfs"]:
             self._animate(name, cmap=cmap, norm=norm)
@@ -445,6 +445,6 @@ class MazeAnimation:
 
 
 if __name__ == '__main__':
-    path = "maze/Images/"
+    path = "images/"
     maze = Maze((20, 20), images_path=path, images_name="style", animate=True)
     maze.visualize()

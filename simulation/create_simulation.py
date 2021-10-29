@@ -35,9 +35,10 @@ class Simulation:
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 60])
+        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 60, 100, 150, 200, 300, 500, 700, 1000])
         self.traj_x = None
         self.traj_y = None
+        self.traj_cell = None
         self.transition_matrices = None
         self.step_x = 2/self.histogram.shape[0]
         self.step_y = 2/self.histogram.shape[1]
@@ -64,6 +65,7 @@ class Simulation:
         # figure out in which cell the trajectory starts and increase the count
         cell = self._point_to_cell((x_n, y_n))
         self.histogram[cell] += 1
+        self.traj_cell = [cell]
         if save_trajectory:
             self.traj_x = np.zeros(N)
             self.traj_y = np.zeros(N)
@@ -83,11 +85,13 @@ class Simulation:
                 # if not using periodic boundaries, points can land outside the histogram
                 self.outside_hist += 1
             # if applicable, save trajectory
+            self.traj_cell.append(cell)
             if save_trajectory:
                 self.traj_x[n] = x_n
                 self.traj_y[n] = y_n
         # normalizing the histogram
         self.histogram = self.histogram / np.sum(self.histogram)
+        self.traj_cell = np.array(self.traj_cell)
 
     def _euler_maruyama(self, x_n: float, y_n: float) -> tuple:
         """
@@ -141,7 +145,8 @@ class Simulation:
         """
         x_n, y_n = point
         # determine the cell of the histogram
-        cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
+        cell = int((y_n + 1) // self.step_x), int((x_n + 1) // self.step_y)
+        #cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
         return cell
 
     def _cell_to_index(self, cell: tuple) -> int:
@@ -189,13 +194,13 @@ class Simulation:
             return [seq[k: k + len_window:len_window-1] for k in range(0, (len(seq)+1)-len_window)]
 
         all_cells = len(self.histogram.flatten())
+        compare = np.zeros((100))
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
-            window_x = window(self.traj_x, int(tau))
-            window_y = window(self.traj_y, int(tau))
-            for w_x, w_y in zip(window_x, window_y):
-                start_cell = self._point_to_cell((w_x[0], w_y[0]))
-                end_cell = self._point_to_cell((w_x[1], w_y[1]))
+            window_cell = window(self.traj_cell, int(tau))
+            for cell_slice in window_cell:
+                start_cell = cell_slice[0]
+                end_cell = cell_slice[1]
                 i = self._cell_to_index(start_cell)
                 j = self._cell_to_index(end_cell)
                 try:
@@ -209,6 +214,11 @@ class Simulation:
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
         self.transition_matrices = self.transition_matrices / sums
+        for i in range(8, len(self.tau_array)):
+            to_plot = self.transition_matrices[i, 12, :]
+            plt.plot(to_plot, label=f"tau = {self.tau_array[i]}")
+        plt.legend()
+        plt.savefig("maze/Images/row.png")
         return self.transition_matrices
 
     def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs) -> tuple:
@@ -274,6 +284,7 @@ class Simulation:
         fig2, ax2 = plt.subplots(1, 1)
         colors = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
         for j in range(1, num_eigv):
+            print("S eigv ", tau_eigenvals[j, :])
             tau_filter = self.tau_array
             to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
@@ -344,7 +355,7 @@ class Simulation:
                 energies.append(self.energy.get_energy(cell))
                 population.append(self.histogram[cell])
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            plt.hist(energies, weights=population, histtype='step')
+            plt.hist(energies, bins=25, weights=population, histtype='step')
             plt.savefig(self.images_path + f"population_per_energy_{self.images_name}.png")
             plt.close()
 
@@ -361,10 +372,10 @@ class Simulation:
 
 
 if __name__ == '__main__':
-    img_path = "simulation/Images/"
+    img_path = "images/"
     my_energy = Energy(images_path=img_path, images_name="energy", m=1, friction=10)
     #my_maze = maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    my_energy.from_potential(size=(10, 10))
+    my_energy.from_potential(size=(30, 30))
     #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
@@ -382,9 +393,9 @@ if __name__ == '__main__':
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     my_simulation.get_transitions_matrix()
-    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="SR")
+    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
     my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(8, which="LR")
-    my_simulation.visualize_its(num_eigv=8, which="SR", rates_eigenvalues=e_eigval)
+    my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
 
 
