@@ -43,7 +43,7 @@ class Energy(AbstractEnergy):
         """
         For testing - initiate an energy surface with a 2D potential well.
         """
-        self.size = size[::-1]
+        self.size = size
         cell_step_x = 2 / self.size[0]
         cell_step_y = 2 / self.size[1]
         start_x = -1 + cell_step_x/2
@@ -51,14 +51,14 @@ class Energy(AbstractEnergy):
         start_y = -1 + cell_step_y / 2
         end_y = 1 - cell_step_y / 2
         size_x, size_y = complex(self.size[0]), complex(self.size[1])
-        self.grid_x, self.grid_y = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
+        self.grid_y, self.grid_x = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
 
         def square_well(x, y, a=5, b=10):
             return a*(x**2 - 0.3)**2 + b*(y**2 - 0.5)**2
 
         self.dV_dx = lambda x: 4*5*x*(x**2 - 0.3)
         self.dV_dy = lambda y: 4*10*y*(y**2 - 0.5)
-        self.energies = square_well(self.grid_y, self.grid_x)
+        self.energies = square_well(self.grid_x, self.grid_y)
         self.energy_cutoff = 10
         self.deltas = np.ones(len(self.size), dtype=int)
         self.pbc = False
@@ -137,9 +137,6 @@ class Energy(AbstractEnergy):
         so that the rowsum of rates_matrix = 0.
         """
         self.explorer = BFSExplorer(self)
-        self.explorer.explore_and_animate()
-        ex_d = DFSExplorer(self)
-        ex_d.explore_and_animate()
         adj_matrix = self.explorer.get_adjacency_matrix()
         self.rates_matrix = np.zeros(adj_matrix.shape)
         # get the adjacent elements
@@ -289,6 +286,8 @@ class Energy(AbstractEnergy):
             ax = plt.axes(projection='3d')
             ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
                             cmap='RdBu_r', edgecolor='none')
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
             ax.figure.savefig(self.images_path + f"3D_energy_{self.images_name}.png")
             plt.close()
             return ax
@@ -409,8 +408,8 @@ class Energy(AbstractEnergy):
 
 if __name__ == '__main__':
     img_path = "images/"
-    my_energy = Energy(images_path=img_path)
-    my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
+    my_energy = Energy(images_path=img_path, friction=10)
+    #my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
     #my_maze.visualize()
     my_energy.from_potential(size=(10, 10))
     #my_energy.from_maze(my_maze, add_noise=True)
@@ -420,8 +419,11 @@ if __name__ == '__main__':
     #my_energy.visualize_3d()
     #my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors(num=6, which="SM")
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SM")
-    #my_energy.visualize_eigenvalues()
+    my_energy.visualize_eigenvectors(num=6, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    my_energy.visualize_eigenvalues()
+    eigval = my_energy.get_eigenval_eigenvec(4, which="LR")[0]
+    print(eigval)
+    print(-1/eigval)
 
 

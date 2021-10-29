@@ -40,8 +40,8 @@ class Simulation:
         self.traj_y = None
         self.traj_cell = None
         self.transition_matrices = None
-        self.step_x = 2/self.histogram.shape[0]
-        self.step_y = 2/self.histogram.shape[1]
+        self.step_x = self.energy.grid_x[0, 1] - self.energy.grid_x[0, 0]
+        self.step_y = self.energy.grid_y[1, 0] - self.energy.grid_y[0, 0]
 
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False,
                   restart_after: int = -1):
@@ -144,6 +144,14 @@ class Simulation:
             tuple (row, column) in which cell of the histogram this point lands
         """
         x_n, y_n = point
+        if x_n > 0:
+            x_n = (x_n + 1) % 2 - 1
+        else:
+            x_n = (x_n - 1) % 2 - 1
+        if y_n > 0:
+            y_n = (y_n + 1) % 2 - 1
+        else:
+            y_n = (y_n - 1) % 2 - 1
         # determine the cell of the histogram
         cell = int((y_n + 1) // self.step_x), int((x_n + 1) // self.step_y)
         #cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
@@ -375,7 +383,7 @@ if __name__ == '__main__':
     img_path = "images/"
     my_energy = Energy(images_path=img_path, images_name="energy", m=1, friction=10)
     #my_maze = maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    my_energy.from_potential(size=(30, 30))
+    my_energy.from_potential(size=(10, 10))
     #my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
@@ -387,6 +395,7 @@ if __name__ == '__main__':
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, m=my_energy.m, friction=my_energy.friction)
+    print("point to cell ", my_simulation._point_to_cell((-0.5, -0.9)))
     #TODO: do a test for different dt
     my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
