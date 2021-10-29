@@ -102,7 +102,6 @@ class Explorer(ABC):
                 self.explore()
             node_cells = nx.get_node_attributes(self.graph, "cell")  # dict node: cell
             self.sorted_accessible_cells = [v for k, v in sorted(node_cells.items())]
-            #self.sorted_accessible_cells = list(node_cells.values())  # dict cell: node
         return self.sorted_accessible_cells
 
 
@@ -148,8 +147,6 @@ class BFSExplorer(Explorer):
         visited[random_cell] = 1
         accessible[random_cell] = 1
         # for the graph we are using running index as cells get discovered
-        #node_index = 0
-        #self.graph.add_node(node_index, energy=self.maze.get_energy(random_cell), cell=random_cell)
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
@@ -162,15 +159,11 @@ class BFSExplorer(Explorer):
                 index_n = self.maze.cell_to_node(n)
                 self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
                 self.graph.add_edge(index_rc, index_n)
-                #node_index += 1
-                #self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
-                #self.graph.add_edge(node_index, 0)  # all neighbours connected to the 0-th node
                 accessible[n] = 1
                 check_queue.append(n)
         # take care of all other cells
         while len(check_queue) > 0:
             cell = check_queue.popleft()
-            #previous_index = node_index
             index_cell = self.maze.cell_to_node(cell)
             neighbours = self.maze.get_neighbours(cell)
             for n in neighbours:
@@ -178,9 +171,6 @@ class BFSExplorer(Explorer):
                     index_n = self.maze.cell_to_node(n)
                     self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
                     self.graph.add_edge(index_cell, index_n)
-                    #node_index += 1
-                    #self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
-                    #self.graph.add_edge(node_index, previous_index)
                     accessible[n] = 1
                     if visited[n] == 0:
                         check_queue.append(n)
@@ -190,7 +180,6 @@ class BFSExplorer(Explorer):
         # returns adjacency matrix
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
-        #self.adj_matrix = csr_matrix(nx.to_numpy_matrix(self.graph))
         # the adjacency matrix must be as long as there are accessible cells in the maze
         assert self.adj_matrix.shape[0] == np.count_nonzero(accessible)
 

@@ -149,8 +149,6 @@ class Energy(AbstractEnergy):
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
-        luca_q = np.genfromtxt("simulation/Q.txt")
-        #np.testing.assert_allclose(luca_q, self.rates_matrix)
         self.rates_matrix = csr_matrix(self.rates_matrix)
 
     def get_rates_matix(self) -> np.ndarray:
@@ -327,7 +325,6 @@ class Energy(AbstractEnergy):
 
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
-        #cell_order = self.explorer.get_sorted_accessible_cells()
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
             fig, ax = plt.subplots(1, num + 1, sharey="row", figsize=(full_width, full_width/(num+1)))
