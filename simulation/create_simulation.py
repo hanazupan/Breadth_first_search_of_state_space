@@ -35,7 +35,8 @@ class Simulation:
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 60, 100, 150, 200, 300, 500, 700, 1000])
+        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 60, 100, 150, 200, 300, 400, 500, 700, 1000,
+                                   2000, 3000, 5000, 6000, 7000, 8000])
         self.traj_x = None
         self.traj_y = None
         self.traj_cell = None
@@ -173,7 +174,7 @@ class Simulation:
             index = index * self.histogram.shape[i] + cell[i]
         return index
 
-    def get_transitions_matrix(self, tau_array: np.ndarray = None) -> np.ndarray:
+    def get_transitions_matrix(self, tau_array: np.ndarray = None, noncorr=False) -> np.ndarray:
         """
         Obtain a set of transition matrices for different tau-s specified in tau_array.
 
@@ -188,24 +189,22 @@ class Simulation:
         if not np.any(self.traj_x):
             raise ValueError("No trajectories found! Check if using the setting save_trajectory=False.")
 
-        # def window(seq, n):
-        #     """Sliding window width tau from seq.  From old itertools recipes."""
-        #     it = iter(seq)
-        #     result = tuple(islice(it, n))
-        #     if len(result) == n:
-        #         yield result
-        #     for elem in it:
-        #         result = result[1:] + (elem,)
-        #         yield result
-
         def window(seq, len_window):
+            # in this case always move the window by 1 and use all points in simulations to count transitions
             return [seq[k: k + len_window:len_window-1] for k in range(0, (len(seq)+1)-len_window)]
 
+        def noncorr_window(seq, len_window):
+            # in this case, only use every tau-th element for MSM. Faster but loses a lot of data
+            cut_seq = seq[0:-1:len_window]
+            return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
+
         all_cells = len(self.histogram.flatten())
-        compare = np.zeros((100))
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
-            window_cell = window(self.traj_cell, int(tau))
+            if not noncorr:
+                window_cell = window(self.traj_cell, int(tau))
+            else:
+                window_cell = noncorr_window(self.traj_cell, int(tau))
             for cell_slice in window_cell:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
@@ -218,15 +217,22 @@ class Simulation:
                 except IndexError:
                     if self.energy.pbc:
                         raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
+        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+            fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
+        for i, tm in enumerate(self.transition_matrices):
+            vmax = np.max(self.transition_matrices[i, 43, :])
+            vmin = np.min(self.transition_matrices[i, 43, :])
+            ax[i].imshow(self.transition_matrices[i, 43, :].reshape((len(self.energy.energies), len(self.energy.energies))),
+                         cmap="RdBu_r", vmin=vmin, vmax=vmax)
+            ax[i].axes.get_xaxis().set_visible(False)
+            ax[i].axes.get_yaxis().set_visible(False)
+            ax[i].set_title(f"tau = {self.tau_array[i]}", fontsize=7)
+        plt.savefig(self.images_path + f"row_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        plt.close()
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
         self.transition_matrices = self.transition_matrices / sums
-        for i in range(8, len(self.tau_array)):
-            to_plot = self.transition_matrices[i, 12, :]
-            plt.plot(to_plot, label=f"tau = {self.tau_array[i]}")
-        plt.legend()
-        plt.savefig("maze/Images/row.png")
         return self.transition_matrices
 
     def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs) -> tuple:
@@ -294,12 +300,13 @@ class Simulation:
         for j in range(1, num_eigv):
             print("S eigv ", tau_eigenvals[j, :])
             tau_filter = self.tau_array
-            to_plot = -self.tau_array / np.log(np.abs(tau_eigenvals[j, :]))
+            to_plot = -self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
         if np.any(rates_eigenvalues):
            for j in range(1, len(rates_eigenvalues)):
                ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
         ax2.legend()
+        ax2.fill_between(self.tau_array, self.tau_array*self.dt, color="grey", alpha=0.5)
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
@@ -311,9 +318,9 @@ class Simulation:
             self.get_transitions_matrix()
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
-        vmax = np.max(self.transition_matrices)
-        vmin = np.min(self.transition_matrices)
         for i, tm in enumerate(self.transition_matrices):
+            vmax = np.max(tm)
+            vmin = np.min(tm)
             ax[i].imshow(tm, cmap="RdBu_r", vmin=vmin, vmax=vmax)
             ax[i].axes.get_xaxis().set_visible(False)
             ax[i].axes.get_yaxis().set_visible(False)
@@ -381,10 +388,10 @@ class Simulation:
 
 if __name__ == '__main__':
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, images_name="energy", m=1, friction=10)
-    #my_maze = maze((7, 9), images_path=img_path, no_branching=True, edge_is_wall=False, animate=False)
-    my_energy.from_potential(size=(10, 10))
-    #my_energy.from_maze(my_maze, add_noise=True)
+    my_energy = Energy(images_path=img_path, images_name="testing", m=1, friction=10, T=150)
+    my_maze = Maze((9, 9), images_path=img_path, images_name="maze", no_branching=True, edge_is_wall=False)
+    #my_energy.from_potential(size=(20, 20))
+    my_energy.from_maze(my_maze, add_noise=True)
     my_energy.visualize()
     my_energy.visualize_boltzmann()
     my_energy.visualize_eigenvectors(num=6, which="LR")
@@ -394,9 +401,8 @@ if __name__ == '__main__':
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
-    my_simulation = Simulation(my_energy, images_path=img_path, m=my_energy.m, friction=my_energy.friction)
-    print("point to cell ", my_simulation._point_to_cell((-0.5, -0.9)))
-    #TODO: do a test for different dt
+    my_simulation = Simulation(my_energy, images_path=img_path, images_name="testing", m=my_energy.m,
+                               friction=my_energy.friction, T=my_energy.T)
     my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()

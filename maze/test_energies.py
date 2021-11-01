@@ -55,3 +55,16 @@ def test_q_ij():
     sigma = np.sqrt(2*my_energy.D)
     correct_rate = sigma ** 2 / 2 / dx ** 2 * np.sqrt(np.exp(-1/(kB*my_energy.T) * (formula(0.3, -0.7) - formula(-0.5, -0.3))))
     assert np.allclose(q_ij, correct_rate)
+
+
+def test_acessible():
+    my_energy = Energy(images_path="images/", images_name="test")
+    size = (10, 10)
+    my_energy.from_potential(size=size)
+    my_energy.energy_cutoff = 100
+    for i in range(size[0]):
+        for j in range(size[1]):
+            assert my_energy.is_accessible((i, j))
+    my_energy.energy_cutoff = 3
+    assert my_energy.is_accessible((0, 4))
+    assert not my_energy.is_accessible((4, 0))

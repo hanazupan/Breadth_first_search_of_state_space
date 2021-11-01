@@ -18,14 +18,15 @@ DIM_SQUARE = (4.45, 4.45)
 
 class Energy(AbstractEnergy):
 
-    def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10):
+    def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
+                 T: float = 293):
         # for now assume uniform, square cells so that geom. parameters = 1 and also diffusion coeff is 1
         super().__init__(None, 5, None, None, images_path, images_name)
         self.h = 1
         self.S = 1
         self.V = 1
         # and let´s assume room temperature (does that make sense?)
-        self.T = 293  # 293K <==> 20°C
+        self.T = T  # 293K <==> 20°C
         self.m = m
         self.friction = friction
         self.D = kB * self.T / self.m / self.friction
@@ -80,13 +81,20 @@ class Energy(AbstractEnergy):
         if len(maze.size) != 2:
             raise ValueError("maze does not have the right dimensionality.")
         # sparse grid
-        size_x, size_y = complex(maze.size[0]), complex(maze.size[1])
-        x_edges, y_edges = np.mgrid[-1:1:size_x, -1:1:size_y]
         # could also do that to work with any dimensionality in case the interpolation scheme also changes
         # dense_size = tuple(np.linspace(-1, 1, num=factor_grid*ms) for ms in maze.size)
         # grid_dense = np.meshgrid(*dense_size)
         # dense grid
-        self.grid_x, self.grid_y = np.mgrid[-1:1:factor_grid*size_x, -1:1:factor_grid*size_y]
+        cell_step_x = 2 / maze.size[0]
+        cell_step_y = 2 / maze.size[1]
+        start_x = -1 + cell_step_x/2
+        end_x = 1 - cell_step_x/2
+        start_y = -1 + cell_step_y / 2
+        end_y = 1 - cell_step_y / 2
+        size_x, size_y = complex(maze.size[0]), complex(maze.size[1])
+        y_edges, x_edges = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
+        self.grid_y, self.grid_x = np.mgrid[start_x:end_x:factor_grid*size_x, start_y:end_y:factor_grid*size_y]
+        #self.grid_x, self.grid_y = np.mgrid[-1:1:size_x, -1:1:size_y]
         z = maze.energies * 10
         # change some random zeroes into -1 and -2
         if add_noise:
@@ -99,8 +107,8 @@ class Energy(AbstractEnergy):
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
-                                   tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
+                                   tx=self.grid_x[0, :], ty=self.grid_y[:, 0])
+        self.energies = interpolate.bisplev(self.grid_x[0, :], self.grid_y[:, 0], tck)
         self.energy_cutoff = 5
         self.spline = tck
         self.size = self.energies.shape
@@ -339,8 +347,9 @@ class Energy(AbstractEnergy):
                 index = 0
                 for j in range(self.size[0]):
                     for k in range(self.size[1]):
-                        array[j, k] = eigenvec[index, i-1]
-                        index += 1
+                        if self.is_accessible((j, k)):
+                            array[j, k] = eigenvec[index, i-1]
+                            index += 1
                 ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, :num+1]), vmin=np.min(eigenvec[:, :num+1]))
                 ax[i].set_title(f"Eigenvector {i}", fontsize=7)
             plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")
