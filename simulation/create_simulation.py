@@ -154,8 +154,10 @@ class Simulation:
         else:
             y_n = (y_n - 1) % 2 - 1
         # determine the cell of the histogram
-        cell = int((y_n + 1) // self.step_x), int((x_n + 1) // self.step_y)
-        #cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
+        if self.energy.pbc:
+            cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
+        else:
+            cell = int((y_n + 1) // self.step_x), int((x_n + 1) // self.step_y)
         return cell
 
     def _cell_to_index(self, cell: tuple) -> int:
@@ -216,13 +218,14 @@ class Simulation:
                     self.transition_matrices[tau_i, j, i] += 1
                 except IndexError:
                     if self.energy.pbc:
+                        print(i, j, self.transition_matrices.shape)
                         raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
         for i, tm in enumerate(self.transition_matrices):
             vmax = np.max(self.transition_matrices[i, 43, :])
             vmin = np.min(self.transition_matrices[i, 43, :])
-            ax[i].imshow(self.transition_matrices[i, 43, :].reshape((len(self.energy.energies), len(self.energy.energies))),
+            ax[i].imshow(self.transition_matrices[i, 43, :].reshape((self.energy.energies.shape[0], self.energy.energies.shape[1])),
                          cmap="RdBu_r", vmin=vmin, vmax=vmax)
             ax[i].axes.get_xaxis().set_visible(False)
             ax[i].axes.get_yaxis().set_visible(False)
@@ -299,14 +302,13 @@ class Simulation:
         colors = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
         for j in range(1, num_eigv):
             print("S eigv ", tau_eigenvals[j, :])
-            tau_filter = self.tau_array
             to_plot = -self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[j, :]))
-            ax2.plot(tau_filter, to_plot, label=f"its {j}", color=colors[j])
-        if np.any(rates_eigenvalues):
-           for j in range(1, len(rates_eigenvalues)):
-               ax2.plot(self.tau_array, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
+            ax2.plot(self.tau_array * self.dt, to_plot, label=f"its {j}", color=colors[j])
+        #if np.any(rates_eigenvalues):
+        #   for j in range(1, len(rates_eigenvalues)):
+        #       ax2.plot(self.tau_array * self.dt, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
         ax2.legend()
-        ax2.fill_between(self.tau_array, self.tau_array*self.dt, color="grey", alpha=0.5)
+        ax2.fill_between(self.tau_array * self.dt, self.tau_array*self.dt, color="grey", alpha=0.5)
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
@@ -379,7 +381,7 @@ class Simulation:
         Plot the points visited by the trajectory.
         """
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            plt.subplots(1, 1, figsize=(8, 10))
+            plt.subplots(1, 1, figsize=self.energy.size)
             plt.scatter(self.traj_y, self.traj_x, marker="o", c="black", s=1)
             plt.gca().invert_yaxis()
             plt.savefig(self.images_path + f"traj_{self.images_name}.png")
@@ -388,16 +390,18 @@ class Simulation:
 
 if __name__ == '__main__':
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, images_name="testing", m=1, friction=10, T=150)
-    my_maze = Maze((9, 9), images_path=img_path, images_name="maze", no_branching=True, edge_is_wall=False)
-    #my_energy.from_potential(size=(20, 20))
+    my_energy = Energy(images_path=img_path, images_name="testing", m=1, friction=10)
+    my_maze = Maze((14, 7), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
+    #my_maze.visualize()
+    #my_energy.from_potential(size=(40, 40))
     my_energy.from_maze(my_maze, add_noise=True)
-    my_energy.visualize()
+    #my_energy.visualize_underlying_maze()
     my_energy.visualize_boltzmann()
-    my_energy.visualize_eigenvectors(num=6, which="LR")
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-    my_energy.visualize_eigenvalues()
-    my_energy.visualize_rates_matrix()
+    my_energy.visualize()
+    #my_energy.visualize_eigenvectors(num=4, which="LR")
+    #my_energy.visualize_eigenvectors_in_maze(num=4, which="LR")
+    #my_energy.visualize_eigenvalues()
+    #my_energy.visualize_rates_matrix()
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
@@ -407,6 +411,7 @@ if __name__ == '__main__':
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
+    my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix()
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
     my_simulation.visualize_transition_matrices()

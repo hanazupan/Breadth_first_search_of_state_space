@@ -51,7 +51,7 @@ class Energy(AbstractEnergy):
         end_x = 1 - cell_step_x/2
         start_y = -1 + cell_step_y / 2
         end_y = 1 - cell_step_y / 2
-        size_x, size_y = complex(self.size[0]), complex(self.size[1])
+        size_y, size_x = complex(self.size[0]), complex(self.size[1])
         self.grid_y, self.grid_x = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
 
         def square_well(x, y, a=5, b=10):
@@ -93,8 +93,13 @@ class Energy(AbstractEnergy):
         end_y = 1 - cell_step_y / 2
         size_x, size_y = complex(maze.size[0]), complex(maze.size[1])
         y_edges, x_edges = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
+        cell_step_x = 2 / (maze.size[0]*factor_grid)
+        cell_step_y = 2 / (maze.size[1]*factor_grid)
+        start_x = -1 + cell_step_x/2
+        end_x = 1 - cell_step_x/2
+        start_y = -1 + cell_step_y / 2
+        end_y = 1 - cell_step_y / 2
         self.grid_y, self.grid_x = np.mgrid[start_x:end_x:factor_grid*size_x, start_y:end_y:factor_grid*size_y]
-        #self.grid_x, self.grid_y = np.mgrid[-1:1:size_x, -1:1:size_y]
         z = maze.energies * 10
         # change some random zeroes into -1 and -2
         if add_noise:
@@ -417,12 +422,12 @@ class Energy(AbstractEnergy):
 
 if __name__ == '__main__':
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, friction=10)
-    #my_maze = Maze((24, 20), images_path=img_path, no_branching=False, edge_is_wall=False, animate=True)
-    #my_maze.visualize()
-    my_energy.from_potential(size=(10, 10))
-    #my_energy.from_maze(my_maze, add_noise=True)
-    #my_energy.visualize_underlying_maze()
+    my_energy = Energy(images_path=img_path, images_name="testing", friction=10)
+    my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
+    my_maze.visualize()
+    #my_energy.from_potential(size=(10, 10))
+    my_energy.from_maze(my_maze, add_noise=True)
+    my_energy.visualize_underlying_maze()
     #my_energy.visualize_boltzmann()
     my_energy.visualize()
     #my_energy.visualize_3d()
@@ -432,7 +437,5 @@ if __name__ == '__main__':
     my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
     eigval = my_energy.get_eigenval_eigenvec(4, which="LR")[0]
-    print(eigval)
-    print(-1/eigval)
 
 
