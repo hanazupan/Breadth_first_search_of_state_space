@@ -9,6 +9,7 @@ from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
 import itertools as it
 import scipy
+import time
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
@@ -35,8 +36,8 @@ class Simulation:
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.tau_array = np.array([5, 7, 10, 12, 15, 20, 25, 40, 60, 100, 150, 200, 300, 400, 500, 700, 1000,
-                                   2000, 3000, 5000, 6000, 7000, 8000])
+        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 500,
+                                   1000, 5000, 10000, 12000])
         self.traj_x = None
         self.traj_y = None
         self.traj_cell = None
@@ -110,10 +111,11 @@ class Simulation:
         else:
             dV_dx = self.energy.dV_dx(x_n)
             dV_dy = self.energy.dV_dy(y_n)
-        eta_x = np.random.normal()
-        x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x * np.sqrt(self.dt)
-        eta_y = np.random.normal()
-        y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y * np.sqrt(self.dt)
+        eta_x = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
+        #print(x_n, dV_dx * self.dt / self.m / self.friction, np.sqrt(2 * self.D) * eta_x)
+        x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x
+        eta_y = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
+        y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y
         return x_n, y_n
 
     def _point_within_bound(self, point: tuple) -> tuple:
@@ -145,18 +147,19 @@ class Simulation:
             tuple (row, column) in which cell of the histogram this point lands
         """
         x_n, y_n = point
-        if x_n > 0:
-            x_n = (x_n + 1) % 2 - 1
-        else:
-            x_n = (x_n - 1) % 2 - 1
-        if y_n > 0:
-            y_n = (y_n + 1) % 2 - 1
-        else:
-            y_n = (y_n - 1) % 2 - 1
         # determine the cell of the histogram
         if self.energy.pbc:
+            if x_n > 0:
+                x_n = (x_n + 1) % 2 - 1
+            else:
+                x_n = (x_n - 1) % 2 - 1
+            if y_n > 0:
+                y_n = (y_n + 1) % 2 - 1
+            else:
+                y_n = (y_n - 1) % 2 - 1
             cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
         else:
+            #print(f"x = {(x_n + 1)}   step x = {self.step_x}   y = {(y_n + 1)}   step y = {self.step_y}")
             cell = int((y_n + 1) // self.step_x), int((x_n + 1) // self.step_y)
         return cell
 
@@ -218,7 +221,7 @@ class Simulation:
                     self.transition_matrices[tau_i, j, i] += 1
                 except IndexError:
                     if self.energy.pbc:
-                        print(i, j, self.transition_matrices.shape)
+                        #print(i, j, self.transition_matrices.shape)
                         raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
@@ -304,9 +307,9 @@ class Simulation:
             print("S eigv ", tau_eigenvals[j, :])
             to_plot = -self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[j, :]))
             ax2.plot(self.tau_array * self.dt, to_plot, label=f"its {j}", color=colors[j])
-        #if np.any(rates_eigenvalues):
-        #   for j in range(1, len(rates_eigenvalues)):
-        #       ax2.plot(self.tau_array * self.dt, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
+        if np.any(rates_eigenvalues):
+           for j in range(1, len(rates_eigenvalues)):
+               ax2.plot(self.tau_array * self.dt, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
         ax2.legend()
         ax2.fill_between(self.tau_array * self.dt, self.tau_array*self.dt, color="grey", alpha=0.5)
         fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
@@ -372,7 +375,14 @@ class Simulation:
                 energies.append(self.energy.get_energy(cell))
                 population.append(self.histogram[cell])
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            plt.hist(energies, bins=25, weights=population, histtype='step')
+            energies = np.array(energies)
+            E_population = np.histogram(energies, bins=25)
+            E_pop = np.zeros(energies.shape)
+            for i, e in enumerate(energies):
+                for j, ep in enumerate(E_population[1][1:]):
+                    if E_population[1][j-1] < e <= E_population[1][j]:
+                        E_pop[i] = E_population[0][j-1]
+            plt.hist(energies, bins=25, weights=np.array(population)/E_pop, histtype='step')
             plt.savefig(self.images_path + f"population_per_energy_{self.images_name}.png")
             plt.close()
 
@@ -389,33 +399,40 @@ class Simulation:
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, images_name="testing", m=1, friction=10)
-    my_maze = Maze((14, 7), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
+    my_energy = Energy(images_path=img_path, images_name="wed", m=1, friction=20, T=1600)
+    my_maze = Maze((6, 8), images_path=img_path, images_name="tuesday", no_branching=True, edge_is_wall=True)
     #my_maze.visualize()
-    #my_energy.from_potential(size=(40, 40))
+    #my_energy.from_potential(size=(30, 30))
     my_energy.from_maze(my_maze, add_noise=True)
     #my_energy.visualize_underlying_maze()
     my_energy.visualize_boltzmann()
     my_energy.visualize()
-    #my_energy.visualize_eigenvectors(num=4, which="LR")
-    #my_energy.visualize_eigenvectors_in_maze(num=4, which="LR")
-    #my_energy.visualize_eigenvalues()
+    my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvalues()
     #my_energy.visualize_rates_matrix()
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
-    my_simulation = Simulation(my_energy, images_path=img_path, images_name="testing", m=my_energy.m,
+    my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name, m=my_energy.m,
                                friction=my_energy.friction, T=my_energy.T)
-    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
-    my_simulation.visualize_trajectory()
-    my_simulation.get_transitions_matrix()
+    #my_simulation.visualize_trajectory()
+    my_simulation.get_transitions_matrix(noncorr=True)
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
-    my_simulation.visualize_transition_matrices()
+    #my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(8, which="LR")
     my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
+    end_time = time.time()
+    duration = end_time - start_time
+    hours = round(duration // 3600 % 24)
+    minutes = round(duration // 60 % 60)
+    seconds = round(duration % 60)
+    print(f"Total time: {hours}h {minutes}min {seconds}s")
 
 

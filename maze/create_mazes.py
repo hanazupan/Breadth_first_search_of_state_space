@@ -1,12 +1,12 @@
 """
-In this file, class maze is introduced and mazes of different sizes can be created using Prim's
-algorithm or a random distribution of cells. The mazes can also be solved using breadth-first search
-algorithm, visualized as graphs and transformed into an adjacency matrix.
+In this file, class AbstractEnergy, which implements general functions for finding neighbours, accessible cells etc.
+is introduced. The simplest derived class, Maze, can be generated using Prim's algorithm or a random distribution of
+cells. The class MazeAnimation enables producing videos of maze or energy surface exploration with maze traversal
+algorithms (DFS, BFS, Dijkstra).
 """
 
 from abc import ABC
 from collections.abc import Sequence
-import matplotlib.image
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -16,12 +16,12 @@ from matplotlib import colors, cm
 
 class AbstractEnergy(ABC):
     """
-    An object with energy data saved in nodes that are connected with edges of possibly different lengths.
-    Each node has a property of energy. There is some energy cutoff that makes some cells accessible and others not.
+    An object with energy data saved in a numpy array self.energies.
+    There is some energy cutoff that makes some cells accessible and others not.
     """
 
-    def __init__(self, energies: np.ndarray, energy_cutoff: float, deltas: np.ndarray, size: tuple,
-                 images_path: str = "./", images_name: str = "abst_energy"):
+    def __init__(self, energies: np.ndarray or None, energy_cutoff: float, deltas: np.ndarray or None,
+                 size: tuple or None, images_path: str = "./", images_name: str = "abst_energy"):
         """
         Initialize some properties of all Energy objects.
 
@@ -37,7 +37,7 @@ class AbstractEnergy(ABC):
         self.deltas = deltas
         self.size = size
         self.energy_cutoff = energy_cutoff
-        self.pbc = True  # whether to use periodic boundary conditions
+        self.pbc = True                      # whether to use periodic boundary conditions
         # prepare for saving images/gifs
         self.images_path = images_path
         self.images_name = images_name
@@ -60,8 +60,9 @@ class AbstractEnergy(ABC):
 
     def node_to_cell(self, node: int) -> tuple:
         """
-        Get the index of the graph node from the coordinates of the cell in the maze. Works with arrays of any
+        Get the coordinates of the cell in the maze from the index of the graph node. Works with arrays of any
         number of dimensions. The index is simply the consecutive number of the cell in the maze array.
+        Inverse function to cell_to_node.
 
         Args:
             node: the index of the node
@@ -78,8 +79,8 @@ class AbstractEnergy(ABC):
 
     def get_neighbours(self, cell: tuple) -> Sequence:
         """
-        Overrides getting neighbours from the graph. For a maze, it makes more sense to get neighbouring cells
-        than neighbouring nodes.
+        Genarator that gives neighbours of the argument cell, using periodic boundary conditions if self.pbc.
+
         Args:
             cell: tuple (int, int ...) of the length self.size - coordinates a cell
 
@@ -89,11 +90,12 @@ class AbstractEnergy(ABC):
         for i, coo in enumerate(cell):
             neig_cel = np.array(cell)
             neig_cel[i] = (cell[i] - self.deltas[i]) % self.size[i]
-            # if no periodic boundaries, there is no -1 neighbour
+            # if no periodic boundaries, there is no -1 neighbour of the first cell
             if self.pbc or coo != 0:
                 yield tuple(neig_cel)
             plus_one = (cell[i] + self.deltas[i]) % self.size[i]
             neig_cel[i] = plus_one
+            # if no periodic boundaries, there is no 0 neighbour of the last cell
             if self.pbc or coo != self.size[i] - 1:
                 yield tuple(neig_cel)
 
@@ -112,11 +114,20 @@ class AbstractEnergy(ABC):
                 yield n
 
     def get_energy(self, cell: tuple) -> float:
+        """
+        Returns the energy of the cell.
+
+        Args:
+            cell: tuple (int, int ...) of the length self.size - coordinates a cell
+
+        Returns:
+            float, energy taken from self.energies
+        """
         return self.energies[cell]
 
     def is_accessible(self, cell: tuple) -> bool:
         """
-        Determines whether a cell of maze is accessible
+        Determines whether a cell of maze is accessible. Cells strictly under energy_cutoff are accessible.
 
         Args:
             cell: (int, int, ...) a tuple of coordinates
@@ -133,7 +144,9 @@ class AbstractEnergy(ABC):
         Returns:
             tuple, (int, int, ...) coordinates of an accessible cell
         """
+        # a random integer in all dimensions of the size
         cell = tuple([np.random.randint(dim) for dim in self.size])
+        # continue generating random cells until one is accessible
         while not self.is_accessible(cell):
             cell = tuple([np.random.randint(dim) for dim in self.size])
         return cell
@@ -193,6 +206,7 @@ class Maze(AbstractEnergy):
         # deltas are distances between neighbours in all directions
         deltas = np.ones(len(size), dtype=int)
         cutoff = 1
+        # in the beginning all maze cells are unassigned
         energies = np.full(size, 2, dtype=int)
         # super takes care of: initializing energies, energy_cutoff, deltas, size, images_path, images_name
         super().__init__(energies, cutoff, deltas, size, images_path, images_name)
@@ -216,8 +230,8 @@ class Maze(AbstractEnergy):
         """
         When using print() on a maze object, it returns the string representation of self.energies.
 
-        Returns: string representation of self.energies
-
+        Returns:
+            string representation of self.energies
         """
         return self.energies.__str__()
 
@@ -256,21 +270,22 @@ class Maze(AbstractEnergy):
             self.energies[cell] = 1
             wall_list.append(cell)
 
-        # pick a random cell as a starting point and turn it into a hall
         if kwargs["edge_is_wall"]:
             # works only for 2D
             self.energies[0, :] = 1
             self.energies[-1, :] = 1
             self.energies[:, 0] = 1
             self.energies[:, 0] = 1
+            # pick a random cell (not the edges) as a starting point and turn it into a hall
             random_cell = tuple([np.random.randint(1, dim - 1) for dim in self.size])
             self.energies[random_cell] = 0
         else:
+            # pick a random cell as a starting point and turn it into a hall
             random_cell = tuple([np.random.randint(dim) for dim in self.size])
             self.energies[random_cell] = 0
         # for video
         yield self.energies
-        # add walls of the cell to the wall list (periodic boundary conditions)
+        # add neighbours of the cell to the wall list (periodic boundary conditions)
         for n in self.get_neighbours(random_cell):
             create_wall(n)
         # for video:
@@ -293,6 +308,7 @@ class Maze(AbstractEnergy):
                     neig_of_neig = []
                     for m in self.get_accessible_neighbours(n):
                         neig_of_neig.append(m)
+                    # each path cell can be surrounded by max two path cells so that there is no branching
                     branching_approved = len(neig_of_neig) < 2
                 else:
                     branching_approved = True
@@ -311,37 +327,35 @@ class Maze(AbstractEnergy):
         # to get the final image for animation with no unassigned cells
         yield self.energies
 
-    def visualize(self) -> matplotlib.image.AxesImage:
+    def visualize(self):
         """
         Visualize the maze with black squares (walls) and white squares (halls).
-
-        Returns:
-            matplotlib.image.AxesImage, the plot
         """
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             ax = plt.imshow(self.energies, cmap="Greys")
             ax.figure.savefig(self.images_path + f"maze_{self.images_name}.png")
             plt.close()
-            return ax
 
 
 class MazeAnimation:
 
     def __init__(self, maze_to_animate: AbstractEnergy):
         """
-        MazeAnimation class enables creating an animation of a specific algorithm on a maze object.
+        MazeAnimation class enables creating an animation of a specific algorithm on a maze/energy object.
 
         Args:
-            maze_to_animate: maze object, a maze that we want to animate.
+            maze_to_animate: Maze or Energy object, the array on which we performed the search
 
         Raises:
-            ValueError if the maze is not 2D.
+            ValueError if the maze/energy is not 2D.
         """
+        # iterator is the generator that gives us the arrays we want to show in each frame of the animation
         self.iterator = None
+        # need to save the iterator value if the iterating function also returns the last value
         self.iterator_value = None
         self.energies = maze_to_animate
         if len(self.energies.size) != 2:
-            raise ValueError("Animation only possible for 2D mazes.")
+            raise ValueError("Animation only possible for 2D mazes or energies.")
         with plt.style.context('Stylesheets/maze_style.mplstyle'):
             self.fig, self.ax = plt.subplots()
 
@@ -377,6 +391,7 @@ class MazeAnimation:
         # interval determines how fast the video when played (not saved)
         anim = animation.FuncAnimation(self.fig, updatefig, blit=True, frames=self.iterator,
                                        repeat=False, interval=10, save_count=height * width)
+        # fps determines how fast the video when saved
         writergif = animation.PillowWriter(fps=50)
         anim.save(self.energies.images_path + f"{name_addition}_{self.energies.images_name}.gif", writer=writergif)
         plt.close()
@@ -391,10 +406,14 @@ class MazeAnimation:
             gray = wall
             black = unassigned
         """
-        self.iterator = self.energies.create_prim(**kwargs)
+        # make sure to only use this animation on Mazes, not other AbstractEnergy objects
+        if type(self.energies) != Maze:
+            raise TypeError("Building animation only available for Mazes, not for Energy objects!")
+        else:
+            self.iterator = self.energies.create_prim(**kwargs)
         self._animate("building", cmap="Greys")
 
-    def animate_search(self, name, iterator, cutoff):
+    def animate_search(self, name: str, iterator, cutoff: float):
         """
         Animate solving the maze with bfs or dfs algorithm. Color map as follows:
             blue = discovered accessible cells
@@ -404,13 +423,14 @@ class MazeAnimation:
         Args:
             name: dfs or bfs, which search should be performed
             iterator: a generator of images
+            cutoff: cells with energy higher than this cutoff will be coloured black
 
         Raises:
             ValueError if an inappropriate name of algorithm is provided.
         """
         self.iterator = iterator
-        # self-defined color map: blue are halls that have been discovered and are negative; 0 undiscovered halls,
-        # above cutoff are the walls, which are black.
+        # self-defined color map: blue are halls that have been discovered and are negative; around
+        # 0 undiscovered halls, above cutoff are the walls, which are black.
         cmap = colors.ListedColormap(['blue', 'white', 'black'])
         bounds = [-200, -100 + cutoff, cutoff, cutoff + 100]
         norm = colors.BoundaryNorm(bounds, cmap.N)
@@ -419,7 +439,7 @@ class MazeAnimation:
         else:
             raise ValueError("Only allowed names are 'bfs', 'dfs'.")
 
-    def animate_dijkstra(self, iterator, start_cell: tuple, end_cell: tuple) -> np.ndarray:
+    def animate_dijkstra(self, iterator, start_cell: tuple, end_cell: tuple):
         """
         Animate finding the connection between start_cell and end_cell (both passages the in maze).
             red = visited cells
@@ -430,9 +450,6 @@ class MazeAnimation:
             iterator: a generator of images
             start_cell: tuple, (x, y) coordinates of the start cell
             end_cell: tuple, (x, y) coordinates of the end cell
-
-        Returns:
-            np.ndarray, the array of distances from start_cell
         """
         self.iterator = iterator
         cmap = cm.get_cmap("RdBu").copy()
@@ -441,7 +458,6 @@ class MazeAnimation:
         self._put_marker(end_cell[1], end_cell[0], "x", color="black", linewidth=1.5)
         self._put_marker(start_cell[1], start_cell[0], "o", color="black", linewidth=1.5)
         self._animate("dijkstra", cmap=cmap, vmin=0.5, vmax=999)
-        return self.iterator_value
 
 
 if __name__ == '__main__':

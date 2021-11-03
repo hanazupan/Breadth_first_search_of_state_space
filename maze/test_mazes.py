@@ -1,10 +1,14 @@
+"""
+The file for testing create_mazes and explore_mazes.
+"""
+
 import numpy as np
 from .create_mazes import Maze
 from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
-from .create_energies import Energy
 
 all_algorithms = ["Prim", "random"]
-img_path = "Maze/Images/"
+img_path = "images/"
+
 
 def test_init():
     for alg in all_algorithms:
@@ -37,6 +41,7 @@ def test_run_everything():
         d_explorer.explore_and_animate()
         d_explorer.get_adjacency_matrix()
         d_explorer.explore()
+        d_explorer.visualize_distances()
         d_explorer.draw_connections_graph()
 
 
@@ -149,15 +154,10 @@ def test_adjacency():
     bfs_explorer = BFSExplorer(test_maze)
     adj = bfs_explorer.get_adjacency_matrix()
     np.testing.assert_array_equal(correct_adj, adj)
-    #adj_bfs = bfs_explorer.get_adjacency_matrix().toarray()
-    # the rows may have different ordering, but they must have the same rows
-    #for row in adj_bfs:
-    #    assert row in correct_adj
     # depth-first search should behave in the same way
-    #dfs_explorer = BFSExplorer(test_maze)
-    #adj_dfs = dfs_explorer.get_adjacency_matrix().toarray()
-    #for row in adj_dfs:
-    #    assert row in correct_adj
+    dfs_explorer = BFSExplorer(test_maze)
+    adj_dfs = dfs_explorer.get_adjacency_matrix()
+    np.testing.assert_array_equal(correct_adj, adj_dfs)
 
 
 def test_path():
@@ -188,75 +188,3 @@ def test_distances():
     d_explorer = DijkstraExplorer(test_maze)
     dist = d_explorer.get_distance(start_cell, end_cell)
     assert corr_dist == dist
-
-
-def test_first_eigenvector():
-    test_maze = Maze((25, 12))
-    test_energy = Energy(images_path=img_path, images_name="test")
-    test_energy.from_maze(test_maze)
-    boltzmann = test_energy.get_boltzmann()
-    relative_boltzmann = boltzmann/boltzmann[0]
-    first_eigenvalue, first_eigenvector = test_energy.get_eigenval_eigenvec(num=1)
-    relative_eigenvector = first_eigenvector.flatten()/first_eigenvector[0, 0]
-    # assert that the shape of Boltzmann distribution is the shape of the first eigenvector
-    assert np.allclose(relative_eigenvector, relative_boltzmann)
-    test_maze = Maze((21, 34))
-    test_energy = Energy(images_path=img_path, images_name="test")
-    test_energy.from_maze(test_maze)
-    boltzmann = test_energy.get_boltzmann()
-    relative_boltzmann = boltzmann/boltzmann[0]
-    first_eigenvalue, first_eigenvector = test_energy.get_eigenval_eigenvec(num=1)
-    relative_eigenvector = first_eigenvector.flatten()/first_eigenvector[0, 0]
-    # assert that the shape of Boltzmann distribution is the shape of the first eigenvector
-    assert np.allclose(relative_eigenvector, relative_boltzmann)
-
-
-def test_three_eigenvectors():
-    test_maze = Maze((18, 19))
-    test_energy = Energy(images_path=img_path, images_name="test")
-    test_energy.from_maze(test_maze)
-    eigenvalues, eigenvectors = test_energy.get_eigenval_eigenvec(num=3)
-    # test that the first one always positive or negative
-    starts_positive = eigenvectors[0, 0] > 0
-    if starts_positive:
-        assert np.all(eigenvectors[:, 0] > 0)
-    else:
-        assert np.all(eigenvectors[:, 0] < 0)
-    # test that the second one changes sign once
-    starts_positive = eigenvectors[0, 1] > 0
-    second_vector = eigenvectors[:, 1].flatten()
-    if starts_positive:
-        assert np.any(second_vector < 0)
-        i = 0
-        while second_vector[i] > 0:
-            i += 1
-        assert np.all(second_vector[i+1:] < 0)
-    else:
-        assert np.any(second_vector > 0)
-        i = 0
-        while second_vector[i] < 0:
-            i += 1
-        assert np.all(second_vector[i+1:] > 0)
-    # test that the third one changes sign twice
-    starts_positive = eigenvectors[0, 2] > 0
-    third_vector = eigenvectors[:, 2].flatten()
-    if starts_positive:
-        assert np.any(third_vector < 0)
-        assert third_vector[-1] > 0
-        i = 0
-        while third_vector[i] > 0:
-            i += 1
-        while third_vector[i] < 0:
-            i += 1
-        assert np.all(third_vector[i + 1:] > 0)
-    else:
-        assert np.any(third_vector > 0)
-        assert third_vector[-1] < 0
-        i = 0
-        while third_vector[i] < 0:
-            i += 1
-        while third_vector[i] > 0:
-            i += 1
-        assert np.all(third_vector[i + 1:] < 0)
-
-

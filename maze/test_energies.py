@@ -3,6 +3,8 @@ from .create_mazes import Maze
 from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 from .create_energies import Energy, kB
 
+# TODO: test adjacency for potentials
+# TODO: test run everything
 
 def formula(x, y):
     return 5 * (x ** 2 - 0.3) ** 2 + 10 * (y ** 2 - 0.5) ** 2

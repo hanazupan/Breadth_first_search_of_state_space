@@ -1,5 +1,5 @@
 from .create_mazes import Maze, AbstractEnergy
-from .explore_mazes import BFSExplorer, DFSExplorer
+from .explore_mazes import BFSExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
@@ -20,21 +20,35 @@ class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
                  T: float = 293):
-        # for now assume uniform, square cells so that geom. parameters = 1 and also diffusion coeff is 1
-        super().__init__(None, 5, None, None, images_path, images_name)
+        """
+        An Energy object has an array in which energies at the midpoint of cells are saved. It also has general
+        thermodynamic/atomic properties (mass, friction, temperature) and geometric properties (area between cells,
+        volume of cells, distances between cell centers).
+
+        Args:
+            images_path: where to save all resulting images
+            images_name: an identifier of saved images
+            m: mass of a particle
+            friction: friction coefficient (for now assumed constant)
+            T: temperature
+        """
+        # energy cutoff is generally 5, at least for mazes
+        cutoff = 5
+        # for now assume uniform, square cells so that geom. parameters = 1
+        super().__init__(None, cutoff, None, None, images_path, images_name)
         self.h = 1
         self.S = 1
         self.V = 1
-        # and let´s assume room temperature (does that make sense?)
+        # and let´s assume room temperature
         self.T = T  # 293K <==> 20°C
         self.m = m
         self.friction = friction
+        # diffusion coefficient
         self.D = kB * self.T / self.m / self.friction
-        # energy cutoff - let's see if it should be changed
         # will only have a value if energy created from maze
         self.underlying_maze = None
-        self.rates_matrix = None
         # in preparation
+        self.rates_matrix = None
         self.grid_x = None
         self.grid_y = None
         self.explorer = None
@@ -45,6 +59,7 @@ class Energy(AbstractEnergy):
         For testing - initiate an energy surface with a 2D potential well.
         """
         self.size = size
+        # making sure that the grid is set up in the middle of the cell
         cell_step_x = 2 / self.size[0]
         cell_step_y = 2 / self.size[1]
         start_x = -1 + cell_step_x/2
@@ -100,7 +115,7 @@ class Energy(AbstractEnergy):
         start_y = -1 + cell_step_y / 2
         end_y = 1 - cell_step_y / 2
         self.grid_y, self.grid_x = np.mgrid[start_x:end_x:factor_grid*size_x, start_y:end_y:factor_grid*size_y]
-        z = maze.energies * 10
+        z = maze.energies
         # change some random zeroes into -1 and -2
         if add_noise:
             for _ in range(int(0.05*np.prod(maze.size))):
@@ -109,6 +124,7 @@ class Energy(AbstractEnergy):
             for _ in range(int(0.04*np.prod(maze.size))):
                 cell = maze.find_random_accessible()
                 z[cell] = -2
+        z = z * 10
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
@@ -347,6 +363,9 @@ class Energy(AbstractEnergy):
             cmap.set_under("black")
             ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
             ax[0].set_title("Energy surface", fontsize=7)
+            print("shape eigv ", eigenvec.shape)
+            print("acces len ", len([1 for j in range(self.size[0]) for k in range(self.size[1]) if self.is_accessible((j, k))]))
+            print("rates len ", self.rates_matrix.shape[0])
             for i in range(1, num+1):
                 array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
                 index = 0
@@ -433,9 +452,8 @@ if __name__ == '__main__':
     #my_energy.visualize_3d()
     #my_energy.get_rates_matix()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors(num=6, which="LR")
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    my_energy.visualize_eigenvectors(num=6, which="LM", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LM", sigma=0)
     my_energy.visualize_eigenvalues()
-    eigval = my_energy.get_eigenval_eigenvec(4, which="LR")[0]
 
 

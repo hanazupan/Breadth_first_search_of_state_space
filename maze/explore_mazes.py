@@ -1,3 +1,9 @@
+"""
+In this file, three algorithms for exploration of Mazes/Energy surfaces are implemented: BFSExplorer, DFSExplorer
+and DijkstraExplorer. They are all subclasses of an abstract class Explorer that implements general methods like
+obtaining a graph or an adjacency matrix.
+"""
+
 from .create_mazes import Maze, MazeAnimation, AbstractEnergy
 from abc import ABC, abstractmethod
 import networkx as nx
@@ -63,13 +69,13 @@ class Explorer(ABC):
 
     def get_adjacency_matrix(self, save=False) -> csr_matrix:
         """
-        Get (and create if not yet created) an adjacency matrix of the maze with breadth-first search.
+        Get (and create if not yet created) an adjacency matrix of the maze.
 
         Args:
-            save: whether to save the produced adjacency matrix
+            save: whether to save the produced adjacency matrix as a txt file
 
         Returns:
-            numpy array, adjacency matrix, square number the size of the number of halls
+            numpy array, adjacency matrix, a square matrix with len equal to the number of accessible cells
         """
         if not self.graph:
             self.explore()
@@ -94,6 +100,7 @@ class Explorer(ABC):
     def get_sorted_accessible_cells(self) -> list:
         """
         Get (or generate) a list of accessible cells, sorted by their node index
+
         Returns:
             a list of accessible cells, sorted by their node index
         """
@@ -114,6 +121,7 @@ class BFSExplorer(Explorer):
         super().__init__(maze, "bfs")
 
     def explore(self) -> nx.Graph:
+        # needed to empty the generator
         for _ in self._bfs_algorithm():
             pass
         return self.graph
@@ -135,7 +143,9 @@ class BFSExplorer(Explorer):
             3. Mark all its accessible neighbours as accessible and add them to the queue
 
         Yields:
-            A numpy array with 0 = undiscovered passage, 1 = wall, -100 = discovered passage
+             A numpy array self.maze.energies - 100*accessible meaning that discovered passages will have a value
+             lower than -100 + energy_cutoff, undiscovered passages and walls will have the same values as they
+             have in the energy array.
         """
         # for video
         yield self.maze.energies
@@ -228,8 +238,6 @@ class DFSExplorer(Explorer):
         # for the graph we are using index of the flattened maze as the identifier
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
-        #node_index = 0
-        #self.graph.add_node(node_index, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
         yield self.maze.energies - 100*accessible
         # take care of the neighbours of the first random cell
@@ -237,9 +245,6 @@ class DFSExplorer(Explorer):
         for n in neighbours:
             visited[n] = 1
             if self.maze.is_accessible(n):
-                #node_index += 1
-                #self.graph.add_node(node_index, energy=self.maze.get_energy(n), cell=n)
-                #self.graph.add_edge(node_index, 0)
                 index_n = self.maze.cell_to_node(n)
                 self.graph.add_node(index_n, energy=self.maze.get_energy(n), cell=n)
                 self.graph.add_edge(index_rc, index_n)
@@ -248,7 +253,6 @@ class DFSExplorer(Explorer):
         # take care of all other cells
         while len(check_queue) > 0:
             cell = check_queue.pop()
-            #previous_index = node_index
             index_cell = self.maze.cell_to_node(cell)
             neighbours = self.maze.get_neighbours(cell)
             # if neighbours visited already, don't need to bother with them
@@ -264,7 +268,6 @@ class DFSExplorer(Explorer):
             # for video
             yield self.maze.energies - 100*accessible
         # creates adjacency matrix
-        #self.adj_matrix = csr_matrix(nx.to_numpy_matrix(self.graph))
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
         # the adjacency matrix must be as long as there are accessible cells in the maze
@@ -274,6 +277,14 @@ class DFSExplorer(Explorer):
 class DijkstraExplorer(Explorer):
 
     def __init__(self, maze: Maze, start_cell: tuple = None, end_cell: tuple = None):
+        """
+        Dijkstra's algorithm can find the shortest path in a maze.
+
+        Args:
+            maze: Maze object on which the search will be performed
+            start_cell: tuple or None, should be mostly entered for testing, else let the alg find a random start
+            end_cell: tuple or None, should be mostly entered for testing, else let the alg find a random end
+        """
         super().__init__(maze, "dijkstra")
         self.distances = None
         self.start_cell = None
@@ -284,7 +295,8 @@ class DijkstraExplorer(Explorer):
     def set_start_end_cell(self, start_cell: tuple = None, end_cell: tuple = None):
         """
         Set up start and/or end cell - if they are provided, check whether they are valid (must be passages),
-        else select random passages.
+        else select random passages. Usually a user shouldn't be setting start and end cells, this is mostly
+        an option for testing.
 
         Args:
             start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
@@ -311,7 +323,8 @@ class DijkstraExplorer(Explorer):
 
     def get_distance(self, start_cell: tuple = None, end_cell: tuple = None) -> int:
         """
-        Get the number of cells between the start and end cell.
+        Get the number of cells between the start and end cell. If start or end cell None, they will be chosen
+        automatically (random accessible cells).
 
         Args:
             start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
@@ -326,7 +339,8 @@ class DijkstraExplorer(Explorer):
 
     def get_path(self, start_cell: tuple = None, end_cell: tuple = None) -> list:
         """
-        Get the shortest possible path (a list of cells) between the start and end cell.
+        Get the shortest possible path (a list of cells) between the start and end cell. If start or end cell None,
+        they will be chosen automatically (random accessible cells).
 
         Args:
             start_cell: tuple or None, (int, int ..) coordinates of the cell where the path starts
