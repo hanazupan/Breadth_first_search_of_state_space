@@ -418,7 +418,7 @@ if __name__ == '__main__':
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name, m=my_energy.m,
                                friction=my_energy.friction, T=my_energy.T)
-    my_simulation.integrate(N=int(1e7), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e8), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
