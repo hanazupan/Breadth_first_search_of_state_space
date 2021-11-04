@@ -36,8 +36,8 @@ class Simulation:
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 500,
-                                   1000, 5000, 10000, 12000])
+        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250])
+        #                           500, 1000, 5000, 10000, 12000])
         self.traj_x = None
         self.traj_y = None
         self.traj_cell = None
@@ -203,6 +203,7 @@ class Simulation:
             cut_seq = seq[0:-1:len_window]
             return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
 
+        #acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1]) if self.energy.is_accessible((i, j))]
         all_cells = len(self.histogram.flatten())
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
@@ -213,16 +214,17 @@ class Simulation:
             for cell_slice in window_cell:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
-                i = self._cell_to_index(start_cell)
-                j = self._cell_to_index(end_cell)
-                try:
-                    self.transition_matrices[tau_i, i, j] += 1
-                    # enforce detailed balance
-                    self.transition_matrices[tau_i, j, i] += 1
-                except IndexError:
-                    if self.energy.pbc:
-                        #print(i, j, self.transition_matrices.shape)
-                        raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
+                if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)):
+                    i = self._cell_to_index(tuple(start_cell))
+                    j = self._cell_to_index(tuple(end_cell))
+                    try:
+                        self.transition_matrices[tau_i, i, j] += 1
+                        # enforce detailed balance
+                        self.transition_matrices[tau_i, j, i] += 1
+                    except IndexError:
+                        if self.energy.pbc:
+                            #print(i, j, self.transition_matrices.shape)
+                            raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
         for i, tm in enumerate(self.transition_matrices):
@@ -266,6 +268,29 @@ class Simulation:
     ############################################################################
     # ------------------------   VISUALIZATION  --------------------------------
     ############################################################################
+
+    def visualize_eigenvalues(self):
+        """
+        Visualize the eigenvalues of rate matrix.
+
+        Args:
+            show: bool, whether to display the image
+        """
+        if not np.any(self.transition_matrices):
+            self.get_transitions_matrix()
+        num = self.transition_matrices.shape[1] - 2
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num_eigv=num)
+        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+            plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
+            xs = np.linspace(0, 1, num=num)
+            plt.scatter(xs, eigenval[-1], s=5, c="black")
+            for i, eigenw in enumerate(eigenval[-1]):
+                plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
+            plt.hlines(0, 0, 1)
+            plt.title("Eigenvalues")
+            plt.gca().axes.get_xaxis().set_visible(False)
+            plt.savefig(self.images_path + f"eigenvalues_msm_{self.images_name}.png")
+            plt.close()
 
     def visualize_eigenvec(self, num_eigv: int = 6, **kwargs):
         """
@@ -401,8 +426,9 @@ class Simulation:
 if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, images_name="wed", m=1, friction=20, T=1600)
-    my_maze = Maze((6, 8), images_path=img_path, images_name="tuesday", no_branching=True, edge_is_wall=True)
+    my_energy = Energy(images_path=img_path, images_name="thu", m=1, friction=20, T=1600)
+    my_maze = Maze((6, 8), images_path=img_path, images_name=my_energy.images_name,
+                   no_branching=True, edge_is_wall=True)
     #my_maze.visualize()
     #my_energy.from_potential(size=(30, 30))
     my_energy.from_maze(my_maze, add_noise=True)
@@ -418,7 +444,7 @@ if __name__ == '__main__':
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name, m=my_energy.m,
                                friction=my_energy.friction, T=my_energy.T)
-    my_simulation.integrate(N=int(1e8), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
@@ -428,6 +454,7 @@ if __name__ == '__main__':
     #my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(8, which="LR")
     my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
+    my_simulation.visualize_eigenvalues()
     end_time = time.time()
     duration = end_time - start_time
     hours = round(duration // 3600 % 24)
