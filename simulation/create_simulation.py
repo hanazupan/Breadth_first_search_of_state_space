@@ -1,3 +1,8 @@
+"""
+In this file, molecular dynamics simulation on an Energy surface is performed, a MSM constructed and evaluated.
+Finally, characteristic ITS are plotted. All these calculations are performed in Simulation class.
+"""
+
 from maze.create_energies import Energy
 from maze.create_mazes import Maze
 from scipy.interpolate import bisplev
@@ -7,8 +12,6 @@ from tqdm import tqdm
 from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
-import itertools as it
-import scipy
 import time
 
 # DEFINING BOLTZMANN CONSTANT
@@ -27,17 +30,18 @@ class Simulation:
         self.spline = self.energy.get_spline()
         self.images_name = images_name
         self.images_path = images_path
+        # TD/particle properties
         self.m = m
         self.friction = friction
         self.T = T
         self.dt = dt
         self.N = N
         self.D = kB*self.T/self.m/self.friction
+        # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
+        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 500, 1000, 5000])
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250])
-        #                           500, 1000, 5000, 10000, 12000])
         self.traj_x = None
         self.traj_y = None
         self.traj_cell = None
@@ -48,7 +52,8 @@ class Simulation:
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False,
                   restart_after: int = -1):
         """
-        Implement the Euler–Maruyama method for integration of the trajectory on self.energy surface.
+        Implement the Euler–Maruyama method for integration of the trajectory on self.energy surface. It is
+        possible to simulate several shorter trajectories using the option restart_after.
 
         Args:
             dt: float, time step
@@ -62,12 +67,14 @@ class Simulation:
         if N:
             self.N = N
         self.histogram = np.zeros(self.energy.size)
-        x_n = 2*np.random.random() - 1               # random between (-1, 1)
-        y_n = 2*np.random.random() - 1               # random between (-1, 1)
-        # figure out in which cell the trajectory starts and increase the count
+        # start at a random position between -1 and 1
+        x_n = 2*np.random.random() - 1
+        y_n = 2*np.random.random() - 1
+        # figure out in which cell the trajectory starts and increase the count of the histogram
         cell = self._point_to_cell((x_n, y_n))
         self.histogram[cell] += 1
         self.traj_cell = [cell]
+        # not neccessary for MSM, but for trajectory visualization the x and y positions can also be saved
         if save_trajectory:
             self.traj_x = np.zeros(N)
             self.traj_y = np.zeros(N)
@@ -86,6 +93,7 @@ class Simulation:
             except IndexError:
                 # if not using periodic boundaries, points can land outside the histogram
                 self.outside_hist += 1
+                if not self.energy
             # if applicable, save trajectory
             self.traj_cell.append(cell)
             if save_trajectory:
@@ -203,8 +211,8 @@ class Simulation:
             cut_seq = seq[0:-1:len_window]
             return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
 
-        #acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1]) if self.energy.is_accessible((i, j))]
-        all_cells = len(self.histogram.flatten())
+        self.acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1]) if self.energy.is_accessible((i, j))]
+        all_cells = len(self.acc_cells)
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
             if not noncorr:
@@ -215,8 +223,8 @@ class Simulation:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
                 if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)):
-                    i = self._cell_to_index(tuple(start_cell))
-                    j = self._cell_to_index(tuple(end_cell))
+                    i = self.acc_cells.index(tuple(start_cell))
+                    j = self.acc_cells.index(tuple(end_cell))
                     try:
                         self.transition_matrices[tau_i, i, j] += 1
                         # enforce detailed balance
@@ -225,18 +233,18 @@ class Simulation:
                         if self.energy.pbc:
                             #print(i, j, self.transition_matrices.shape)
                             raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
-        for i, tm in enumerate(self.transition_matrices):
-            vmax = np.max(self.transition_matrices[i, 43, :])
-            vmin = np.min(self.transition_matrices[i, 43, :])
-            ax[i].imshow(self.transition_matrices[i, 43, :].reshape((self.energy.energies.shape[0], self.energy.energies.shape[1])),
-                         cmap="RdBu_r", vmin=vmin, vmax=vmax)
-            ax[i].axes.get_xaxis().set_visible(False)
-            ax[i].axes.get_yaxis().set_visible(False)
-            ax[i].set_title(f"tau = {self.tau_array[i]}", fontsize=7)
-        plt.savefig(self.images_path + f"row_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        plt.close()
+        # with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+        #     fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
+        # for i, tm in enumerate(self.transition_matrices):
+        #     vmax = np.max(self.transition_matrices[i, 43, :])
+        #     vmin = np.min(self.transition_matrices[i, 43, :])
+        #     ax[i].imshow(self.transition_matrices[i, 43, :].reshape((self.energy.energies.shape[0], self.energy.energies.shape[1])),
+        #                  cmap="RdBu_r", vmin=vmin, vmax=vmax)
+        #     ax[i].axes.get_xaxis().set_visible(False)
+        #     ax[i].axes.get_yaxis().set_visible(False)
+        #     ax[i].set_title(f"tau = {self.tau_array[i]}", fontsize=7)
+        # plt.savefig(self.images_path + f"row_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        # plt.close()
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
@@ -279,7 +287,7 @@ class Simulation:
         if not np.any(self.transition_matrices):
             self.get_transitions_matrix()
         num = self.transition_matrices.shape[1] - 2
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num_eigv=num)
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num_eigv=num, which="LR")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
             xs = np.linspace(0, 1, num=num)
@@ -304,16 +312,23 @@ class Simulation:
                                figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
         vmin = np.min(tau_eigenvec)
         vmax = np.max(tau_eigenvec)
+        cmap = cm.get_cmap("RdBu").copy()
+        cmap.set_over("black")
+        cmap.set_under("black")
         for i, tau in enumerate(self.tau_array):
             for j in range(num_eigv):
-                to_plot = tau_eigenvec[i, :, j]
-                to_plot = to_plot.reshape(self.energy.size)
-                ax[i][j].imshow(to_plot, cmap="RdBu_r", vmin=vmin, vmax=vmax)
+                array = np.full(self.histogram.shape, np.max(tau_eigenvec[i, :, j]) + 1)
+                index = 0
+                for m in range(self.histogram.shape[0]):
+                    for n in range(self.histogram.shape[1]):
+                        if self.energy.is_accessible((m, n)):
+                            array[m, n] = tau_eigenvec[i, index, j]
+                            index += 1
+                ax[i][j].imshow(array, cmap=cmap, vmax=vmax, vmin=vmin)
                 ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
                 ax[i][j].set_yticklabels([])
-                #ax[i][j].axes.get_yaxis().set_visible(False)
         fig.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
@@ -444,7 +459,7 @@ if __name__ == '__main__':
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name, m=my_energy.m,
                                friction=my_energy.friction, T=my_energy.T)
-    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=True)
+    my_simulation.integrate(N=int(1e8), dt=0.001, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
