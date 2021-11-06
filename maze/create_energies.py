@@ -1,3 +1,8 @@
+"""
+In this file, Energy surfaces are created - from Mazes, double well potential or atoms positioned at various points.
+Square root approximation is implemented using the rates matrices of those surfaces.
+"""
+from abc import abstractmethod
 from .create_mazes import Maze, AbstractEnergy
 from .explore_mazes import BFSExplorer
 import numpy as np
@@ -6,6 +11,7 @@ from scipy import interpolate
 from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
+from scipy.interpolate import bisplev
 from mpl_toolkits import mplot3d  # a necessary import
 
 # DEFINING BOLTZMANN CONSTANT
@@ -14,6 +20,8 @@ kB = 0.008314463  # kJ/mol/K
 DIM_LANDSCAPE = (7.25, 4.45)
 DIM_PORTRAIT = (3.45, 4.45)
 DIM_SQUARE = (4.45, 4.45)
+
+# TODO: change orientation of EnergyFromMaze; test if visualize3d works! change tests too
 
 
 class Energy(AbstractEnergy):
@@ -45,95 +53,29 @@ class Energy(AbstractEnergy):
         self.friction = friction
         # diffusion coefficient
         self.D = kB * self.T / self.m / self.friction
-        # will only have a value if energy created from maze
-        self.underlying_maze = None
         # in preparation
         self.rates_matrix = None
         self.grid_x = None
         self.grid_y = None
         self.explorer = None
-        self.spline = None
 
-    def from_potential(self, size=(12, 16)):
-        """
-        For testing - initiate an energy surface with a 2D potential well.
-        """
-        self.size = size
-        # making sure that the grid is set up in the middle of the cell
-        cell_step_x = 2 / self.size[0]
-        cell_step_y = 2 / self.size[1]
-        start_x = -1 + cell_step_x/2
-        end_x = 1 - cell_step_x/2
+    def _prepare_grid(self, factor=1) -> tuple:
+        cell_step_x = 2 / (self.size[0] * factor)
+        cell_step_y = 2 / (self.size[1] * factor)
+        start_x = -1 + cell_step_x / 2
+        end_x = 1 - cell_step_x / 2
         start_y = -1 + cell_step_y / 2
         end_y = 1 - cell_step_y / 2
-        size_y, size_x = complex(self.size[0]), complex(self.size[1])
-        self.grid_y, self.grid_x = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
+        size_x, size_y = complex(self.size[0]), complex(self.size[1])
+        return np.mgrid[start_x:end_x:factor*size_x, start_y:end_y:factor*size_y]
 
-        def square_well(x, y, a=5, b=10):
-            return a*(x**2 - 0.3)**2 + b*(y**2 - 0.5)**2
+    @abstractmethod
+    def get_x_derivative(self, point: tuple) -> float:
+        """Obtain the derivative of the energy surface dV/dx at point (x, y)."""
 
-        self.dV_dx = lambda x: 4*5*x*(x**2 - 0.3)
-        self.dV_dy = lambda y: 4*10*y*(y**2 - 0.5)
-        self.energies = square_well(self.grid_x, self.grid_y)
-        self.energy_cutoff = 10
-        self.deltas = np.ones(len(self.size), dtype=int)
-        self.pbc = False
-        self.h = cell_step_x
-        self.S = cell_step_y
-        self.V = cell_step_x*cell_step_y
-
-    def from_maze(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2):
-        """
-        A function for creating a energy surface from a 2D maze object.
-
-        Args:
-            maze: a maze object that should be changed into an energy surface.
-            add_noise: boolean, if False, the maze is not changed, if True, some of 0s in the maze -> -1 or -2
-            factor_grid: int, how many times more points for interpolation than in original maze
-                         (note: factor_grid > 2 produces very localized min/max)
-        """
-        # interpolation only available for 2D mazes
-        if len(maze.size) != 2:
-            raise ValueError("maze does not have the right dimensionality.")
-        # sparse grid
-        # could also do that to work with any dimensionality in case the interpolation scheme also changes
-        # dense_size = tuple(np.linspace(-1, 1, num=factor_grid*ms) for ms in maze.size)
-        # grid_dense = np.meshgrid(*dense_size)
-        # dense grid
-        cell_step_x = 2 / maze.size[0]
-        cell_step_y = 2 / maze.size[1]
-        start_x = -1 + cell_step_x/2
-        end_x = 1 - cell_step_x/2
-        start_y = -1 + cell_step_y / 2
-        end_y = 1 - cell_step_y / 2
-        size_x, size_y = complex(maze.size[0]), complex(maze.size[1])
-        y_edges, x_edges = np.mgrid[start_x:end_x:size_x, start_y:end_y:size_y]
-        cell_step_x = 2 / (maze.size[0]*factor_grid)
-        cell_step_y = 2 / (maze.size[1]*factor_grid)
-        start_x = -1 + cell_step_x/2
-        end_x = 1 - cell_step_x/2
-        start_y = -1 + cell_step_y / 2
-        end_y = 1 - cell_step_y / 2
-        self.grid_y, self.grid_x = np.mgrid[start_x:end_x:factor_grid*size_x, start_y:end_y:factor_grid*size_y]
-        z = maze.energies
-        # change some random zeroes into -1 and -2
-        if add_noise:
-            for _ in range(int(0.05*np.prod(maze.size))):
-                cell = maze.find_random_accessible()
-                z[cell] = -1
-            for _ in range(int(0.04*np.prod(maze.size))):
-                cell = maze.find_random_accessible()
-                z[cell] = -2
-        z = z * 10
-        self.underlying_maze = z
-        m = max(maze.size)
-        tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid*m, nyest=factor_grid*m, task=-1,
-                                   tx=self.grid_x[0, :], ty=self.grid_y[:, 0])
-        self.energies = interpolate.bisplev(self.grid_x[0, :], self.grid_y[:, 0], tck)
-        self.energy_cutoff = 5
-        self.spline = tck
-        self.size = self.energies.shape
-        self.deltas = np.ones(len(self.size), dtype=int)
+    @abstractmethod
+    def get_y_derivative(self, point: tuple) -> float:
+        """Obtain the derivative of the energy surface dV/dy at point (x, y)."""
 
     ############################################################################
     # ------------------------   RATES MATRIX  ---------------------------------
@@ -151,8 +93,6 @@ class Energy(AbstractEnergy):
         Returns:
             float, the ij-th element of the rates matrix Q
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         energy_i = self.get_energy(cell_i)
         energy_j = self.get_energy(cell_j)
         return self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.T)))
@@ -189,8 +129,6 @@ class Energy(AbstractEnergy):
         Raises:
             ValueError: if there are no self.energies
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
         return self.rates_matrix
@@ -198,11 +136,6 @@ class Energy(AbstractEnergy):
     ############################################################################
     # --------------------------   GETTERS  -----------------------------------
     ############################################################################
-
-    def get_spline(self):
-        if not np.any(self.energies):
-            raise ValueError("No splines present! The interpolation never occured.")
-        return self.spline
 
     def get_boltzmann(self) -> np.ndarray:
         """
@@ -215,8 +148,6 @@ class Energy(AbstractEnergy):
         Raises:
             ValueError if no self.energies
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
         list_of_cells = self.explorer.get_sorted_accessible_cells()
@@ -236,8 +167,6 @@ class Energy(AbstractEnergy):
         Raises:
             ValueError if no self.energies
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
@@ -267,22 +196,6 @@ class Energy(AbstractEnergy):
         im_ratio = self.size[0] / self.size[1]
         fig.colorbar(im, ax=ax, fraction=0.05 * im_ratio, pad=0.04)
 
-    def visualize_underlying_maze(self):
-        """
-        Visualization of the maze (with eventually added noise) from which the Energy object was created.
-
-        Raises:
-            Value error: if there is no self.underlying_maze (if self.from_maze has not been used).
-        """
-        if not np.any(self.underlying_maze):
-            raise ValueError("No underlying maze present! This is only available for surfaces created from mazes.")
-        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
-            lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
-            fig, ax = plt.subplots(1, 1)
-            im = plt.imshow(self.underlying_maze, **lims)
-            self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"underlying_maze_{self.images_name}.png")
-            plt.close()
 
     def visualize(self):
         """
@@ -291,8 +204,6 @@ class Energy(AbstractEnergy):
         Raises:
             ValueError: if there are no self.energies
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             lims = dict(cmap='RdBu_r')
             fig, ax = plt.subplots(1, 1)
@@ -309,8 +220,6 @@ class Energy(AbstractEnergy):
         Raises:
             ValueError: if there are no self.energies
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         with plt.style.context('Stylesheets/not_animation.mplstyle'):
             ax = plt.axes(projection='3d')
             ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
@@ -363,9 +272,8 @@ class Energy(AbstractEnergy):
             cmap.set_under("black")
             ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
             ax[0].set_title("Energy surface", fontsize=7)
-            print("shape eigv ", eigenvec.shape)
-            print("acces len ", len([1 for j in range(self.size[0]) for k in range(self.size[1]) if self.is_accessible((j, k))]))
-            print("rates len ", self.rates_matrix.shape[0])
+            len_acc = len([1 for j in range(self.size[0]) for k in range(self.size[1]) if self.is_accessible((j, k))])
+            assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
             for i in range(1, num+1):
                 array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
                 index = 0
@@ -386,8 +294,6 @@ class Energy(AbstractEnergy):
         Args:
             show: bool, whether to display the image
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
         num = self.rates_matrix.shape[0] - 2
@@ -411,8 +317,6 @@ class Energy(AbstractEnergy):
         Raises:
             ValueError: if there are no self.energies
         """
-        if not np.any(self.energies):
-            raise ValueError("No energies present! First, create an energy surface (e.g. from a maze).")
         if not self.explorer:
             self._calculate_rates_matrix()
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
@@ -439,18 +343,109 @@ class Energy(AbstractEnergy):
             plt.close()
 
 
+class EnergyFromMaze(Energy):
+
+    def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = "./",
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+        """
+        Creating a energy surface from a 2D maze object.
+
+        Args:
+            maze: a maze object that should be changed into an energy surface.
+            add_noise: boolean, if False, the maze is not changed, if True, some of 0s in the maze -> -1 or -2
+            factor_grid: int, how many times more points for interpolation than in original maze
+                         (note: factor_grid > 2 produces very localized min/max)
+        """
+        super().__init__(images_path, images_name, m, friction, T)
+        # interpolation only available for 2D mazes
+        if len(maze.size) != 2:
+            raise ValueError("Maze does not have the right dimensionality.")
+        self.size = maze.size
+        # sparse grid
+        y_edges, x_edges = self._prepare_grid()
+        # dense grid
+        self.grid_y, self.grid_x = self._prepare_grid(factor=factor_grid)
+        z = maze.energies
+        # change some random zeroes into -1 and -2
+        if add_noise:
+            for _ in range(int(0.05 * np.prod(maze.size))):
+                cell = maze.find_random_accessible()
+                z[cell] = -1
+            for _ in range(int(0.04 * np.prod(maze.size))):
+                cell = maze.find_random_accessible()
+                z[cell] = -2
+        z = z * 10
+        self.underlying_maze = z
+        m = max(maze.size)
+        tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
+                                   tx=self.grid_x[0, :], ty=self.grid_y[:, 0])
+        self.energies = interpolate.bisplev(self.grid_x[0, :], self.grid_y[:, 0], tck)
+        self.size = self.energies.shape
+        self.spline = tck
+        self.energy_cutoff = 5
+        self.deltas = np.ones(len(self.size), dtype=int)
+
+    def get_x_derivative(self, point: tuple) -> float:
+        return bisplev(point[0], point[1], self.spline, dx=1)
+
+    def get_y_derivative(self, point: tuple) -> float:
+        return bisplev(point[0], point[1], self.spline, dy=1)
+
+    def visualize_underlying_maze(self):
+        """
+        Visualization of the maze (with eventually added noise) from which the Energy object was created.
+
+        Raises:
+            Value error: if there is no self.underlying_maze (if self.from_maze has not been used).
+        """
+        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
+            lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+            fig, ax = plt.subplots(1, 1)
+            im = plt.imshow(self.underlying_maze, **lims)
+            self._add_colorbar(fig, ax, im)
+            ax.figure.savefig(self.images_path + f"underlying_maze_{self.images_name}.png")
+            plt.close()
+
+
+class EnergyFromPotential(Energy):
+
+    def __init__(self, size: tuple = (12, 16), images_path: str = "./",
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+        """
+        Initiate an energy surface with a 2D potential well.
+        """
+        super().__init__(images_path, images_name, m, friction, T)
+        self.size = size
+        # making sure that the grid is set up in the middle of the cell
+        self.grid_y, self.grid_x = self._prepare_grid()
+        self.energies = self.square_well(self.grid_x, self.grid_y)
+        self.energy_cutoff = 10
+        self.deltas = np.ones(len(self.size), dtype=int)
+        self.pbc = False
+        self.h = 2 / (self.size[0])
+        self.S = 2 / (self.size[1])
+        self.V = 2 / (self.size[0]) * 2 / (self.size[1])
+
+    def square_well(self, x, y, a=5, b=10):
+        return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2
+
+    def get_x_derivative(self, point: tuple) -> float:
+        return 4 * 5 * point[0] * (point[0] ** 2 - 0.3)
+
+    def get_y_derivative(self, point: tuple) -> float:
+        return 4 * 10 * point[1] * (point[1] ** 2 - 0.5)
+
+
 if __name__ == '__main__':
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, images_name="testing", friction=10)
-    my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
-    my_maze.visualize()
-    #my_energy.from_potential(size=(10, 10))
-    my_energy.from_maze(my_maze, add_noise=True)
-    my_energy.visualize_underlying_maze()
-    #my_energy.visualize_boltzmann()
+    #my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
+    #my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
+    #my_maze.visualize()
+    #my_energy.visualize_underlying_maze()
+    my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="testing", friction=10)
+    my_energy.visualize_boltzmann()
     my_energy.visualize()
-    #my_energy.visualize_3d()
-    #my_energy.get_rates_matix()
+    my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors(num=6, which="LM", sigma=0)
     my_energy.visualize_eigenvectors_in_maze(num=6, which="LM", sigma=0)

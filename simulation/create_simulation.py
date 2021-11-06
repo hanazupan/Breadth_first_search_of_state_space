@@ -3,9 +3,8 @@ In this file, molecular dynamics simulation on an Energy surface is performed, a
 Finally, characteristic ITS are plotted. All these calculations are performed in Simulation class.
 """
 
-from maze.create_energies import Energy
+from maze.create_energies import EnergyFromPotential, EnergyFromMaze
 from maze.create_mazes import Maze
-from scipy.interpolate import bisplev
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -24,21 +23,20 @@ DIM_SQUARE = (4.45, 4.45)
 
 class Simulation:
 
-    def __init__(self, energy, m: float = 1, friction: float = 1, T: float = 293, dt: float = 0.01, N: int = int(1e7),
+    def __init__(self, energy, dt: float = 0.01, N: int = int(1e7),
                  images_path: str = "./", images_name: str = "simulation"):
         self.energy = energy
-        self.spline = self.energy.get_spline()
         self.images_name = images_name
         self.images_path = images_path
         # TD/particle properties
-        self.m = m
-        self.friction = friction
-        self.T = T
+        self.m = self.energy.m
+        self.friction = self.energy.friction
+        self.T = self.energy.T
         self.dt = dt
         self.N = N
         self.D = kB*self.T/self.m/self.friction
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
-        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 500, 1000, 5000])
+        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
@@ -90,15 +88,14 @@ class Simulation:
             cell = self._point_to_cell((x_n, y_n))
             try:
                 self.histogram[cell] += 1
+                self.traj_cell.append(cell)
+                # if applicable, save trajectory
+                if save_trajectory:
+                    self.traj_x[n] = x_n
+                    self.traj_y[n] = y_n
             except IndexError:
                 # if not using periodic boundaries, points can land outside the histogram
                 self.outside_hist += 1
-                if not self.energy
-            # if applicable, save trajectory
-            self.traj_cell.append(cell)
-            if save_trajectory:
-                self.traj_x[n] = x_n
-                self.traj_y[n] = y_n
         # normalizing the histogram
         self.histogram = self.histogram / np.sum(self.histogram)
         self.traj_cell = np.array(self.traj_cell)
@@ -113,12 +110,8 @@ class Simulation:
         Returns: tuple (x_n, y_n), the integrated new trajectory points (not necessarily between -1 and 1)
 
         """
-        if self.spline:
-            dV_dx = bisplev(x_n, y_n, self.spline, dx=1)
-            dV_dy = bisplev(x_n, y_n, self.spline, dy=1)
-        else:
-            dV_dx = self.energy.dV_dx(x_n)
-            dV_dy = self.energy.dV_dy(y_n)
+        dV_dx = self.energy.get_x_derivative((x_n, y_n))
+        dV_dy = self.energy.get_y_derivative((x_n, y_n))
         eta_x = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
         #print(x_n, dV_dx * self.dt / self.m / self.friction, np.sqrt(2 * self.D) * eta_x)
         x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x
@@ -168,7 +161,7 @@ class Simulation:
             cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
         else:
             #print(f"x = {(x_n + 1)}   step x = {self.step_x}   y = {(y_n + 1)}   step y = {self.step_y}")
-            cell = int((y_n + 1) // self.step_x), int((x_n + 1) // self.step_y)
+            cell = int((y_n + 1) // self.step_y), int((x_n + 1) // self.step_x)
         return cell
 
     def _cell_to_index(self, cell: tuple) -> int:
@@ -199,8 +192,6 @@ class Simulation:
         """
         if tau_array:
             self.tau_array = tau_array
-        if not np.any(self.traj_x):
-            raise ValueError("No trajectories found! Check if using the setting save_trajectory=False.")
 
         def window(seq, len_window):
             # in this case always move the window by 1 and use all points in simulations to count transitions
@@ -441,32 +432,31 @@ class Simulation:
 if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
-    my_energy = Energy(images_path=img_path, images_name="thu", m=1, friction=20, T=1600)
-    my_maze = Maze((6, 8), images_path=img_path, images_name=my_energy.images_name,
-                   no_branching=True, edge_is_wall=True)
-    #my_maze.visualize()
-    #my_energy.from_potential(size=(30, 30))
-    my_energy.from_maze(my_maze, add_noise=True)
-    #my_energy.visualize_underlying_maze()
+    my_maze = Maze((6, 8), images_path=img_path, images_name="sat_maze",
+                  no_branching=True, edge_is_wall=True)
+    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
+    my_maze.visualize()
+    my_energy.visualize_underlying_maze()
+    #my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="sat_potential", m=1,
+    #                                friction=20, T=200)
     my_energy.visualize_boltzmann()
     my_energy.visualize()
     my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
     my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
     my_energy.visualize_eigenvalues()
-    #my_energy.visualize_rates_matrix()
+    my_energy.visualize_rates_matrix()
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
-    my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name, m=my_energy.m,
-                               friction=my_energy.friction, T=my_energy.T)
-    my_simulation.integrate(N=int(1e8), dt=0.001, save_trajectory=True)
+    my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
+    my_simulation.integrate(N=int(1e7), dt=0.01)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     #my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix(noncorr=True)
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
-    #my_simulation.visualize_transition_matrices()
+    my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(8, which="LR")
     my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
     my_simulation.visualize_eigenvalues()
