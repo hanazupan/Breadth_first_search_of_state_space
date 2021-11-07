@@ -28,7 +28,7 @@ class Simulation:
         self.energy = energy
         self.images_name = images_name
         self.images_path = images_path
-        # TD/particle properties
+        # TD/particle properties inhherited from Energy
         self.m = self.energy.m
         self.friction = self.energy.friction
         self.T = self.energy.T
@@ -44,8 +44,8 @@ class Simulation:
         self.traj_y = None
         self.traj_cell = None
         self.transition_matrices = None
-        self.step_x = self.energy.grid_x[0, 1] - self.energy.grid_x[0, 0]
-        self.step_y = self.energy.grid_y[1, 0] - self.energy.grid_y[0, 0]
+        self.step_x = self.energy.grid_x[1, 0] - self.energy.grid_x[0, 0]
+        self.step_y = self.energy.grid_y[0, 1] - self.energy.grid_y[0, 0]
 
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False,
                   restart_after: int = -1):
@@ -83,17 +83,17 @@ class Simulation:
                 y_n = 2 * np.random.random() - 1                # random between (-1, 1)
             # integrate the trajectory one step and increase the histogram count
             x_n, y_n = self._euler_maruyama(x_n, y_n)
-            if self.energy.pbc:
-                x_n, y_n = self._point_within_bound((x_n, y_n))
+            #if self.energy.pbc:
+            #    x_n, y_n = self._point_within_bound((x_n, y_n))
             cell = self._point_to_cell((x_n, y_n))
-            try:
+            if np.all([0 <= cell[i] < self.histogram.shape[i] for i in range(len(self.histogram.shape))]):
                 self.histogram[cell] += 1
                 self.traj_cell.append(cell)
                 # if applicable, save trajectory
                 if save_trajectory:
                     self.traj_x[n] = x_n
                     self.traj_y[n] = y_n
-            except IndexError:
+            else:
                 # if not using periodic boundaries, points can land outside the histogram
                 self.outside_hist += 1
         # normalizing the histogram
@@ -113,7 +113,6 @@ class Simulation:
         dV_dx = self.energy.get_x_derivative((x_n, y_n))
         dV_dy = self.energy.get_y_derivative((x_n, y_n))
         eta_x = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
-        #print(x_n, dV_dx * self.dt / self.m / self.friction, np.sqrt(2 * self.D) * eta_x)
         x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x
         eta_y = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
         y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y
@@ -158,10 +157,7 @@ class Simulation:
                 y_n = (y_n + 1) % 2 - 1
             else:
                 y_n = (y_n - 1) % 2 - 1
-            cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
-        else:
-            #print(f"x = {(x_n + 1)}   step x = {self.step_x}   y = {(y_n + 1)}   step y = {self.step_y}")
-            cell = int((y_n + 1) // self.step_y), int((x_n + 1) // self.step_x)
+        cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
         return cell
 
     def _cell_to_index(self, cell: tuple) -> int:
@@ -202,7 +198,8 @@ class Simulation:
             cut_seq = seq[0:-1:len_window]
             return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
 
-        self.acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1]) if self.energy.is_accessible((i, j))]
+        self.acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
+                          if self.energy.is_accessible((i, j))]
         all_cells = len(self.acc_cells)
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
@@ -432,13 +429,13 @@ class Simulation:
 if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
-    # my_maze = Maze((6, 8), images_path=img_path, images_name="sat_maze",
-    #               no_branching=True, edge_is_wall=True)
-    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
-    # my_maze.visualize()
-    # my_energy.visualize_underlying_maze()
-    my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="sat_potential", m=1,
-                                    friction=20, T=200)
+    my_maze = Maze((6, 8), images_path=img_path, images_name="sat_maze",
+                  no_branching=True, edge_is_wall=True)
+    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
+    my_maze.visualize()
+    my_energy.visualize_underlying_maze()
+    # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="sat_potential", m=1,
+    #                                 friction=20, T=200)
     my_energy.visualize_boltzmann()
     my_energy.visualize()
     my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
