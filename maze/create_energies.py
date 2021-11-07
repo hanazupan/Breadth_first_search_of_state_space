@@ -1,7 +1,9 @@
 """
 In this file, Energy surfaces are created - from Mazes, double well potential or atoms positioned at various points.
+This is implemented in subclasses EnergyFromMaze, EnergyFromPotential and EnergyFromAtoms.
 Square root approximation is implemented using the rates matrices of those surfaces.
 """
+
 from abc import abstractmethod
 from .create_mazes import Maze, AbstractEnergy
 from .explore_mazes import BFSExplorer
@@ -20,8 +22,6 @@ kB = 0.008314463  # kJ/mol/K
 DIM_LANDSCAPE = (7.25, 4.45)
 DIM_PORTRAIT = (3.45, 4.45)
 DIM_SQUARE = (4.45, 4.45)
-
-# TODO: change orientation of EnergyFromMaze; test if visualize3d works! change tests too
 
 
 class Energy(AbstractEnergy):
@@ -196,7 +196,6 @@ class Energy(AbstractEnergy):
         im_ratio = self.size[0] / self.size[1]
         fig.colorbar(im, ax=ax, fraction=0.05 * im_ratio, pad=0.04)
 
-
     def visualize(self):
         """
         Visualizes the array self.energies.
@@ -257,11 +256,8 @@ class Energy(AbstractEnergy):
         Black squares mean the cells are not accessible.
 
         Args:
-            show: bool, whether to show the image
             num: int, how many eigenvectors of rates matrix to show
-
-        Returns:
-
+            **kwargs: named arguments that can be passed to self.get_eigenval_eigenvec()
         """
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
@@ -290,9 +286,6 @@ class Energy(AbstractEnergy):
     def visualize_eigenvalues(self):
         """
         Visualize the eigenvalues of rate matrix.
-
-        Args:
-            show: bool, whether to display the image
         """
         if not self.explorer:
             self._calculate_rates_matrix()
@@ -349,6 +342,8 @@ class EnergyFromMaze(Energy):
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
         """
         Creating a energy surface from a 2D maze object.
+        Grid x is the same for the first row, changes row for row.
+        Grid y changes column for column.
 
         Args:
             maze: a maze object that should be changed into an energy surface.
@@ -362,9 +357,9 @@ class EnergyFromMaze(Energy):
             raise ValueError("Maze does not have the right dimensionality.")
         self.size = maze.size
         # sparse grid
-        y_edges, x_edges = self._prepare_grid()
+        x_edges, y_edges = self._prepare_grid()
         # dense grid
-        self.grid_y, self.grid_x = self._prepare_grid(factor=factor_grid)
+        self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
         z = maze.energies
         # change some random zeroes into -1 and -2
         if add_noise:
@@ -378,18 +373,18 @@ class EnergyFromMaze(Energy):
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
-                                   tx=self.grid_x[0, :], ty=self.grid_y[:, 0])
-        self.energies = interpolate.bisplev(self.grid_x[0, :], self.grid_y[:, 0], tck)
+                                   tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
+        self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.spline = tck
         self.energy_cutoff = 5
         self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_x_derivative(self, point: tuple) -> float:
-        return bisplev(point[0], point[1], self.spline, dx=1)
+        return bisplev(point[0], point[1], self.spline, dx=1)  # do not change, this is correct
 
     def get_y_derivative(self, point: tuple) -> float:
-        return bisplev(point[0], point[1], self.spline, dy=1)
+        return bisplev(point[0], point[1], self.spline, dy=1)   # do not change, this is correct
 
     def visualize_underlying_maze(self):
         """
@@ -413,11 +408,13 @@ class EnergyFromPotential(Energy):
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
         """
         Initiate an energy surface with a 2D potential well.
+        Grid x is the same for the first row, changes row for row.
+        Grid y changes column for column.
         """
         super().__init__(images_path, images_name, m, friction, T)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
-        self.grid_y, self.grid_x = self._prepare_grid()
+        self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)
         self.energy_cutoff = 10
         self.deltas = np.ones(len(self.size), dtype=int)
@@ -436,13 +433,17 @@ class EnergyFromPotential(Energy):
         return 4 * 10 * point[1] * (point[1] ** 2 - 0.5)
 
 
+class EnergyFromAtoms(Energy):
+    pass
+
+
 if __name__ == '__main__':
     img_path = "images/"
-    #my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
-    #my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
-    #my_maze.visualize()
-    #my_energy.visualize_underlying_maze()
-    my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="testing", friction=10)
+    my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
+    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
+    my_maze.visualize()
+    my_energy.visualize_underlying_maze()
+    #my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="testing", friction=10)
     my_energy.visualize_boltzmann()
     my_energy.visualize()
     my_energy.visualize_3d()

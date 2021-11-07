@@ -432,13 +432,13 @@ class Simulation:
 if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
-    my_maze = Maze((6, 8), images_path=img_path, images_name="sat_maze",
-                  no_branching=True, edge_is_wall=True)
-    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
-    my_maze.visualize()
-    my_energy.visualize_underlying_maze()
-    #my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="sat_potential", m=1,
-    #                                friction=20, T=200)
+    # my_maze = Maze((6, 8), images_path=img_path, images_name="sat_maze",
+    #               no_branching=True, edge_is_wall=True)
+    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
+    # my_maze.visualize()
+    # my_energy.visualize_underlying_maze()
+    my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="sat_potential", m=1,
+                                    friction=20, T=200)
     my_energy.visualize_boltzmann()
     my_energy.visualize()
     my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
@@ -449,7 +449,7 @@ if __name__ == '__main__':
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
-    my_simulation.integrate(N=int(1e7), dt=0.01)
+    my_simulation.integrate(N=int(1e6), dt=0.01)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
