@@ -1,7 +1,7 @@
 import numpy as np
 from .create_mazes import Maze
 from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
-from .create_energies import Energy, kB
+from .create_energies import EnergyFromMaze, EnergyFromPotential, kB
 
 # TODO: test adjacency for potentials
 # TODO: test run everything
@@ -12,18 +12,17 @@ def formula(x, y):
 
 
 def test_creation_from_potential():
-    my_energy = Energy(images_path="images/", images_name="test")
     size = (8, 10)
+    my_energy = EnergyFromPotential(size, images_path="images/", images_name="test")
     dx = 2 / size[0]
     dy = 2 / size[1]
-    my_energy.from_potential(size=size)
 
     # shapes of grid and energies correct
-    assert my_energy.grid_x[0, 0] == -1
-    assert my_energy.grid_x[-1, -1] == 1
+    assert my_energy.grid_x[0, 0] == -1 + dx/2
+    assert my_energy.grid_x[-1, -1] == 1 - dx/2
     assert my_energy.grid_x.shape == size
-    assert my_energy.grid_y[0, 0] == -1
-    assert my_energy.grid_y[-1, -1] == 1
+    assert my_energy.grid_y[0, 0] == -1 + dy/2
+    assert my_energy.grid_y[-1, -1] == 1 - dy/2
     assert my_energy.grid_y.shape == size
     assert my_energy.energies.shape == size
 
@@ -35,10 +34,10 @@ def test_creation_from_potential():
     assert np.allclose(my_energy.energies[0, :], my_energy.energies[-1, :])
 
     # derivatives are correct, even outside the boundaries
-    assert my_energy.dV_dx(0.3) == 4 * 5 * 0.3 * (0.3 ** 2 - 0.3)
-    assert my_energy.dV_dx(-15) == 4 * 5 * (-15) * ((-15) ** 2 - 0.3)
-    assert my_energy.dV_dy(-0.7) == 4*10*(-0.7)*((-0.7)**2 - 0.5)
-    assert my_energy.dV_dy(42) == 4 * 10 * 42 * (42 ** 2 - 0.5)
+    assert my_energy.get_x_derivative((0.3, 5)) == 4 * 5 * 0.3 * (0.3 ** 2 - 0.3)
+    assert my_energy.get_x_derivative((-15, 2)) == 4 * 5 * (-15) * ((-15) ** 2 - 0.3)
+    assert my_energy.get_y_derivative((0, -0.7)) == 4*10*(-0.7)*((-0.7)**2 - 0.5)
+    assert my_energy.get_y_derivative((55, 42)) == 4 * 10 * 42 * (42 ** 2 - 0.5)
 
     # no periodic boundaries in use
 
@@ -48,10 +47,9 @@ def test_creation_from_potential():
 
 
 def test_q_ij():
-    my_energy = Energy(images_path="images/", images_name="test")
     size = (10, 10)
+    my_energy = EnergyFromPotential(size, images_path="images/", images_name="test")
     dx = 2 / size[0]
-    my_energy.from_potential(size=size)
     cell_i = (2, 3)
     cell_j = (6, 1)
     q_ij = my_energy._calculate_rates_matrix_ij(cell_i, cell_j)
@@ -61,13 +59,12 @@ def test_q_ij():
 
 
 def test_acessible():
-    my_energy = Energy(images_path="images/", images_name="test")
     size = (10, 10)
-    my_energy.from_potential(size=size)
+    my_energy = EnergyFromPotential(size, images_path="images/", images_name="test")
     my_energy.energy_cutoff = 100
     for i in range(size[0]):
         for j in range(size[1]):
             assert my_energy.is_accessible((i, j))
     my_energy.energy_cutoff = 3
-    assert my_energy.is_accessible((0, 4))
-    assert not my_energy.is_accessible((4, 0))
+    assert not my_energy.is_accessible((0, 4))
+    assert my_energy.is_accessible((4, 0))
