@@ -11,10 +11,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors, cm
+from matplotlib.ticker import FormatStrFormatter
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
 from scipy.interpolate import bisplev
-import math
+import seaborn as sns
+import pandas as pd
 from mpl_toolkits import mplot3d  # a necessary import
 
 # DEFINING BOLTZMANN CONSTANT
@@ -206,7 +208,8 @@ class Energy(AbstractEnergy):
         """
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, 1)
-            im = plt.imshow(self.energies, cmap='RdBu_r', **kwargs)
+            cmap = cm.get_cmap("RdBu").copy()
+            im = plt.imshow(self.energies, cmap=cmap, **kwargs)
             self._add_colorbar(fig, ax, im)
             ax.figure.savefig(self.images_path + f"energy_{self.images_name}.png")
             plt.close()
@@ -484,20 +487,46 @@ class EnergyFromAtoms(Energy):
         super().__init__(images_path, images_name, m, friction, T)
         self.atoms = atoms
         self.size = size
+        self.energy_cutoff = 0
         self.energies = np.zeros(self.size)
+        x_positions = [atom.position[0] for atom in self.atoms]
+        y_positions = [atom.position[1] for atom in self.atoms]
+        size_x, size_y = complex(self.size[0]), complex(self.size[1])
+        self.grid_x, self.grid_y = np.mgrid[np.min(x_positions)-0.1*np.min(x_positions):np.max(x_positions)+0.1*np.max(x_positions):size_x,
+                                            np.min(y_positions)-0.1*np.min(y_positions):np.max(y_positions)+0.1*np.max(y_positions):size_y]
         for atom in atoms:
-            # check whether atoms within size
-            for i in range(len(size)):
-                if atom.position[i] > size[i] or atom.position[i] < 0:
-                    raise IndexError(f"Atoms must positioned within the energy surface of the size {self.size}!")
             for i in range(self.size[0]):
                 for j in range(self.size[1]):
-                    self.energies[i, j] += atom.get_potential((i, j))
-        self.energy_cutoff = 10
+                    # minimum image convention
+                    point_x = self.grid_x[i, j]
+                    point_y = self.grid_y[i, j]
+                    dx = atom.position[0] - point_x
+                    dy = atom.position[1] - point_y
+                    range_x = self.grid_x[-1, 0] - self.grid_x[0, 0]
+                    range_y = self.grid_y[0, -1] - self.grid_y[0, 0]
+                    if dx > range_x * 0.5:
+                        dx = dx - range_x
+                    if dx <= -range_x * 0.5:
+                        dx = dx + range_x
+                    if dy > range_y * 0.5:
+                        dy = dy - range_y
+                    if dy <= -range_y * 0.5:
+                        dy = dy + range_y
+                    point_x = atom.position[0] + dx
+                    point_y = atom.position[1] + dy
+                    self.energies[i, j] += atom.get_potential((point_x, point_y))
         self.deltas = np.ones(len(self.size), dtype=int)
-        self.grid_x, self.grid_y = np.mgrid[0:self.size[0]:1, 0:self.size[1]:1]
 
     def get_x_derivative(self, point: tuple) -> float:
+        """
+        Obtain the x derivative of energy surface at a certain point
+
+        Args:
+            point: (x, y) - needs to be coordinates in actual space (not cells!)
+
+        Returns:
+            value of dV/dx at point
+        """
         total_derivative = 0
         for atom in self.atoms:
             total_derivative += atom.get_dV_dx(point)
@@ -508,19 +537,47 @@ class EnergyFromAtoms(Energy):
         for atom in self.atoms:
             total_derivative += atom.get_dV_dy(point)
         return total_derivative
-    
-    def visualize(self):
-        super(EnergyFromAtoms, self).visualize(norm=colors.LogNorm())
-    
-    def visualize_3d(self, **kwargs):
-        super(EnergyFromAtoms, self).visualize_3d(norm=colors.LogNorm())
+
+    def visualize_with_cutoff(self, **kwargs):
+        """
+        Visualizes the array self.energies.
+
+        Raises:
+            ValueError: if there are no self.energies
+        """
+        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+            fig, ax = plt.subplots(1, 1)
+            df = pd.DataFrame(data=self.energies, index=self.grid_x[:, 0], columns=self.grid_y[0, :])
+            cmap = cm.get_cmap("RdBu_r").copy()
+            cmap.set_over("black")
+            im = sns.heatmap(df, cmap=cmap, vmax=self.energy_cutoff, fmt='.2f',
+                             yticklabels=[f"{ind:.2f}" for ind in df.index],
+                             xticklabels=[f"{col:.2f}" for col in df.columns])
+            for atom in self.atoms:
+                range_x_grid = self.grid_x[-1, 0] - self.grid_x[0, 0]
+                range_y_grid = self.grid_y[0, -1] - self.grid_y[0, 0]
+                ax.scatter((atom.position[1]-self.grid_y[0, 0])*self.size[1]/range_y_grid,
+                           (atom.position[0]-self.grid_x[0, 0])*self.size[0]/range_x_grid, marker="o", c="white")
+            ax.figure.savefig(self.images_path + f"energy_with_cutoff_{self.images_name}.png")
+            plt.close()
+            return ax
+
+    def visualize(self, **kwargs):
+        super(EnergyFromAtoms, self).visualize(norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(self.energies),
+                                                                      vmin=-np.max(self.energies)))
 
 
 if __name__ == '__main__':
     img_path = "images/"
-    atom_1 = Atom((3.1, 10.5), 3.18*1.6022e-22, 3)
-    atom_2 = Atom((5.3, 5.3), 3.18*1.6022e-22, 3)
-    my_energy = EnergyFromAtoms((15, 15), (atom_2, atom_1), images_name="testing", images_path=img_path)
+    epsilon = 3.18*1.6022e-22
+    sigma = 5.928
+    atom_1 = Atom((0.3, 20.5), epsilon, sigma)
+    atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
+    atom_3 = Atom((5.3, 45.3), epsilon/3, sigma)
+    my_energy = EnergyFromAtoms((20, 25), (atom_1, atom_2, atom_3), images_name="testing", images_path=img_path)
+    me = BFSExplorer(my_energy)
+    me.explore_and_animate()
+    #print(my_energy.energies)
     #my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
     #my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
     #my_maze.visualize()
@@ -528,10 +585,12 @@ if __name__ == '__main__':
     #my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="testing", friction=10)
     my_energy.visualize_boltzmann()
     my_energy.visualize()
+    my_energy.visualize_with_cutoff()
     my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors(num=6, which="LR", sigma=0)
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR", sigma=0)
+    print(my_energy.get_eigenval_eigenvec(num=6, which="SM", sigma=0)[0])
+    my_energy.visualize_eigenvectors(num=6, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
 
 

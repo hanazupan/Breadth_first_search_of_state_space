@@ -147,8 +147,14 @@ class BFSExplorer(Explorer):
              lower than -100 + energy_cutoff, undiscovered passages and walls will have the same values as they
              have in the energy array.
         """
+
+        def scale(x, out_range=(-100, 100)):
+            domain = np.min(x), np.max(x)
+            y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
+            return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
+
         # for video
-        yield self.maze.energies
+        yield scale(self.maze.energies)
         visited = np.zeros(self.maze.size, dtype=int)
         accessible = np.zeros(self.maze.size, dtype=int)
         check_queue = deque()
@@ -160,7 +166,7 @@ class BFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
-        yield self.maze.energies - 100*accessible
+        yield scale(self.maze.energies) - 100*accessible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -186,7 +192,7 @@ class BFSExplorer(Explorer):
                         check_queue.append(n)
                 visited[n] = 1
             # for video
-            yield self.maze.energies - 100*accessible
+            yield scale(self.maze.energies) - 100*accessible
         # returns adjacency matrix
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
