@@ -3,7 +3,7 @@ In this file, molecular dynamics simulation on an Energy surface is performed, a
 Finally, characteristic ITS are plotted. All these calculations are performed in Simulation class.
 """
 
-from maze.create_energies import EnergyFromPotential, EnergyFromMaze
+from maze.create_energies import EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms
 from maze.create_mazes import Maze
 import numpy as np
 import matplotlib.pyplot as plt
@@ -83,9 +83,11 @@ class Simulation:
                 y_n = 2 * np.random.random() - 1                # random between (-1, 1)
             # integrate the trajectory one step and increase the histogram count
             x_n, y_n = self._euler_maruyama(x_n, y_n)
-            #if self.energy.pbc:
-            #    x_n, y_n = self._point_within_bound((x_n, y_n))
+            #print("position ", (x_n, y_n))
+            if self.energy.pbc:
+                x_n, y_n = self._point_within_bound((x_n, y_n))
             cell = self._point_to_cell((x_n, y_n))
+            #print("cell ", cell)
             if np.all([0 <= cell[i] < self.histogram.shape[i] for i in range(len(self.histogram.shape))]):
                 self.histogram[cell] += 1
                 self.traj_cell.append(cell)
@@ -130,10 +132,21 @@ class Simulation:
             tuple (x_n, y_n), a 2D point corrected to an equivalent position within (-1, 1)
         """
         x_n, y_n = point
-        dist_x_n = (abs(x_n) + 1) // 2
-        x_n = x_n - np.sign(x_n) * 2 * dist_x_n
-        dist_y_n = (abs(y_n) + 1) // 2
-        y_n = y_n - np.sign(y_n) * 2 * dist_y_n
+        xstep = self.energy.grid_x[1, 0] - self.energy.grid_x[0, 0]
+        ystep = self.energy.grid_y[0, 1] - self.energy.grid_y[0, 0]
+        range_x_grid = self.energy.grid_x[-1, 0] - self.energy.grid_x[0, 0] + xstep
+        range_y_grid = self.energy.grid_y[0, -1] - self.energy.grid_y[0, 0] + ystep
+        x_cell = (x_n - self.energy.grid_x[0, 0])*self.energy.size[0]/range_x_grid + 0.5
+        y_cell = (y_n - self.energy.grid_y[0, 0])*self.energy.size[1]/range_y_grid + 0.5
+        # periodic boundary cond
+        x_cell = x_cell % self.energy.size[0]
+        y_cell = y_cell % self.energy.size[1]
+        x_n = (x_cell - 0.5)*range_x_grid/self.energy.size[0] + self.energy.grid_x[0, 0]
+        y_n = (y_cell - 0.5) * range_y_grid / self.energy.size[1] + self.energy.grid_y[0, 0]
+        # dist_x_n = (abs(x_n) + 1) // 2
+        # x_n = x_n - np.sign(x_n) * 2 * dist_x_n
+        # dist_y_n = (abs(y_n) + 1) // 2
+        # y_n = y_n - np.sign(y_n) * 2 * dist_y_n
         return x_n, y_n
 
     def _point_to_cell(self, point: tuple) -> tuple:
@@ -147,18 +160,22 @@ class Simulation:
             tuple (row, column) in which cell of the histogram this point lands
         """
         x_n, y_n = point
-        # determine the cell of the histogram
-        if self.energy.pbc:
-            if x_n > 0:
-                x_n = (x_n + 1) % 2 - 1
-            else:
-                x_n = (x_n - 1) % 2 - 1
-            if y_n > 0:
-                y_n = (y_n + 1) % 2 - 1
-            else:
-                y_n = (y_n - 1) % 2 - 1
-        cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
-        return cell
+        xstep = self.energy.grid_x[1, 0] - self.energy.grid_x[0, 0]
+        ystep = self.energy.grid_y[0, 1] - self.energy.grid_y[0, 0]
+        range_x_grid = self.energy.grid_x[-1, 0] - self.energy.grid_x[0, 0] + xstep
+        range_y_grid = self.energy.grid_y[0, -1] - self.energy.grid_y[0, 0] + ystep
+        # xmin = self.energy.grid_x[0, 0] - xstep/2
+        # xmax = self.energy.grid_x[-1, 0] + xstep/2
+        # ymin = self.energy.grid_y[0, 0] - ystep / 2
+        # conversion from grid to cell -------------------THIS WORKS
+        x_cell = (x_n - self.energy.grid_x[0, 0])*self.energy.size[0]/range_x_grid + 0.5
+        y_cell = (y_n - self.energy.grid_y[0, 0])*self.energy.size[1]/range_y_grid + 0.5
+        # periodic boundary cond
+        # if self.energy.pbc:
+        #     x_cell = x_cell % self.energy.size[0]
+        #     y_cell = y_cell % self.energy.size[1]
+        #cell = int((x_n + 1) // self.step_x), int((y_n + 1) // self.step_y)
+        return int(x_cell), int(y_cell)
 
     def _cell_to_index(self, cell: tuple) -> int:
         """
@@ -429,16 +446,36 @@ class Simulation:
 if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
-    my_maze = Maze((6, 8), images_path=img_path, images_name="sat_maze",
-                  no_branching=True, edge_is_wall=True)
-    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
-    my_maze.visualize()
-    my_energy.visualize_underlying_maze()
-    # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="sat_potential", m=1,
+    # ------------------- MAZE ------------------
+    # my_maze = Maze((6, 8), images_path=img_path, images_name="mazes",
+    #               no_branching=True, edge_is_wall=False)
+    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
+    # my_maze.visualize()
+    # my_energy.visualize_underlying_maze()
+    # ------------------- POTENTIAL ------------------
+    # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="potentials", m=1,
     #                                 friction=20, T=200)
+    # ------------------- ATOMS ------------------
+    epsilon = 3.18*1.6022e-22
+    sigma = 5.928
+    atom_1 = Atom((0.3, 20.5), epsilon, sigma)
+    atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
+    atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
+    my_energy = EnergyFromAtoms((12, 13), (atom_1, atom_2, atom_3), grid_edges=(-5, 20, -5, 50),
+                                images_name="atoms", images_path=img_path)
+    my_energy.visualize_with_cutoff()
+    arr_x = np.zeros(my_energy.size)
+    arr_y = np.zeros(my_energy.size)
+    for i in range(my_energy.size[0]):
+        for j in range(my_energy.size[1]):
+            arr_x[i, j] = my_energy.get_x_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
+            arr_y[i, j] = my_energy.get_y_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
+    plt.quiver(my_energy.grid_x, my_energy.grid_y, arr_x, units="width")
+    plt.show()
+    print(arr_x)
+    # ------------------- GENERAL FUNCTIONS ------------------
     my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
     my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
     my_energy.visualize_eigenvalues()
     my_energy.visualize_rates_matrix()
@@ -446,11 +483,11 @@ if __name__ == '__main__':
     print("ITS energies ", -1/e_eigval)
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
-    my_simulation.integrate(N=int(1e6), dt=0.01)
+    my_simulation.integrate(N=int(1e6), dt=0.1, save_trajectory=True)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
-    #my_simulation.visualize_trajectory()
+    my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix(noncorr=True)
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
     my_simulation.visualize_transition_matrices()

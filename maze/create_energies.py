@@ -535,8 +535,10 @@ class EnergyFromAtoms(Energy):
         """
         dx = atom.position[0] - point[0]
         dy = atom.position[1] - point[1]
-        range_x = self.grid_x[-1, 0] - self.grid_x[0, 0]
-        range_y = self.grid_y[0, -1] - self.grid_y[0, 0]
+        xstep = self.grid_x[1, 0] - self.grid_x[0, 0]
+        ystep = self.grid_y[0, 1] - self.grid_y[0, 0]
+        range_x = self.grid_x[-1, 0] - self.grid_x[0, 0] + xstep
+        range_y = self.grid_y[0, -1] - self.grid_y[0, 0] + ystep
         if dx > range_x * 0.5:
             dx = dx - range_x
         if dx <= -range_x * 0.5:
@@ -586,10 +588,12 @@ class EnergyFromAtoms(Energy):
                              yticklabels=[f"{ind:.2f}" for ind in df.index],
                              xticklabels=[f"{col:.2f}" for col in df.columns])
             for atom in self.atoms:
-                range_x_grid = self.grid_x[-1, 0] - self.grid_x[0, 0]
-                range_y_grid = self.grid_y[0, -1] - self.grid_y[0, 0]
-                ax.scatter((atom.position[1]-self.grid_y[0, 0])*self.size[1]/range_y_grid,
-                           (atom.position[0]-self.grid_x[0, 0])*self.size[0]/range_x_grid, marker="o", c="white")
+                xstep = self.grid_x[1, 0] - self.grid_x[0, 0]
+                ystep = self.grid_y[0, 1] - self.grid_y[0, 0]
+                range_x_grid = self.grid_x[-1, 0] - self.grid_x[0, 0] + xstep
+                range_y_grid = self.grid_y[0, -1] - self.grid_y[0, 0] + ystep
+                ax.scatter((atom.position[1]-self.grid_y[0, 0])*self.size[1]/range_y_grid + 0.5,
+                           (atom.position[0]-self.grid_x[0, 0])*self.size[0]/range_x_grid + 0.5, marker="o", c="white")
             ax.figure.savefig(self.images_path + f"energy_with_cutoff_{self.images_name}.png")
             plt.close()
             return ax
