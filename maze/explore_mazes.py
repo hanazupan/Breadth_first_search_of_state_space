@@ -16,6 +16,7 @@ import heapq
 from scipy.sparse import csr_matrix
 
 
+
 class Explorer(ABC):
 
     def __init__(self, energy: AbstractEnergy, explorer_name: str):
@@ -31,6 +32,16 @@ class Explorer(ABC):
         self.adj_matrix = None
         self.explorer_name = explorer_name
         self.sorted_accessible_cells = None
+        self.never_accesible = np.zeros(self.maze.size, dtype=int)
+        for i in range(self.never_accesible.shape[0]):
+            for j in range(self.never_accesible.shape[1]):
+                self.never_accesible[i, j] = not self.maze.is_accessible((i, j))
+
+    def scale(self, x):
+        out_range = (-100 + 1.1 * self.maze.energy_cutoff, 0.9 * self.maze.energy_cutoff)
+        domain = np.min(x), np.max(x)
+        y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
+        return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
 
     @abstractmethod
     def explore(self) -> nx.Graph:
@@ -148,13 +159,9 @@ class BFSExplorer(Explorer):
              have in the energy array.
         """
 
-        def scale(x, out_range=(-100, 100)):
-            domain = np.min(x), np.max(x)
-            y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
-            return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
-
         # for video
-        yield scale(self.maze.energies)
+        yield self.scale(self.maze.energies) + 1001 * self.never_accesible
+        yield self.scale(self.maze.energies) + 1001 * self.never_accesible
         visited = np.zeros(self.maze.size, dtype=int)
         accessible = np.zeros(self.maze.size, dtype=int)
         check_queue = deque()
@@ -166,7 +173,7 @@ class BFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
-        yield scale(self.maze.energies) - 100*accessible
+        yield self.scale(self.maze.energies) - 100*accessible + 1001*self.never_accesible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -192,7 +199,7 @@ class BFSExplorer(Explorer):
                         check_queue.append(n)
                 visited[n] = 1
             # for video
-            yield scale(self.maze.energies) - 100*accessible
+            yield self.scale(self.maze.energies) - 100*accessible + 1001*self.never_accesible
         # returns adjacency matrix
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
@@ -233,7 +240,8 @@ class DFSExplorer(Explorer):
             A numpy array with 0 = undiscovered passage, 1 = wall, -100 = discovered passage
         """
         # for video
-        yield self.maze.energies
+        yield self.scale(self.maze.energies) + 101 * self.never_accesible
+        yield self.scale(self.maze.energies) + 101 * self.never_accesible
         visited = np.zeros(self.maze.size, dtype=int)
         accessible = np.zeros(self.maze.size, dtype=int)
         check_queue = []
@@ -245,7 +253,7 @@ class DFSExplorer(Explorer):
         index_rc = self.maze.cell_to_node(random_cell)
         self.graph.add_node(index_rc, energy=self.maze.get_energy(random_cell), cell=random_cell)
         # for video
-        yield self.maze.energies - 100*accessible
+        yield self.scale(self.maze.energies) - 100*accessible + 101 * self.never_accesible
         # take care of the neighbours of the first random cell
         neighbours = self.maze.get_neighbours(random_cell)
         for n in neighbours:
@@ -272,7 +280,7 @@ class DFSExplorer(Explorer):
                         check_queue.append(n)
                 visited[n] = 1
             # for video
-            yield self.maze.energies - 100*accessible
+            yield self.scale(self.maze.energies) - 100*accessible + 101 * self.never_accesible
         # creates adjacency matrix
         self.adj_matrix = nx.to_numpy_matrix(self.graph,
                                              nodelist=[i for i, x in enumerate(accessible.flatten()) if x == 1])
@@ -282,7 +290,7 @@ class DFSExplorer(Explorer):
 
 class DijkstraExplorer(Explorer):
 
-    def __init__(self, maze: Maze, start_cell: tuple = None, end_cell: tuple = None):
+    def __init__(self, maze: AbstractEnergy, start_cell: tuple = None, end_cell: tuple = None):
         """
         Dijkstra's algorithm can find the shortest path in a maze.
 

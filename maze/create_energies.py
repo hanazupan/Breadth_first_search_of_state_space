@@ -6,7 +6,7 @@ Square root approximation is implemented using the rates matrices of those surfa
 
 from abc import abstractmethod
 from .create_mazes import Maze, AbstractEnergy
-from .explore_mazes import BFSExplorer
+from .explore_mazes import BFSExplorer, DFSExplorer, DijkstraExplorer
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
@@ -363,7 +363,7 @@ class EnergyFromMaze(Energy):
         x_edges, y_edges = self._prepare_grid()
         # dense grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
-        z = maze.energies
+        z = maze.energies.copy()
         # change some random zeroes into -1 and -2
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
@@ -476,7 +476,7 @@ class Atom:
 
 class EnergyFromAtoms(Energy):
 
-    def __init__(self, size: tuple, atoms: tuple, images_path: str = "./",
+    def __init__(self, size: tuple, atoms: tuple, images_path: str = "./", grid_edges: tuple or None = None,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
         """
         Initiate an energy surface with LJ potentials induced by atoms placed on the surface.
@@ -486,36 +486,66 @@ class EnergyFromAtoms(Energy):
         """
         super().__init__(images_path, images_name, m, friction, T)
         self.atoms = atoms
+        if len(self.atoms) < 2:
+            if not grid_edges:
+                raise AttributeError("Add at least two atoms or use grid_edges!")
         self.size = size
-        self.energy_cutoff = 0
+        self.energy_cutoff = np.max([4*atom.epsilon for atom in atoms])
         self.energies = np.zeros(self.size)
         x_positions = [atom.position[0] for atom in self.atoms]
         y_positions = [atom.position[1] for atom in self.atoms]
         size_x, size_y = complex(self.size[0]), complex(self.size[1])
-        self.grid_x, self.grid_y = np.mgrid[np.min(x_positions)-0.1*np.min(x_positions):np.max(x_positions)+0.1*np.max(x_positions):size_x,
-                                            np.min(y_positions)-0.1*np.min(y_positions):np.max(y_positions)+0.1*np.max(y_positions):size_y]
+        if grid_edges:
+            # assert all atoms fit in the box
+            xmin, xmax, ymin, ymax = grid_edges
+            for atom in atoms:
+                if atom.position[0] > xmax or atom.position[0] < xmin:
+                    raise AttributeError("Atoms do not fit in grid edges!")
+                if atom.position[1] > ymax or atom.position[1] < ymin:
+                    raise AttributeError("Atoms do not fit in grid edges!")
+
+        else:
+            xmin = np.min(x_positions)-0.1*np.min(x_positions)
+            xmax = np.max(x_positions)+0.1*np.max(x_positions)
+            ymin = np.min(y_positions)-0.1*np.min(y_positions)
+            ymax = np.max(y_positions)+0.1*np.max(y_positions)
+        self.grid_x, self.grid_y = np.mgrid[xmin:xmax:size_x, ymin:ymax:size_y]
         for atom in atoms:
             for i in range(self.size[0]):
                 for j in range(self.size[1]):
-                    # minimum image convention
+                    # be sure to use the grid, not the cell index!
                     point_x = self.grid_x[i, j]
                     point_y = self.grid_y[i, j]
-                    dx = atom.position[0] - point_x
-                    dy = atom.position[1] - point_y
-                    range_x = self.grid_x[-1, 0] - self.grid_x[0, 0]
-                    range_y = self.grid_y[0, -1] - self.grid_y[0, 0]
-                    if dx > range_x * 0.5:
-                        dx = dx - range_x
-                    if dx <= -range_x * 0.5:
-                        dx = dx + range_x
-                    if dy > range_y * 0.5:
-                        dy = dy - range_y
-                    if dy <= -range_y * 0.5:
-                        dy = dy + range_y
-                    point_x = atom.position[0] + dx
-                    point_y = atom.position[1] + dy
-                    self.energies[i, j] += atom.get_potential((point_x, point_y))
+                    # minimum image convention
+                    pbc_point = self._get_closest_mirror(atom, (point_x, point_y))
+                    self.energies[i, j] += atom.get_potential(pbc_point)
         self.deltas = np.ones(len(self.size), dtype=int)
+
+    def _get_closest_mirror(self, atom: Atom, point: tuple) -> tuple:
+        """
+        Instead of point, get an equivalent point in one of neighbouring mirror images that has smaller x and y
+        distance to the atom.
+
+        Args:
+            atom: reference Atom
+            point: tuple, position at which we try to calculate something
+
+        Returns:
+            a point in the same or one of the mirroring simulation boxes
+        """
+        dx = atom.position[0] - point[0]
+        dy = atom.position[1] - point[1]
+        range_x = self.grid_x[-1, 0] - self.grid_x[0, 0]
+        range_y = self.grid_y[0, -1] - self.grid_y[0, 0]
+        if dx > range_x * 0.5:
+            dx = dx - range_x
+        if dx <= -range_x * 0.5:
+            dx = dx + range_x
+        if dy > range_y * 0.5:
+            dy = dy - range_y
+        if dy <= -range_y * 0.5:
+            dy = dy + range_y
+        return atom.position[0] + dx, atom.position[1] + dy
 
     def get_x_derivative(self, point: tuple) -> float:
         """
@@ -529,13 +559,15 @@ class EnergyFromAtoms(Energy):
         """
         total_derivative = 0
         for atom in self.atoms:
-            total_derivative += atom.get_dV_dx(point)
+            pbc_point = self._get_closest_mirror(atom, point)
+            total_derivative += atom.get_dV_dx(pbc_point)
         return total_derivative
 
     def get_y_derivative(self, point: tuple) -> float:
         total_derivative = 0
         for atom in self.atoms:
-            total_derivative += atom.get_dV_dy(point)
+            pbc_point = self._get_closest_mirror(atom, point)
+            total_derivative += atom.get_dV_dy(pbc_point)
         return total_derivative
 
     def visualize_with_cutoff(self, **kwargs):
@@ -550,7 +582,7 @@ class EnergyFromAtoms(Energy):
             df = pd.DataFrame(data=self.energies, index=self.grid_x[:, 0], columns=self.grid_y[0, :])
             cmap = cm.get_cmap("RdBu_r").copy()
             cmap.set_over("black")
-            im = sns.heatmap(df, cmap=cmap, vmax=self.energy_cutoff, fmt='.2f',
+            im = sns.heatmap(df, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff), fmt='.2f',
                              yticklabels=[f"{ind:.2f}" for ind in df.index],
                              xticklabels=[f"{col:.2f}" for col in df.columns])
             for atom in self.atoms:
@@ -565,32 +597,44 @@ class EnergyFromAtoms(Energy):
     def visualize(self, **kwargs):
         super(EnergyFromAtoms, self).visualize(norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(self.energies),
                                                                       vmin=-np.max(self.energies)))
+    
+    def visualize_3d(self, **kwargs):
+        super(EnergyFromAtoms, self).visualize_3d(norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(self.energies),
+                                                                      vmin=-np.max(self.energies)))
 
 
 if __name__ == '__main__':
     img_path = "images/"
+    # ------------------- ATOMS -----------------------
     epsilon = 3.18*1.6022e-22
     sigma = 5.928
     atom_1 = Atom((0.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
-    atom_3 = Atom((5.3, 45.3), epsilon/3, sigma)
-    my_energy = EnergyFromAtoms((20, 25), (atom_1, atom_2, atom_3), images_name="testing", images_path=img_path)
+    atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
+    my_energy = EnergyFromAtoms((18, 16), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 5, 50),
+                                images_name="atoms", images_path=img_path)
+    my_energy.visualize_with_cutoff()
+    # ------------------- MAZES -----------------------
+    # my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=False, edge_is_wall=False)
+    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="mazes", friction=10)
+    # my_maze.visualize()
+    # my_energy.visualize_underlying_maze()
+    # ------------------- POTENTIAL -----------------------
+    # my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="potential", friction=10)
+    # ------------------- EXPLORERS -----------------------
     me = BFSExplorer(my_energy)
     me.explore_and_animate()
-    #print(my_energy.energies)
-    #my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=False)
-    #my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
-    #my_maze.visualize()
-    #my_energy.visualize_underlying_maze()
-    #my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="testing", friction=10)
+    me = DFSExplorer(my_energy)
+    me.explore_and_animate()
+    # ------------------- GENERAL FUNCTIONS -----------------------
     my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_with_cutoff()
+
     my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
-    print(my_energy.get_eigenval_eigenvec(num=6, which="SM", sigma=0)[0])
-    my_energy.visualize_eigenvectors(num=6, which="LR")
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    rm = my_energy.get_rates_matix()
+    my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
     my_energy.visualize_eigenvalues()
 
 
