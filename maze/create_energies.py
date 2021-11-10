@@ -110,6 +110,7 @@ class Energy(AbstractEnergy):
         """
         self.explorer = BFSExplorer(self)
         adj_matrix = self.explorer.get_adjacency_matrix()
+        self.adj_matrix = adj_matrix
         self.rates_matrix = np.zeros(adj_matrix.shape)
         # get the adjacent elements
         rows, cols = adj_matrix.nonzero()
@@ -293,7 +294,7 @@ class Energy(AbstractEnergy):
         if not self.explorer:
             self._calculate_rates_matrix()
         num = self.rates_matrix.shape[0] - 2
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num)
+        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LR")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
             xs = np.linspace(0, 1, num=num)
@@ -439,39 +440,73 @@ class EnergyFromPotential(Energy):
 class Atom:
 
     def __init__(self, position: tuple, epsilon: float, sigma: float):
+        """
+        An instance of an atom with LJ potential. For now no real atoms, parameters must be explicitly given.
+
+        Args:
+            position: (x, y) coordinates of the atom on the grid in Angstrom
+            epsilon: parameter of the LJ potential, the depth of the potential well
+            sigma: parameter of the LJ potential, the distance at which the particle-particle potential energy is zero
+        """
         self.epsilon = epsilon
         self.sigma = sigma
         self.position = position
 
     def _find_r(self, point: tuple) -> float:
+        """
+        Find the distance between a point on grid and the position of the atom (Euclidean distance).
+
+        Args:
+            point: coordinates of a point in grid space
+
+        Returns:
+            distance between the point and the atom
+        """
         x, y = point
         x0, y0 = self.position
         r = np.sqrt((x - x0)**2 + (y - y0)**2)
         return r
 
     def get_potential(self, point: tuple) -> float:
+        """
+        Find the LJ potential that the atom causes at a certain point.
+
+        Args:
+            point: coordinates of a point in grid space
+
+        Returns:
+            energy contribution of this atom at point
+        """
         r = self._find_r(point)
         return 4*self.epsilon*((self.sigma/r)**12 - (self.sigma/r)**6)
 
     def get_dV_dx(self, point: tuple) -> float:
+        """
+        Find the x derivative of the LJ potential that the atom causes at a certain point.
+
+        Args:
+            point: coordinates of a point in grid space
+
+        Returns:
+            dV/dx where V is the potential energy contribution of this atom at point
+        """
         r = self._find_r(point)
-        return 4*self.epsilon*(-12*self.sigma**12*r**(-13) + 6*self.sigma**6*r**(-7))*r**(-0.5)*point[0]
+        x, y = point
+        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*x/r
 
     def get_dV_dy(self, point: tuple) -> float:
-        r = self._find_r(point)
-        return 4*self.epsilon*(-12*self.sigma**12*r**(-13) + 6*self.sigma**6*r**(-7))*r**(-0.5)*point[1]
+        """
+        Find the y derivative of the LJ potential that the atom causes at a certain point.
 
-    def plot_atom(self):
-        x0, y0 = self.position
-        xs = np.linspace(x0-1, x0+1, num=100)
-        ys = np.linspace(y0-1, y0+1, num=100)
-        array = np.zeros((100, 100))
-        for i, x in enumerate(xs):
-            for j, y in enumerate(ys):
-                array[i, j] = self.get_potential((x, y))
-        plt.imshow(array, norm=colors.LogNorm())
-        plt.colorbar()
-        plt.savefig(f"single_atom.png")
+        Args:
+            point: coordinates of a point in grid space
+
+        Returns:
+            dV/dy where V is the potential energy contribution of this atom at point
+        """
+        r = self._find_r(point)
+        x, y = point
+        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*y/r
 
 
 class EnergyFromAtoms(Energy):
@@ -486,30 +521,42 @@ class EnergyFromAtoms(Energy):
         """
         super().__init__(images_path, images_name, m, friction, T)
         self.atoms = atoms
+        # plotting is problematic if including only one atom and not prescribing where the grid starts and ends
         if len(self.atoms) < 2:
             if not grid_edges:
                 raise AttributeError("Add at least two atoms or use grid_edges!")
         self.size = size
+        # cutoff is 4* max epsilon
         self.energy_cutoff = np.max([4*atom.epsilon for atom in atoms])
-        self.energies = np.zeros(self.size)
+        # create the grid, determine grid edges automatically if not given
         x_positions = [atom.position[0] for atom in self.atoms]
         y_positions = [atom.position[1] for atom in self.atoms]
-        size_x, size_y = complex(self.size[0]), complex(self.size[1])
         if grid_edges:
-            # assert all atoms fit in the box
+            # if grid edges given, assert all atoms fit into them
             xmin, xmax, ymin, ymax = grid_edges
             for atom in atoms:
                 if atom.position[0] > xmax or atom.position[0] < xmin:
                     raise AttributeError("Atoms do not fit in grid edges!")
                 if atom.position[1] > ymax or atom.position[1] < ymin:
                     raise AttributeError("Atoms do not fit in grid edges!")
-
         else:
-            xmin = np.min(x_positions)-0.1*np.min(x_positions)
-            xmax = np.max(x_positions)+0.1*np.max(x_positions)
-            ymin = np.min(y_positions)-0.1*np.min(y_positions)
-            ymax = np.max(y_positions)+0.1*np.max(y_positions)
+            # if grid edges not given, create a grid a bit larger than what covers all atoms
+            xmin = 0.9*np.min(x_positions)
+            xmax = 1.1*np.max(x_positions)
+            ymin = 0.9*np.min(y_positions)
+            ymax = 1.1*np.max(y_positions)
+        size_x, size_y = complex(self.size[0]), complex(self.size[1])
         self.grid_x, self.grid_y = np.mgrid[xmin:xmax:size_x, ymin:ymax:size_y]
+        self.step_x = self.grid_x[1, 0] - self.grid_x[0, 0]
+        self.step_y = self.grid_y[0, 1] - self.grid_y[0, 0]
+        # xmin, xmax, ymin, ymax - NOT middle of cells, but actual min/max
+        xmin = self.grid_x[0, 0] - self.step_x / 2
+        xmax = self.grid_x[-1, -1] + self.step_x / 2
+        ymin = self.grid_y[0, 0] - self.step_y / 2
+        ymax = self.grid_y[-1, -1] + self.step_y / 2
+        self.grid_edges = (xmin, xmax, ymin, ymax)
+        # calculate energies by looping over contributions of all atoms and adding them up
+        self.energies = np.zeros(self.size)
         for atom in atoms:
             for i in range(self.size[0]):
                 for j in range(self.size[1]):
@@ -535,10 +582,8 @@ class EnergyFromAtoms(Energy):
         """
         dx = atom.position[0] - point[0]
         dy = atom.position[1] - point[1]
-        xstep = self.grid_x[1, 0] - self.grid_x[0, 0]
-        ystep = self.grid_y[0, 1] - self.grid_y[0, 0]
-        range_x = self.grid_x[-1, 0] - self.grid_x[0, 0] + xstep
-        range_y = self.grid_y[0, -1] - self.grid_y[0, 0] + ystep
+        range_x = self.grid_edges[1] - self.grid_edges[0]
+        range_y = self.grid_edges[3] - self.grid_edges[2]
         if dx > range_x * 0.5:
             dx = dx - range_x
         if dx <= -range_x * 0.5:
@@ -551,7 +596,8 @@ class EnergyFromAtoms(Energy):
 
     def get_x_derivative(self, point: tuple) -> float:
         """
-        Obtain the x derivative of energy surface at a certain point
+        Obtain the x derivative of energy surface at a certain point by summing over contributions of all atoms
+        while respecting the mirror image convention
 
         Args:
             point: (x, y) - needs to be coordinates in actual space (not cells!)
@@ -566,15 +612,25 @@ class EnergyFromAtoms(Energy):
         return total_derivative
 
     def get_y_derivative(self, point: tuple) -> float:
+        """
+        Obtain the y derivative of energy surface at a certain point by summing over contributions of all atoms
+        while respecting the mirror image convention
+
+        Args:
+            point: (x, y) - needs to be coordinates in actual space (not cells!)
+
+        Returns:
+            value of dV/dy at point
+        """
         total_derivative = 0
         for atom in self.atoms:
             pbc_point = self._get_closest_mirror(atom, point)
             total_derivative += atom.get_dV_dy(pbc_point)
         return total_derivative
 
-    def visualize_with_cutoff(self, **kwargs):
+    def visualize(self, **kwargs):
         """
-        Visualizes the array self.energies.
+        Visualizes the array self.energies. Use same color for all values above cutoff.
 
         Raises:
             ValueError: if there are no self.energies
@@ -582,29 +638,21 @@ class EnergyFromAtoms(Energy):
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
             fig, ax = plt.subplots(1, 1)
             df = pd.DataFrame(data=self.energies, index=self.grid_x[:, 0], columns=self.grid_y[0, :])
-            cmap = cm.get_cmap("RdBu_r").copy()
-            cmap.set_over("black")
-            im = sns.heatmap(df, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff), fmt='.2f',
-                             yticklabels=[f"{ind:.2f}" for ind in df.index],
-                             xticklabels=[f"{col:.2f}" for col in df.columns])
+            sns.heatmap(df, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff), fmt='.2f',
+                        yticklabels=[f"{ind:.2f}" for ind in df.index],
+                        xticklabels=[f"{col:.2f}" for col in df.columns], ax=ax)
             for atom in self.atoms:
-                xstep = self.grid_x[1, 0] - self.grid_x[0, 0]
-                ystep = self.grid_y[0, 1] - self.grid_y[0, 0]
-                range_x_grid = self.grid_x[-1, 0] - self.grid_x[0, 0] + xstep
-                range_y_grid = self.grid_y[0, -1] - self.grid_y[0, 0] + ystep
-                ax.scatter((atom.position[1]-self.grid_y[0, 0])*self.size[1]/range_y_grid + 0.5,
-                           (atom.position[0]-self.grid_x[0, 0])*self.size[0]/range_x_grid + 0.5, marker="o", c="white")
+                range_x_grid = self.grid_edges[1] - self.grid_edges[0]
+                range_y_grid = self.grid_edges[3] - self.grid_edges[2]
+                ax.scatter((atom.position[1]-self.grid_edges[2])*self.size[1]/range_y_grid,
+                           (atom.position[0]-self.grid_edges[0])*self.size[0]/range_x_grid, marker="o", c="white")
             ax.figure.savefig(self.images_path + f"energy_with_cutoff_{self.images_name}.png")
             plt.close()
             return ax
-
-    def visualize(self, **kwargs):
-        super(EnergyFromAtoms, self).visualize(norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(self.energies),
-                                                                      vmin=-np.max(self.energies)))
     
     def visualize_3d(self, **kwargs):
         super(EnergyFromAtoms, self).visualize_3d(norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(self.energies),
-                                                                      vmin=-np.max(self.energies)))
+                                                                         vmin=-np.max(self.energies)))
 
 
 if __name__ == '__main__':
@@ -612,12 +660,11 @@ if __name__ == '__main__':
     # ------------------- ATOMS -----------------------
     epsilon = 3.18*1.6022e-22
     sigma = 5.928
-    atom_1 = Atom((0.3, 20.5), epsilon, sigma)
+    atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((18, 16), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 5, 50),
+    my_energy = EnergyFromAtoms((18, 16), (atom_1, atom_2, atom_3), grid_edges=(-8, 55, 5, 50),
                                 images_name="atoms", images_path=img_path)
-    my_energy.visualize_with_cutoff()
     # ------------------- MAZES -----------------------
     # my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=False, edge_is_wall=False)
     # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="mazes", friction=10)
@@ -626,10 +673,10 @@ if __name__ == '__main__':
     # ------------------- POTENTIAL -----------------------
     # my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="potential", friction=10)
     # ------------------- EXPLORERS -----------------------
-    me = BFSExplorer(my_energy)
-    me.explore_and_animate()
-    me = DFSExplorer(my_energy)
-    me.explore_and_animate()
+    # me = BFSExplorer(my_energy)
+    # me.explore_and_animate()
+    # me = DFSExplorer(my_energy)
+    # me.explore_and_animate()
     # ------------------- GENERAL FUNCTIONS -----------------------
     my_energy.visualize_boltzmann()
     my_energy.visualize()
