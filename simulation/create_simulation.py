@@ -454,8 +454,8 @@ if __name__ == '__main__':
     atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((50, 50), (atom_1, atom_2, atom_3), grid_edges=(2, 20, 2, 50),
-                                images_name="atoms", images_path=img_path, friction=10)
+    my_energy = EnergyFromAtoms((25, 20), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 0, 50),
+                                images_name="atoms", images_path=img_path, friction=10, T=100)
     arr_x = np.zeros(my_energy.size)
     arr_y = np.zeros(my_energy.size)
     for i in range(my_energy.size[0]):
@@ -469,22 +469,8 @@ if __name__ == '__main__':
     # sns.heatmap(df, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=my_energy.energy_cutoff), fmt='.2f',
     #             yticklabels=[f"{ind:.2f}" for ind in df.index],
     #             xticklabels=[f"{col:.2f}" for col in df.columns], ax=im)
-    im.quiver(my_energy.grid_y, my_energy.grid_x, arr_x/vec_lens, arr_y/vec_lens, pivot='mid')
+    im.quiver(arr_x/vec_lens, arr_y/vec_lens, pivot='mid')
     plt.savefig("images/derivatives.png")
-    plt.close()
-    # plot a mirror cell
-    array = np.zeros((200, 200))
-    xs = np.linspace(-100, 100, num=200)
-    ys = np.linspace(-100, 100, num=200)
-    my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
-    for i, x in enumerate(xs):
-        for j, y in enumerate(ys):
-            x, y = my_simulation._point_within_bound((x, y))
-            array[i, j] = my_energy.get_full_potential((x, y))
-            if array[i, j] > my_energy.energy_cutoff:
-                array[i, j] = my_energy.energy_cutoff
-    plt.imshow(array, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=my_energy.energy_cutoff))
-    plt.savefig("images/negative_grid.png")
     plt.close()
     # ------------------- GENERAL FUNCTIONS ------------------
     my_energy.visualize_boltzmann()
@@ -497,7 +483,7 @@ if __name__ == '__main__':
     print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
     to_save_trajectory = True
-    my_simulation.integrate(N=int(1e6), dt=0.01, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(1e7), dt=0.01, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()

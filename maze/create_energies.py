@@ -494,9 +494,10 @@ class Atom:
             dV/dx where V is the potential energy contribution of this atom at point
         """
         atom_mirrored = self.get_closest_mirror(point, grid_edges)
+        x_a, y_a = atom_mirrored
         r = self._find_r(point, atom_mirrored)
         x, y = point
-        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*x/r
+        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*(x_a-x)/r
 
     def get_dV_dy(self, point: tuple, grid_edges: tuple) -> float:
         """
@@ -510,9 +511,10 @@ class Atom:
             dV/dy where V is the potential energy contribution of this atom at point
         """
         atom_mirrored = self.get_closest_mirror(point, grid_edges)
+        x_a, y_a = atom_mirrored
         r = self._find_r(point, atom_mirrored)
         x, y = point
-        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*y/r
+        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*(y_a-y)/r
 
     def get_closest_mirror(self, point: tuple, grid_edges: tuple) -> tuple:
         """
