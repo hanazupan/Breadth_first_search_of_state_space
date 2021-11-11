@@ -81,10 +81,64 @@ def test_atoms():
     atom_pos = (3.3, 20.5)
     atom_1 = Atom(atom_pos, epsilon, sigma)
     point_pos = (4.7, 8.3)
-    calc_potential = atom_1.get_potential(point_pos)
+    calc_potential = atom_1.get_potential(point_pos, (-5, 50, -5, 50))
     r = np.linalg.norm(np.array(atom_pos)-np.array(point_pos))
     # test potential
     assert np.isclose(calc_potential, 4*epsilon*((sigma/r)**12 - (sigma/r)**6))
+    calc_der_x = atom_1.get_dV_dx(point_pos, (-5, 50, -5, 50))
+    calc_der_y = atom_1.get_dV_dy(point_pos, (-5, 50, -5, 50))
+    x, y = point_pos
+    assert np.isclose(calc_der_x, 4 * epsilon * (-12 * sigma ** 12 * r ** (-13) + 6 * sigma ** 6 * r ** (-7)) * x / r)
+    assert np.isclose(calc_der_y, 4 * epsilon * (-12 * sigma ** 12 * r ** (-13) + 6 * sigma ** 6 * r ** (-7)) * y / r)
+
+
+def test_potential_and_derivatives_pbc():
+    epsilon = 3.18 * 1.6022e-22
+    sigma = 5.928
+    atom_1 = Atom((3.3, 7.5), epsilon, sigma)
+    atom_2 = Atom((4.3, 9.3), epsilon, sigma - 2)
+    my_energy = EnergyFromAtoms((8, 10), (atom_1, atom_2), grid_edges=(3.2, 4.5, -5.5, 11.5),
+                                images_name="atoms", images_path="images/")
+    # potential
+    in_real_box = my_energy.get_full_potential((4.5, 5.5))
+    in_imaginary_box = my_energy.get_full_potential((4.5+17*1.4857142857142849, 5.5-4*18.88888888888889))
+    assert np.isclose(in_real_box, in_imaginary_box)
+    in_real_box = my_energy.get_full_potential((-0.3, -7.2))
+    in_imaginary_box = my_energy.get_full_potential((-0.3-22*1.4857142857142849, -7.2-8*18.88888888888889))
+    assert np.isclose(in_real_box, in_imaginary_box)
+    # x derivative
+    in_real_box = my_energy.get_x_derivative((4.5, 5.5))
+    in_imaginary_box = my_energy.get_x_derivative((4.5+17*1.4857142857142849, 5.5-4*18.88888888888889))
+    assert np.isclose(in_real_box, in_imaginary_box)
+    in_real_box = my_energy.get_x_derivative((4.5, 5.5))
+    in_imaginary_box = my_energy.get_x_derivative((4.5 - 3 * 1.4857142857142849, 5.5 + 7 * 18.88888888888889))
+    assert np.isclose(in_real_box, in_imaginary_box)
+    # y derivative
+    in_real_box = my_energy.get_y_derivative((12.3, 88.6))
+    in_imaginary_box = my_energy.get_y_derivative((12.3 + 8 * 1.4857142857142849, 88.6 - 4 * 18.88888888888889))
+    assert np.isclose(in_real_box, in_imaginary_box)
+
+
+def test_closest_mirror():
+    epsilon = 3.18 * 1.6022e-22
+    sigma = 5.928
+    atom_1 = Atom((3.3, 7.5), epsilon, sigma)
+    atom_2 = Atom((4.3, 9.3), epsilon, sigma - 2)
+    my_energy = EnergyFromAtoms((8, 10), (atom_1, atom_2), grid_edges=(3.2, 4.5, -5.5, 11.5),
+                                images_name="atoms", images_path="images/")
+    atom_3 = Atom((3.3, 7.5 - 18.88888888888889), epsilon, sigma)
+    atom_4 = Atom((4.3, 9.3 - 18.88888888888889), epsilon, sigma - 2)
+    second_energy = EnergyFromAtoms((8, 10), (atom_3, atom_4), grid_edges=(3.2, 4.5, -5.5, 11.5),
+                                images_name="atoms", images_path="images/")
+    point = np.array((4.4, -5))
+    atom_x, atom_y = my_energy.atoms[1].position
+    moved_atom = np.array((atom_x, atom_y - 18.88888888888889))
+    correct = np.linalg.norm(moved_atom - point)
+    closest_mir = atom_2.get_closest_mirror(tuple(point), my_energy.grid_edges)
+    assert np.linalg.norm(point-np.array(closest_mir)) == correct
+    assert np.isclose(my_energy.get_full_potential(tuple(point)), second_energy.get_full_potential(tuple(point)))
+    assert np.isclose(my_energy.get_x_derivative(tuple(point)), second_energy.get_x_derivative(tuple(point)))
+    assert np.isclose(my_energy.get_y_derivative(tuple(point)), second_energy.get_y_derivative(tuple(point)))
 
 
 def test_run_everything():

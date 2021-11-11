@@ -452,9 +452,9 @@ class Atom:
         self.sigma = sigma
         self.position = position
 
-    def _find_r(self, point: tuple) -> float:
+    def _find_r(self, point: tuple, pbc_atom: tuple) -> float:
         """
-        Find the distance between a point on grid and the position of the atom (Euclidean distance).
+        Find the distance between a point on grid and the, possibly mirrored, position of the atom (Euclidean distance).
 
         Args:
             point: coordinates of a point in grid space
@@ -463,50 +463,86 @@ class Atom:
             distance between the point and the atom
         """
         x, y = point
-        x0, y0 = self.position
+        x0, y0 = pbc_atom
         r = np.sqrt((x - x0)**2 + (y - y0)**2)
         return r
 
-    def get_potential(self, point: tuple) -> float:
+    def get_potential(self, point: tuple, grid_edges: tuple) -> float:
         """
         Find the LJ potential that the atom causes at a certain point.
 
         Args:
             point: coordinates of a point in grid space
+            grid_edges: (xmin, xmax, ymin, ymax) sizes of the grid - for mirroring
 
         Returns:
             energy contribution of this atom at point
         """
-        r = self._find_r(point)
+        atom_mirrored = self.get_closest_mirror(point, grid_edges)
+        r = self._find_r(point, atom_mirrored)
         return 4*self.epsilon*((self.sigma/r)**12 - (self.sigma/r)**6)
 
-    def get_dV_dx(self, point: tuple) -> float:
+    def get_dV_dx(self, point: tuple, grid_edges: tuple) -> float:
         """
         Find the x derivative of the LJ potential that the atom causes at a certain point.
 
         Args:
             point: coordinates of a point in grid space
+            grid_edges: (xmin, xmax, ymin, ymax) sizes of the grid - for mirroring
 
         Returns:
             dV/dx where V is the potential energy contribution of this atom at point
         """
-        r = self._find_r(point)
+        atom_mirrored = self.get_closest_mirror(point, grid_edges)
+        r = self._find_r(point, atom_mirrored)
         x, y = point
         return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*x/r
 
-    def get_dV_dy(self, point: tuple) -> float:
+    def get_dV_dy(self, point: tuple, grid_edges: tuple) -> float:
         """
         Find the y derivative of the LJ potential that the atom causes at a certain point.
 
         Args:
             point: coordinates of a point in grid space
+            grid_edges: (xmin, xmax, ymin, ymax) sizes of the grid - for mirroring
 
         Returns:
             dV/dy where V is the potential energy contribution of this atom at point
         """
-        r = self._find_r(point)
+        atom_mirrored = self.get_closest_mirror(point, grid_edges)
+        r = self._find_r(point, atom_mirrored)
         x, y = point
         return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*y/r
+
+    def get_closest_mirror(self, point: tuple, grid_edges: tuple) -> tuple:
+        """
+        Instead of atom position, get an equivalent atom in one of neighbouring mirror images that has smaller x and y
+        distance to the atom.
+
+        Args:
+            point: tuple, position at which we try to calculate something
+            grid_edges: (xmin, xmax, ymin, ymax) sizes of the grid - for mirroring
+
+        Returns:
+            a point in the same or one of the mirroring simulation boxes
+        """
+        dx = self.position[0] - point[0]
+        dy = self.position[1] - point[1]
+        range_x = grid_edges[1] - grid_edges[0]
+        range_y = grid_edges[3] - grid_edges[2]
+        pos_x = self.position[0]
+        pos_y = self.position[1]
+        if dx > range_x * 0.5:
+            pos_x = pos_x - range_x
+        if dx <= -range_x * 0.5:
+            pos_x = pos_x + range_x
+        if dy > range_y * 0.5:
+            pos_y = pos_y - range_y
+        if dy <= -range_y * 0.5:
+            pos_y = pos_y + range_y
+        assert abs(pos_x - point[0]) <= abs(dx)
+        assert abs(pos_y - point[1]) <= abs(dy)
+        return pos_x, pos_y
 
 
 class EnergyFromAtoms(Energy):
@@ -534,11 +570,11 @@ class EnergyFromAtoms(Energy):
         if grid_edges:
             # if grid edges given, assert all atoms fit into them
             xmin, xmax, ymin, ymax = grid_edges
-            for atom in atoms:
-                if atom.position[0] > xmax or atom.position[0] < xmin:
-                    raise AttributeError("Atoms do not fit in grid edges!")
-                if atom.position[1] > ymax or atom.position[1] < ymin:
-                    raise AttributeError("Atoms do not fit in grid edges!")
+            # for atom in atoms:
+            #     if atom.position[0] > xmax or atom.position[0] < xmin:
+            #         raise AttributeError("Atoms do not fit in grid edges!")
+            #     if atom.position[1] > ymax or atom.position[1] < ymin:
+            #         raise AttributeError("Atoms do not fit in grid edges!")
         else:
             # if grid edges not given, create a grid a bit larger than what covers all atoms
             xmin = 0.9*np.min(x_positions)
@@ -557,42 +593,19 @@ class EnergyFromAtoms(Energy):
         self.grid_edges = (xmin, xmax, ymin, ymax)
         # calculate energies by looping over contributions of all atoms and adding them up
         self.energies = np.zeros(self.size)
-        for atom in atoms:
-            for i in range(self.size[0]):
-                for j in range(self.size[1]):
-                    # be sure to use the grid, not the cell index!
-                    point_x = self.grid_x[i, j]
-                    point_y = self.grid_y[i, j]
-                    # minimum image convention
-                    pbc_point = self._get_closest_mirror(atom, (point_x, point_y))
-                    self.energies[i, j] += atom.get_potential(pbc_point)
+        for i in range(self.size[0]):
+            for j in range(self.size[1]):
+                # be sure to use the grid, not the cell index!
+                point_x = self.grid_x[i, j]
+                point_y = self.grid_y[i, j]
+                self.energies[i, j] = self.get_full_potential((point_x, point_y))
         self.deltas = np.ones(len(self.size), dtype=int)
 
-    def _get_closest_mirror(self, atom: Atom, point: tuple) -> tuple:
-        """
-        Instead of point, get an equivalent point in one of neighbouring mirror images that has smaller x and y
-        distance to the atom.
-
-        Args:
-            atom: reference Atom
-            point: tuple, position at which we try to calculate something
-
-        Returns:
-            a point in the same or one of the mirroring simulation boxes
-        """
-        dx = atom.position[0] - point[0]
-        dy = atom.position[1] - point[1]
-        range_x = self.grid_edges[1] - self.grid_edges[0]
-        range_y = self.grid_edges[3] - self.grid_edges[2]
-        if dx > range_x * 0.5:
-            dx = dx - range_x
-        if dx <= -range_x * 0.5:
-            dx = dx + range_x
-        if dy > range_y * 0.5:
-            dy = dy - range_y
-        if dy <= -range_y * 0.5:
-            dy = dy + range_y
-        return atom.position[0] + dx, atom.position[1] + dy
+    def get_full_potential(self, point: tuple) -> float:
+        full_potential = 0
+        for atom in self.atoms:
+            full_potential += atom.get_potential(point, self.grid_edges)
+        return full_potential
 
     def get_x_derivative(self, point: tuple) -> float:
         """
@@ -607,8 +620,7 @@ class EnergyFromAtoms(Energy):
         """
         total_derivative = 0
         for atom in self.atoms:
-            pbc_point = self._get_closest_mirror(atom, point)
-            total_derivative += atom.get_dV_dx(pbc_point)
+            total_derivative += atom.get_dV_dx(point, self.grid_edges)
         return total_derivative
 
     def get_y_derivative(self, point: tuple) -> float:
@@ -624,8 +636,7 @@ class EnergyFromAtoms(Energy):
         """
         total_derivative = 0
         for atom in self.atoms:
-            pbc_point = self._get_closest_mirror(atom, point)
-            total_derivative += atom.get_dV_dy(pbc_point)
+            total_derivative += atom.get_dV_dy(point, self.grid_edges)
         return total_derivative
 
     def visualize(self, **kwargs):
@@ -659,7 +670,7 @@ if __name__ == '__main__':
     img_path = "images/"
     # ------------------- ATOMS -----------------------
     epsilon = 3.18*1.6022e-22
-    sigma = 5.928
+    sigma = 5
     atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
