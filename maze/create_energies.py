@@ -98,7 +98,8 @@ class Energy(AbstractEnergy):
         """
         energy_i = self.get_energy(cell_i)
         energy_j = self.get_energy(cell_j)
-        return self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.T)))
+        return min(self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.T))),
+                   self.D * self.S / self.h / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(kB*self.T))))
 
     def _calculate_rates_matrix(self):
         """
@@ -497,7 +498,7 @@ class Atom:
         x_a, y_a = atom_mirrored
         r = self._find_r(point, atom_mirrored)
         x, y = point
-        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*(x_a-x)/r
+        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*(x-x_a)/r
 
     def get_dV_dy(self, point: tuple, grid_edges: tuple) -> float:
         """
@@ -514,7 +515,7 @@ class Atom:
         x_a, y_a = atom_mirrored
         r = self._find_r(point, atom_mirrored)
         x, y = point
-        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*(y_a-y)/r
+        return 4*self.epsilon*(-12*(self.sigma/r)**12/r + 6*(self.sigma/r)**6/r)*(y-y_a)/r
 
     def get_closest_mirror(self, point: tuple, grid_edges: tuple) -> tuple:
         """

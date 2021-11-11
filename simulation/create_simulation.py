@@ -449,41 +449,41 @@ if __name__ == '__main__':
     # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="potentials", m=1,
     #                                 friction=20, T=200)
     # ------------------- ATOMS ------------------
-    epsilon = 3.18*1.6022e-22
+    epsilon = 30.18
     sigma = 5.928
     atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
     my_energy = EnergyFromAtoms((25, 20), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 0, 50),
-                                images_name="atoms", images_path=img_path, friction=10, T=100)
-    arr_x = np.zeros(my_energy.size)
-    arr_y = np.zeros(my_energy.size)
-    for i in range(my_energy.size[0]):
-        for j in range(my_energy.size[1]):
-            arr_x[i, j] = my_energy.get_x_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
-            arr_y[i, j] = my_energy.get_y_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
-    vec_lens = np.sqrt(arr_x**2 + arr_y**2)
-    df = pd.DataFrame(data=my_energy.energies, index=my_energy.grid_x[:, 0], columns=my_energy.grid_y[0, :])
-    cmap = cm.get_cmap("RdBu_r").copy()
-    fig, im = plt.subplots(1, 1)
+                                images_name="atoms", images_path=img_path, friction=10)
+    # arr_x = np.zeros(my_energy.size)
+    # arr_y = np.zeros(my_energy.size)
+    # for i in range(my_energy.size[0]):
+    #     for j in range(my_energy.size[1]):
+    #         arr_x[i, j] = my_energy.get_x_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
+    #         arr_y[i, j] = my_energy.get_y_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
+    # vec_lens = np.sqrt(arr_x**2 + arr_y**2)
+    # df = pd.DataFrame(data=my_energy.energies, index=my_energy.grid_x[:, 0], columns=my_energy.grid_y[0, :])
+    # cmap = cm.get_cmap("RdBu_r").copy()
+    # fig, im = plt.subplots(1, 1)
     # sns.heatmap(df, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=my_energy.energy_cutoff), fmt='.2f',
     #             yticklabels=[f"{ind:.2f}" for ind in df.index],
     #             xticklabels=[f"{col:.2f}" for col in df.columns], ax=im)
-    im.quiver(arr_x/vec_lens, arr_y/vec_lens, pivot='mid')
-    plt.savefig("images/derivatives.png")
-    plt.close()
+    # im.quiver(arr_x/vec_lens, arr_y/vec_lens, pivot='mid')
+    # plt.savefig("images/derivatives.png")
+    # plt.close()
     # ------------------- GENERAL FUNCTIONS ------------------
-    my_energy.visualize_boltzmann()
+    # my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
-    my_energy.visualize_eigenvalues()
-    my_energy.visualize_rates_matrix()
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
-    print("ITS energies ", -1/e_eigval)
-    print("E eigv ", e_eigval)
+    # my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    # my_energy.visualize_eigenvalues()
+    # my_energy.visualize_rates_matrix()
+    # e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
+    # print("ITS energies ", -1/e_eigval)
+    # print("E eigv ", e_eigval)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
     to_save_trajectory = True
-    my_simulation.integrate(N=int(1e7), dt=0.01, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(1e6), dt=0.1, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
@@ -493,7 +493,7 @@ if __name__ == '__main__':
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
     my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(8, which="LR")
-    my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
+    # my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
     my_simulation.visualize_eigenvalues()
     print("outsiders: ", my_simulation.outside_hist)
     # ----------   TIMING -----------------
