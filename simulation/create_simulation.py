@@ -56,8 +56,7 @@ class Simulation:
         ymax = self.energy.grid_y[-1, -1] + self.step_y / 2
         self.grid_edges = (xmin, xmax, ymin, ymax)
 
-    def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False,
-                  restart_after: int = -1):
+    def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False):
         """
         Implement the Euler–Maruyama method for integration of the trajectory on self.energy surface. It is
         possible to simulate several shorter trajectories using the option restart_after.
@@ -66,7 +65,6 @@ class Simulation:
             dt: float, time step
             N: int, number of time steps
             save_trajectory: bool, should the trajectory be saved (True needed for MSM analysis)
-            restart_after: int, after how many time steps the trajectory should restart (-1 if never)
         """
         # the time step and number of steps can be redefined for every simulation
         if dt:
@@ -86,10 +84,6 @@ class Simulation:
             self.traj_x = np.zeros(N)
             self.traj_y = np.zeros(N)
         for n in tqdm(range(self.N)):
-            # every restart_after-th step start the trajectory in a new random place
-            if restart_after != -1 and n % restart_after == 0:
-                x_n = self.step_x * self.energy.size[0] * np.random.random() + self.grid_edges[0]
-                y_n = self.step_y * self.energy.size[1] * np.random.random() + self.grid_edges[2]
             # integrate the trajectory one step and increase the histogram count
             x_n, y_n = self._euler_maruyama(x_n, y_n)
             if self.energy.pbc:
@@ -124,7 +118,9 @@ class Simulation:
         dV_dx = self.energy.get_x_derivative((x_n, y_n))
         dV_dy = self.energy.get_y_derivative((x_n, y_n))
         eta_x = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
-        x_n = x_n - dV_dx * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_x
+        deterministic_part = dV_dx * self.dt / self.m / self.friction
+        random_part = np.sqrt(2 * self.D) * eta_x
+        x_n = x_n - deterministic_part + random_part
         eta_y = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
         y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y
         return x_n, y_n
@@ -166,7 +162,7 @@ class Simulation:
             x_n, y_n = self._point_within_bound(point)
         range_x_grid = self.grid_edges[1] - self.grid_edges[0]
         range_y_grid = self.grid_edges[3] - self.grid_edges[2]
-        # conversion from grid to cell -------------------THIS WORKS
+        # conversion from grid to cell
         x_cell = (x_n - self.grid_edges[0])*self.energy.size[0]/range_x_grid
         y_cell = (y_n - self.grid_edges[2])*self.energy.size[1]/range_y_grid
         return int(x_cell), int(y_cell)
@@ -229,21 +225,7 @@ class Simulation:
                         # enforce detailed balance
                         self.transition_matrices[tau_i, j, i] += 1
                     except IndexError:
-                        if self.energy.pbc:
-                            #print(i, j, self.transition_matrices.shape)
-                            raise IndexError("If PBC used, all points on a trajectory should fit in the histogram!")
-        # with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-        #     fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
-        # for i, tm in enumerate(self.transition_matrices):
-        #     vmax = np.max(self.transition_matrices[i, 43, :])
-        #     vmin = np.min(self.transition_matrices[i, 43, :])
-        #     ax[i].imshow(self.transition_matrices[i, 43, :].reshape((self.energy.energies.shape[0], self.energy.energies.shape[1])),
-        #                  cmap="RdBu_r", vmin=vmin, vmax=vmax)
-        #     ax[i].axes.get_xaxis().set_visible(False)
-        #     ax[i].axes.get_yaxis().set_visible(False)
-        #     ax[i].set_title(f"tau = {self.tau_array[i]}", fontsize=7)
-        # plt.savefig(self.images_path + f"row_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-        # plt.close()
+                        assert not self.energy.pbc, "If PBC used, all points on a trajectory should fit in the histogram!"
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
@@ -449,12 +431,12 @@ if __name__ == '__main__':
     # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="potentials", m=1,
     #                                 friction=20, T=200)
     # ------------------- ATOMS ------------------
-    epsilon = 30.18
-    sigma = 5.928
+    epsilon = 3.18#*1.6022e-22
+    sigma = 5
     atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
-    atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((25, 20), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 0, 50),
+    atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
+    my_energy = EnergyFromAtoms((20, 40), (atom_1, atom_2, atom_3), grid_edges=(-1, 40, 0, 40),
                                 images_name="atoms", images_path=img_path, friction=10)
     # arr_x = np.zeros(my_energy.size)
     # arr_y = np.zeros(my_energy.size)
@@ -475,17 +457,14 @@ if __name__ == '__main__':
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
-    # my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
-    # my_energy.visualize_eigenvalues()
-    # my_energy.visualize_rates_matrix()
-    # e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
-    # print("ITS energies ", -1/e_eigval)
-    # print("E eigv ", e_eigval)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvalues()
+    my_energy.visualize_rates_matrix()
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
-    to_save_trajectory = True
-    my_simulation.integrate(N=int(1e6), dt=0.1, save_trajectory=to_save_trajectory)
+    to_save_trajectory = False
+    my_simulation.integrate(N=int(1e7), dt=0.1, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
-    my_simulation.visualize_sim_Boltzmann()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
         my_simulation.visualize_trajectory()
@@ -493,9 +472,8 @@ if __name__ == '__main__':
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
     my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(8, which="LR")
-    # my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
+    my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
     my_simulation.visualize_eigenvalues()
-    print("outsiders: ", my_simulation.outside_hist)
     # ----------   TIMING -----------------
     end_time = time.time()
     duration = end_time - start_time

@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors, cm
-from matplotlib.ticker import FormatStrFormatter
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix
 from scipy.interpolate import bisplev
@@ -560,6 +559,7 @@ class EnergyFromAtoms(Energy):
         """
         super().__init__(images_path, images_name, m, friction, T)
         self.atoms = atoms
+        self.epsilon = np.max([atom.epsilon for atom in atoms])
         # plotting is problematic if including only one atom and not prescribing where the grid starts and ends
         if len(self.atoms) < 2:
             if not grid_edges:
@@ -602,6 +602,7 @@ class EnergyFromAtoms(Energy):
                 point_x = self.grid_x[i, j]
                 point_y = self.grid_y[i, j]
                 self.energies[i, j] = self.get_full_potential((point_x, point_y))
+        self.energies[self.energies > 4*self.epsilon] = 4*self.epsilon
         self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_full_potential(self, point: tuple) -> float:
@@ -653,7 +654,7 @@ class EnergyFromAtoms(Energy):
             fig, ax = plt.subplots(1, 1)
             df = pd.DataFrame(data=self.energies, index=self.grid_x[:, 0], columns=self.grid_y[0, :])
             sns.heatmap(df, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff), fmt='.2f',
-                        yticklabels=[f"{ind:.2f}" for ind in df.index],
+                        yticklabels=[f"{ind:.2f}" for ind in df.index], square=True,
                         xticklabels=[f"{col:.2f}" for col in df.columns], ax=ax)
             for atom in self.atoms:
                 range_x_grid = self.grid_edges[1] - self.grid_edges[0]
@@ -672,12 +673,12 @@ class EnergyFromAtoms(Energy):
 if __name__ == '__main__':
     img_path = "images/"
     # ------------------- ATOMS -----------------------
-    epsilon = 3.18*1.6022e-22
+    epsilon = 3
     sigma = 5
     atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((18, 16), (atom_1, atom_2, atom_3), grid_edges=(-8, 55, 5, 50),
+    my_energy = EnergyFromAtoms((18, 16), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
                                 images_name="atoms", images_path=img_path)
     # ------------------- MAZES -----------------------
     # my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=False, edge_is_wall=False)
@@ -692,14 +693,10 @@ if __name__ == '__main__':
     # me = DFSExplorer(my_energy)
     # me.explore_and_animate()
     # ------------------- GENERAL FUNCTIONS -----------------------
-    my_energy.visualize_boltzmann()
     my_energy.visualize()
-
     my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
-    rm = my_energy.get_rates_matix()
-    my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
 
 

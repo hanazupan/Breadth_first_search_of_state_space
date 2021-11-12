@@ -93,7 +93,7 @@ class Explorer(ABC):
         if save:
             np.savetxt(f"{self.maze.images_path}{self.explorer_name}_adj_matrix_{self.maze.images_name}",
                        self.adj_matrix)
-        return self.adj_matrix
+        return csr_matrix(self.adj_matrix)
 
     def get_cell_from_adj(self, index: int) -> tuple:
         """
