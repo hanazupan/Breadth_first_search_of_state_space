@@ -153,11 +153,11 @@ def test_adjacency():
     # compare to the created one
     bfs_explorer = BFSExplorer(test_maze)
     adj = bfs_explorer.get_adjacency_matrix()
-    np.testing.assert_array_equal(correct_adj, adj)
+    np.testing.assert_array_equal(correct_adj, adj.toarray())
     # depth-first search should behave in the same way
     dfs_explorer = BFSExplorer(test_maze)
     adj_dfs = dfs_explorer.get_adjacency_matrix()
-    np.testing.assert_array_equal(correct_adj, adj_dfs)
+    np.testing.assert_array_equal(correct_adj, adj_dfs.toarray())
 
 
 def test_path():

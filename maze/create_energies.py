@@ -29,7 +29,7 @@ DIM_SQUARE = (4.45, 4.45)
 class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
-                 T: float = 293):
+                 temperature: float = 293):
         """
         An Energy object has an array in which energies at the midpoint of cells are saved. It also has general
         thermodynamic/atomic properties (mass, friction, temperature) and geometric properties (area between cells,
@@ -50,11 +50,11 @@ class Energy(AbstractEnergy):
         self.S = 1
         self.V = 1
         # and let´s assume room temperature
-        self.T = T  # 293K <==> 20°C
+        self.temperature = temperature  # 293K <==> 20°C
         self.m = m
         self.friction = friction
         # diffusion coefficient
-        self.D = kB * self.T / self.m / self.friction
+        self.D = kB * self.temperature / self.m / self.friction
         # in preparation
         self.rates_matrix = None
         self.grid_x = None
@@ -97,8 +97,8 @@ class Energy(AbstractEnergy):
         """
         energy_i = self.get_energy(cell_i)
         energy_j = self.get_energy(cell_j)
-        return min(self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.T))),
-                   self.D * self.S / self.h / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(kB*self.T))))
+        return min(self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.temperature))),
+                   self.D * self.S / self.h / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(kB*self.temperature))))
 
     def _calculate_rates_matrix(self):
         """
@@ -115,9 +115,12 @@ class Energy(AbstractEnergy):
         # get the adjacent elements
         rows, cols = adj_matrix.nonzero()
         for r, c in zip(rows, cols):
-            cell_i = self.node_to_cell(r)
-            cell_j = self.node_to_cell(c)
-            self.rates_matrix[r, c] = self._calculate_rates_matrix_ij(cell_i, cell_j)
+            # important! Index in adj cell is not the same as index in self.energies because non-accessible
+            # cells are skipped! Will not work if you use node_to_cell!
+            # TODO: create an Energy method that gets a cell from index of accessible and vice versa
+            cell_i = self.explorer.get_cell_from_adj(r)
+            cell_j = self.explorer.get_cell_from_adj(c)
+            self.rates_matrix[r, c] += self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
@@ -148,14 +151,11 @@ class Energy(AbstractEnergy):
 
         Returns:
             an array of floats, each containing Boltzmann distribution at the energy of one accessible cell
-
-        Raises:
-            ValueError if no self.energies
         """
         if not self.explorer:
             self._calculate_rates_matrix()
         list_of_cells = self.explorer.get_sorted_accessible_cells()
-        boltzmanns = np.array([np.exp(-self.get_energy(cell) / (kB * self.T)) for cell in list_of_cells])
+        boltzmanns = np.array([np.exp(-self.get_energy(cell) / (kB * self.temperature)) for cell in list_of_cells])
         return boltzmanns
 
     def get_eigenval_eigenvec(self, num: int = 10, **kwargs) -> tuple:
@@ -174,7 +174,7 @@ class Energy(AbstractEnergy):
         if not self.explorer:
             self._calculate_rates_matrix()
         # left eigenvectors and eigenvalues
-        eigenval, eigenvec = eigs(self.rates_matrix.T, num, **kwargs)
+        eigenval, eigenvec = eigs(self.rates_matrix.transpose(copy=True), num, **kwargs)
         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
             eigenvec = eigenvec.real
             eigenval = eigenval.real
@@ -272,16 +272,13 @@ class Energy(AbstractEnergy):
             cmap.set_under("black")
             ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
             ax[0].set_title("Energy surface", fontsize=7)
-            len_acc = len([1 for j in range(self.size[0]) for k in range(self.size[1]) if self.is_accessible((j, k))])
+            accesible = self.explorer.get_sorted_accessible_cells()
+            len_acc = len(accesible)
             assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
             for i in range(1, num+1):
                 array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
-                index = 0
-                for j in range(self.size[0]):
-                    for k in range(self.size[1]):
-                        if self.is_accessible((j, k)):
-                            array[j, k] = eigenvec[index, i-1]
-                            index += 1
+                for index, cell in enumerate(accesible):
+                    array[cell] = eigenvec[index, i-1]
                 ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, :num+1]), vmin=np.min(eigenvec[:, :num+1]))
                 ax[i].set_title(f"Eigenvector {i}", fontsize=7)
             plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")
@@ -673,12 +670,12 @@ class EnergyFromAtoms(Energy):
 if __name__ == '__main__':
     img_path = "images/"
     # ------------------- ATOMS -----------------------
-    epsilon = 3
-    sigma = 5
-    atom_1 = Atom((3.3, 20.5), epsilon, sigma)
-    atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
-    atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((18, 16), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
+    my_epsilon = 3
+    my_sigma = 5
+    atom_1 = Atom((3.3, 20.5), my_epsilon, my_sigma)
+    atom_2 = Atom((14.3, 9.3), my_epsilon, my_sigma-2)
+    atom_3 = Atom((5.3, 45.3), my_epsilon/5, my_sigma)
+    my_energy = EnergyFromAtoms((50, 60), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
                                 images_name="atoms", images_path=img_path)
     # ------------------- MAZES -----------------------
     # my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=False, edge_is_wall=False)
@@ -696,7 +693,6 @@ if __name__ == '__main__':
     my_energy.visualize()
     my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
     my_energy.visualize_eigenvalues()
-
 

@@ -3,20 +3,14 @@ In this file, molecular dynamics simulation on an Energy surface is performed, a
 Finally, characteristic ITS are plotted. All these calculations are performed in Simulation class.
 """
 
-from maze.create_energies import EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms  # need all imports
+from maze.create_energies import Energy, EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms  # need all
 from maze.create_mazes import Maze  # need this import
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from matplotlib import cm, colors
+from matplotlib import cm
 from scipy.sparse.linalg import eigs
-from scipy.sparse import csr_matrix
 import time
-import pandas as pd
-import seaborn as sns
-
-# DEFINING BOLTZMANN CONSTANT
-kB = 0.008314463  # kJ/mol/K
 
 DIM_LANDSCAPE = (7.25, 4.45)
 DIM_PORTRAIT = (3.45, 4.45)
@@ -25,26 +19,38 @@ DIM_SQUARE = (4.45, 4.45)
 
 class Simulation:
 
-    def __init__(self, energy, dt: float = 0.01, N: int = int(1e7),
+    def __init__(self, energy: Energy, dt: float = 0.01, N: int = int(1e7),
                  images_path: str = "./", images_name: str = "simulation"):
+        """
+        Class Simulation intended to run simulations on the Energy object using Euler–Maruyama integration
+        as well as performing Markov State Modelling (MSM) and calculate eigenvectors and eigenvalues of so
+        determined transitions matrix.
+
+        Args:
+            energy: Energy object containing the E surface and a way to calculate its derivatives
+            dt: time step for integration
+            N: total number of time steps
+            images_path: where should images be saved
+            images_name: how should images be identified
+        """
         self.energy = energy
         self.images_name = images_name
         self.images_path = images_path
         # TD/particle properties inherited from Energy
         self.m = self.energy.m
         self.friction = self.energy.friction
-        self.T = self.energy.T
+        self.temperature = self.energy.temperature
         self.dt = dt
         self.N = N
-        self.D = kB*self.T/self.m/self.friction
+        self.D = self.energy.D
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
         self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
-        self.traj_x = None
-        self.traj_y = None
-        self.traj_cell = None
+        self.traj_x = []
+        self.traj_y = []
+        self.traj_cell = []
         self.transition_matrices = None
         # everything to do with the grid
         self.step_x = self.energy.grid_x[1, 0] - self.energy.grid_x[0, 0]
@@ -58,13 +64,13 @@ class Simulation:
 
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False):
         """
-        Implement the Euler–Maruyama method for integration of the trajectory on self.energy surface. It is
-        possible to simulate several shorter trajectories using the option restart_after.
+        Implement the Euler–Maruyama method for integration of the trajectory on self.energy surface.
 
         Args:
             dt: float, time step
             N: int, number of time steps
-            save_trajectory: bool, should the trajectory be saved (True needed for MSM analysis)
+            save_trajectory: bool, should the trajectory be saved
+                             (not needed for MSM analysis, only for plotting trajectories)
         """
         # the time step and number of steps can be redefined for every simulation
         if dt:
@@ -78,12 +84,8 @@ class Simulation:
         # figure out in which cell the trajectory starts and increase the count of the histogram
         cell = self._point_to_cell((x_n, y_n))
         self.histogram[cell] += 1
-        self.traj_cell = [cell]
-        # not necessary for MSM, but for trajectory visualization the x and y positions can also be saved
-        if save_trajectory:
-            self.traj_x = np.zeros(N)
-            self.traj_y = np.zeros(N)
-        for n in tqdm(range(self.N)):
+        self.traj_cell.append(cell)
+        for _ in tqdm(range(self.N)):
             # integrate the trajectory one step and increase the histogram count
             x_n, y_n = self._euler_maruyama(x_n, y_n)
             if self.energy.pbc:
@@ -95,8 +97,8 @@ class Simulation:
                 self.traj_cell.append(cell)
                 # if applicable, save trajectory
                 if save_trajectory:
-                    self.traj_x[n] = x_n
-                    self.traj_y[n] = y_n
+                    self.traj_x.append(x_n)
+                    self.traj_y.append(y_n)
             else:
                 # if not using periodic boundaries, points can land outside the histogram
                 self.outside_hist += 1
@@ -107,7 +109,9 @@ class Simulation:
 
     def _euler_maruyama(self, x_n: float, y_n: float) -> tuple:
         """
-        Complete a step of trajectory integration using an Euler-Maruyama integrator.
+        Complete a step of trajectory integration using an Euler-Maruyama integrator. If PBC, the (x_n, y_n) point
+        can be assumed to be in the primary grid.
+
         Args:
             x_n: float, x-coordinate of the current trajectory point
             y_n: float, y-coordinate of the current trajectory point
@@ -115,34 +119,44 @@ class Simulation:
         Returns: tuple (x_n, y_n), the integrated new trajectory points (not necessarily between -1 and 1)
 
         """
+        if self.energy.pbc:
+            assert self.grid_edges[0] <= x_n <= self.grid_edges[1], "Pbc used but x not in the original grid."
+            assert self.grid_edges[2] <= y_n <= self.grid_edges[3], "Pbc used but y not in the original grid."
+        # update x
         dV_dx = self.energy.get_x_derivative((x_n, y_n))
-        dV_dy = self.energy.get_y_derivative((x_n, y_n))
         eta_x = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
-        deterministic_part = dV_dx * self.dt / self.m / self.friction
-        random_part = np.sqrt(2 * self.D) * eta_x
-        x_n = x_n - deterministic_part + random_part
+        x_deterministic = dV_dx * self.dt / self.m / self.friction
+        x_random = np.sqrt(2 * self.D) * eta_x
+        x_n = x_n - x_deterministic + x_random
+        # update y
+        dV_dy = self.energy.get_y_derivative((x_n, y_n))
         eta_y = np.random.normal(loc=0.0, scale=np.sqrt(self.dt))
-        y_n = y_n - dV_dy * self.dt / self.m / self.friction + np.sqrt(2 * self.D) * eta_y
+        y_deterministic = dV_dy * self.dt / self.m / self.friction
+        y_random = np.sqrt(2 * self.D) * eta_y
+        y_n = y_n - y_deterministic + y_random
         return x_n, y_n
 
     def _point_within_bound(self, point: tuple) -> tuple:
         """
         Apply periodic boundary conditions so that the argument point is transformed into an equivalent point
-        within the original grid (-1 to 1).
+        within the original grid.
 
         Args:
-            point: tuple (x_n, y_n) a 2D point potentially outside (-1, 1)
+            point: tuple (x_n, y_n) a 2D point potentially outside self.grid_edges
 
         Returns:
-            tuple (x_n, y_n), a 2D point corrected to an equivalent position within (-1, 1)
+            tuple (x_n, y_n), a 2D point corrected to an equivalent position within self.grid_edges
         """
         x_n, y_n = point
         range_x_grid = self.grid_edges[1] - self.grid_edges[0]
         range_y_grid = self.grid_edges[3] - self.grid_edges[2]
+        # move to zero and stretch/shrink to the number of cells width
         x_cell = (x_n - self.grid_edges[0]) * self.energy.size[0] / range_x_grid
         y_cell = (y_n - self.grid_edges[2]) * self.energy.size[1] / range_y_grid
+        # go to the "original" simulation box
         x_cell = x_cell % self.energy.size[0]
         y_cell = y_cell % self.energy.size[1]
+        # transform back to grid
         x_n = x_cell * range_x_grid / self.energy.size[0] + self.grid_edges[0]
         y_n = y_cell * range_y_grid / self.energy.size[1] + self.grid_edges[2]
         return x_n, y_n
@@ -152,19 +166,18 @@ class Simulation:
         Given a trajectory point (x_n, y_n), determine to which cell of the histogram this trajectory point belongs to.
 
         Args:
-            point: tuple (x_n, y_n) a 2D point potentially outside (-1, 1)
+            point: tuple (x_n, y_n) a 2D point always inside self.grid_edges (if pbc)
 
         Returns:
             tuple (row, column) in which cell of the histogram this point lands
         """
         x_n, y_n = point
-        if self.energy.pbc:
-            x_n, y_n = self._point_within_bound(point)
         range_x_grid = self.grid_edges[1] - self.grid_edges[0]
         range_y_grid = self.grid_edges[3] - self.grid_edges[2]
-        # conversion from grid to cell
-        x_cell = (x_n - self.grid_edges[0])*self.energy.size[0]/range_x_grid
-        y_cell = (y_n - self.grid_edges[2])*self.energy.size[1]/range_y_grid
+        # move to zero and strech/shrink to the number of cells width
+        x_cell = (x_n - self.grid_edges[0]) * self.energy.size[0] / range_x_grid
+        y_cell = (y_n - self.grid_edges[2]) * self.energy.size[1] / range_y_grid
+        # always round down - points between 0 and 1 belong all in cell 0, between 1 and 2 all in cell 1 and so on
         return int(x_cell), int(y_cell)
 
     def _cell_to_index(self, cell: tuple) -> int:
@@ -183,13 +196,14 @@ class Simulation:
             index = index * self.histogram.shape[i] + cell[i]
         return index
 
-    def get_transitions_matrix(self, tau_array: np.ndarray = None, noncorr=False) -> np.ndarray:
+    def get_transitions_matrix(self, tau_array: np.ndarray = None, noncorr: bool = False) -> np.ndarray:
         """
         Obtain a set of transition matrices for different tau-s specified in tau_array.
 
         Args:
             tau_array: 1D array of tau values for which the transition matrices should be constructed
-
+            noncorr: bool, should only every tau-th frame be used for MSM construction
+                     (if False, use sliding window - much more expensive but throws away less data)
         Returns:
             an array of transition matrices
         """
@@ -205,9 +219,10 @@ class Simulation:
             cut_seq = seq[0:-1:len_window]
             return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
 
-        self.acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
-                          if self.energy.is_accessible((i, j))]
-        all_cells = len(self.acc_cells)
+        # now we are creating transitions matrix only for accessible cells - already ordered
+        acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
+                     if self.energy.is_accessible((i, j))]
+        all_cells = len(acc_cells)
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
             if not noncorr:
@@ -217,15 +232,17 @@ class Simulation:
             for cell_slice in window_cell:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
+                # this is again because we use only accessible cells (subject to change)
                 if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)):
-                    i = self.acc_cells.index(tuple(start_cell))
-                    j = self.acc_cells.index(tuple(end_cell))
+                    i = acc_cells.index(tuple(start_cell))
+                    j = acc_cells.index(tuple(end_cell))
                     try:
                         self.transition_matrices[tau_i, i, j] += 1
                         # enforce detailed balance
                         self.transition_matrices[tau_i, j, i] += 1
                     except IndexError:
-                        assert not self.energy.pbc, "If PBC used, all points on a trajectory should fit in the histogram!"
+                        assert not self.energy.pbc,\
+                            "If PBC used, all points on a trajectory should fit in the histogram!"
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
@@ -235,6 +252,10 @@ class Simulation:
     def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs) -> tuple:
         """
         Obtain eigenvectors and eigenvalues of the transition matrices.
+
+        Args:
+            num_eigv: how many eigenvalues/vectors pairs
+            **kwargs: named arguments to forward to eigs()
         Returns:
             (eigenval, eigenvec) a tuple of eigenvalues and eigenvectors, first num_eigv given for all tau-s
         """
@@ -261,9 +282,6 @@ class Simulation:
     def visualize_eigenvalues(self):
         """
         Visualize the eigenvalues of rate matrix.
-
-        Args:
-            show: bool, whether to display the image
         """
         if not np.any(self.transition_matrices):
             self.get_transitions_matrix()
@@ -286,6 +304,7 @@ class Simulation:
         Visualize first num_eiv of the transitions matrix for all tau-s in the self.tau_array
         Args:
             num_eigv: number of eigenvectors to visualize
+            **kwargs: named arguments to forward to eigs()
         """
         tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
         full_width = DIM_LANDSCAPE[0]
@@ -319,21 +338,24 @@ class Simulation:
 
         Args:
             num_eigv: how many eigenvalues/timescales to plot
+
+            rates_eigenvalues: if not None, provide a list of SqRA eigenvalues so that it is possible to
+                               plot ITS of SqRA as dashed lines for comparison
         """
         tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
         tau_eigenvals = tau_eigenvals.T
-        fig2, ax2 = plt.subplots(1, 1)
-        colors = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
+        fig, ax = plt.subplots(1, 1)
+        colors_circle = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
         for j in range(1, num_eigv):
-            print("S eigv ", tau_eigenvals[j, :])
             to_plot = -self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[j, :]))
-            ax2.plot(self.tau_array * self.dt, to_plot, label=f"its {j}", color=colors[j])
+            ax.plot(self.tau_array * self.dt, to_plot, label=f"its {j}", color=colors_circle[j])
         if np.any(rates_eigenvalues):
-           for j in range(1, len(rates_eigenvalues)):
-               ax2.plot(self.tau_array * self.dt, [-1/rates_eigenvalues[j] for _ in self.tau_array], color="black", ls="--")
-        ax2.legend()
-        ax2.fill_between(self.tau_array * self.dt, self.tau_array*self.dt, color="grey", alpha=0.5)
-        fig2.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+            for j in range(1, len(rates_eigenvalues)):
+                ax.plot(self.tau_array * self.dt, [-1/rates_eigenvalues[j] for _ in self.tau_array],
+                        color="black", ls="--")
+        ax.legend()
+        ax.fill_between(self.tau_array * self.dt, self.tau_array*self.dt, color="grey", alpha=0.5)
+        fig.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def visualize_transition_matrices(self):
@@ -431,39 +453,23 @@ if __name__ == '__main__':
     # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="potentials", m=1,
     #                                 friction=20, T=200)
     # ------------------- ATOMS ------------------
-    epsilon = 3.18#*1.6022e-22
-    sigma = 5
-    atom_1 = Atom((3.3, 20.5), epsilon, sigma)
-    atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
-    atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((20, 40), (atom_1, atom_2, atom_3), grid_edges=(-1, 40, 0, 40),
-                                images_name="atoms", images_path=img_path, friction=10)
-    # arr_x = np.zeros(my_energy.size)
-    # arr_y = np.zeros(my_energy.size)
-    # for i in range(my_energy.size[0]):
-    #     for j in range(my_energy.size[1]):
-    #         arr_x[i, j] = my_energy.get_x_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
-    #         arr_y[i, j] = my_energy.get_y_derivative((my_energy.grid_x[i, j], my_energy.grid_y[i, j]))
-    # vec_lens = np.sqrt(arr_x**2 + arr_y**2)
-    # df = pd.DataFrame(data=my_energy.energies, index=my_energy.grid_x[:, 0], columns=my_energy.grid_y[0, :])
-    # cmap = cm.get_cmap("RdBu_r").copy()
-    # fig, im = plt.subplots(1, 1)
-    # sns.heatmap(df, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=my_energy.energy_cutoff), fmt='.2f',
-    #             yticklabels=[f"{ind:.2f}" for ind in df.index],
-    #             xticklabels=[f"{col:.2f}" for col in df.columns], ax=im)
-    # im.quiver(arr_x/vec_lens, arr_y/vec_lens, pivot='mid')
-    # plt.savefig("images/derivatives.png")
-    # plt.close()
+    # epsilon = 3.18
+    # sigma = 5
+    # atom_1 = Atom((3.3, 20.5), epsilon, sigma)
+    # atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
+    # atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
+    # my_energy = EnergyFromAtoms((20, 40), (atom_1, atom_2, atom_3), grid_edges=(-1, 40, 0, 40),
+    #                             images_name="atoms_big", images_path=img_path, friction=10)
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
     my_energy.visualize_rates_matrix()
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
     to_save_trajectory = False
-    my_simulation.integrate(N=int(1e7), dt=0.1, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(1e7), dt=0.01, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
@@ -481,5 +487,4 @@ if __name__ == '__main__':
     minutes = round(duration // 60 % 60)
     seconds = round(duration % 60)
     print(f"Total time: {hours}h {minutes}min {seconds}s")
-
 

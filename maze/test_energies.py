@@ -71,8 +71,10 @@ def test_adj_energy():
     maze = Maze((6, 6), algorithm="handmade1", images_name="test_handmade", images_path="images/")
     energy = EnergyFromMaze(maze, images_name="test_handmade", images_path="images/")
     energy.get_rates_matix()
-    assert energy.adj_matrix[0, :9].astype(int).tolist()[0] == [0, 1, 0, 0, 0, 0, 0, 1, 1]
-    assert np.all(energy.adj_matrix[0, 9:] == 0)
+    correct = np.array([0, 1, 0, 0, 0, 0, 0, 1, 1])
+    toarry = energy.adj_matrix[0, :9].astype(int).toarray()[0]
+    assert np.all([x == y for x, y in zip(correct, toarry)])
+    assert np.all([x == 0 for x in energy.adj_matrix[0, 9:].toarray()])
 
 
 def test_atoms():
@@ -161,8 +163,8 @@ def test_run_everything():
     my_energy.visualize()
     my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors(num=6, which="SR", sigma=0)
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors(num=6, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
     # ------------------- MAZES -----------------------
     my_maze = Maze((15, 12), images_path=img_path, images_name="test_mazes", no_branching=False, edge_is_wall=False)
