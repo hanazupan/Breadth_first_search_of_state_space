@@ -453,13 +453,13 @@ if __name__ == '__main__':
     # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="potentials", m=1,
     #                                 friction=20, T=200)
     # ------------------- ATOMS ------------------
-    # epsilon = 3.18
-    # sigma = 5
-    # atom_1 = Atom((3.3, 20.5), epsilon, sigma)
-    # atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
-    # atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
-    # my_energy = EnergyFromAtoms((20, 40), (atom_1, atom_2, atom_3), grid_edges=(-1, 40, 0, 40),
-    #                             images_name="atoms_big", images_path=img_path, friction=10)
+    epsilon = 3.18
+    sigma = 5
+    atom_1 = Atom((3.3, 20.5), epsilon, sigma)
+    atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
+    atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
+    my_energy = EnergyFromAtoms((40, 40), (atom_1, atom_2, atom_3), grid_edges=(-1, 40, 0, 40),
+                                images_name="atoms_big", images_path=img_path, friction=10)
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
