@@ -51,7 +51,7 @@ def test_q_ij():
     cell_j = (6, 1)
     q_ij = my_energy._calculate_rates_matrix_ij(cell_i, cell_j)
     sigma = np.sqrt(2*my_energy.D)
-    correct_rate = sigma ** 2 / 2 / dx ** 2 * np.sqrt(np.exp(-1/(kB*my_energy.T) * (formula(0.3, -0.7) - formula(-0.5, -0.3))))
+    correct_rate = sigma ** 2 / 2 / dx ** 2 * np.sqrt(np.exp(-1/(kB*my_energy.temperature) * (formula(0.3, -0.7) - formula(-0.5, -0.3))))
     assert np.allclose(q_ij, correct_rate)
 
 

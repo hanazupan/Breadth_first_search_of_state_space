@@ -1,5 +1,5 @@
 """
-Try to run, for example: run_maze.py --size (40,40) --animate y --graph y --matrix y --name test --path Images/
+Try to run, for example: python3 run_maze.py --size "(40,40)" --animate y --graph y --name test --path images/
 """
 from maze.create_mazes import Maze
 from maze.explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
@@ -19,10 +19,8 @@ parser.add_argument('--explorer', metavar='e', type=str, nargs='?',
                     default='bfs', help='Algorithm for exploration of the maze (bfs, dijkstra)?')
 parser.add_argument('--graph', metavar='g', type=str, nargs='?',
                     default='n', help='Produce graph image?')
-parser.add_argument('--matrix', metavar='m', type=str, nargs='?',
-                    default='n', help='Produce adjacency matrix?')
 parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
-                    default='n', help='Produce maze image?')
+                    default='y', help='Produce maze image?')
 
 
 def create_and_explore_maze(args):
@@ -37,14 +35,14 @@ def create_and_explore_maze(args):
     maze = Maze(args.size, animate=animate, images_name=args.name, images_path=args.path)
     # visualization
     if args.visualize != "n":
-        maze.visualize(show=False)
+        maze.visualize()
         print(f"Visualization of Maze will be saved in: {args.path}maze_{args.name}.png")
     # exploration
     if args.explorer == "bfs":
         explorer = BFSExplorer(maze)
     elif args.explorer == "dijkstra":
         explorer = DijkstraExplorer(maze)
-        explorer.visualize_distances(show=False)
+        explorer.visualize_distances()
         print(f"Visualization of distances will be saved in: {args.path}distances_{args.name}.png")
     elif args.explorer == "dfs":
         explorer = DFSExplorer(maze)
@@ -63,11 +61,7 @@ def create_and_explore_maze(args):
     # graph
     if args.graph != "n":
         print(f"Visualization of Graph will be saved in: {args.path}{args.explorer}_graph_{args.name}.png")
-        explorer.draw_connections_graph(show=False, with_labels=True)
-    # matrix
-    if args.matrix != "n":
-        print(f"The adjacency matrix will be saved in: {args.path}{args.explorer}_adj_matrix_{args.name}.npy")
-        explorer.get_adjacency_matrix(save=True)
+        explorer.draw_connections_graph(with_labels=True)
     print("Finished.")
 
 

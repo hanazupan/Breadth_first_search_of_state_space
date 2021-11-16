@@ -568,13 +568,7 @@ class EnergyFromAtoms(Energy):
         x_positions = [atom.position[0] for atom in self.atoms]
         y_positions = [atom.position[1] for atom in self.atoms]
         if grid_edges:
-            # if grid edges given, assert all atoms fit into them
             xmin, xmax, ymin, ymax = grid_edges
-            # for atom in atoms:
-            #     if atom.position[0] > xmax or atom.position[0] < xmin:
-            #         raise AttributeError("Atoms do not fit in grid edges!")
-            #     if atom.position[1] > ymax or atom.position[1] < ymin:
-            #         raise AttributeError("Atoms do not fit in grid edges!")
         else:
             # if grid edges not given, create a grid a bit larger than what covers all atoms
             xmin = 0.9*np.min(x_positions)
@@ -651,8 +645,9 @@ class EnergyFromAtoms(Energy):
             fig, ax = plt.subplots(1, 1)
             df = pd.DataFrame(data=self.energies, index=self.grid_x[:, 0], columns=self.grid_y[0, :])
             sns.heatmap(df, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff), fmt='.2f',
-                        yticklabels=[f"{ind:.2f}" for ind in df.index], square=True,
-                        xticklabels=[f"{col:.2f}" for col in df.columns], ax=ax)
+                        square=True, ax=ax, yticklabels=[], xticklabels=[])
+            # if you want labels: yticklabels=[f"{ind:.2f}" for ind in df.index]
+            # xticklabels=[f"{col:.2f}" for col in df.columns]
             for atom in self.atoms:
                 range_x_grid = self.grid_edges[1] - self.grid_edges[0]
                 range_y_grid = self.grid_edges[3] - self.grid_edges[2]
@@ -670,18 +665,18 @@ class EnergyFromAtoms(Energy):
 if __name__ == '__main__':
     img_path = "images/"
     # ------------------- ATOMS -----------------------
-    my_epsilon = 3
-    my_sigma = 5
-    atom_1 = Atom((3.3, 20.5), my_epsilon, my_sigma)
-    atom_2 = Atom((14.3, 9.3), my_epsilon, my_sigma-2)
-    atom_3 = Atom((5.3, 45.3), my_epsilon/5, my_sigma)
-    my_energy = EnergyFromAtoms((50, 60), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
-                                images_name="atoms", images_path=img_path)
+    # my_epsilon = 3
+    # my_sigma = 5
+    # atom_1 = Atom((3.3, 20.5), my_epsilon, my_sigma)
+    # atom_2 = Atom((14.3, 9.3), my_epsilon, my_sigma-2)
+    # atom_3 = Atom((5.3, 45.3), my_epsilon/5, my_sigma)
+    # my_energy = EnergyFromAtoms((50, 60), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
+    #                             images_name="atoms", images_path=img_path)
     # ------------------- MAZES -----------------------
-    # my_maze = Maze((30, 20), images_path=img_path, images_name="testing", no_branching=False, edge_is_wall=False)
-    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="mazes", friction=10)
-    # my_maze.visualize()
-    # my_energy.visualize_underlying_maze()
+    my_maze = Maze((6, 9), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=True)
+    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="mazes", friction=10)
+    my_maze.visualize()
+    my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL -----------------------
     # my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="potential", friction=10)
     # ------------------- EXPLORERS -----------------------
@@ -693,6 +688,6 @@ if __name__ == '__main__':
     my_energy.visualize()
     my_energy.visualize_3d()
     my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
 

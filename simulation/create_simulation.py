@@ -45,7 +45,7 @@ class Simulation:
         self.D = self.energy.D
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
         if type(energy) == EnergyFromPotential:
-            self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
+            self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500])
         else:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
         # prepare empty objects
@@ -313,12 +313,12 @@ class Simulation:
         full_width = DIM_LANDSCAPE[0]
         fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row",
                                figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
-        vmin = np.min(tau_eigenvec)
-        vmax = np.max(tau_eigenvec)
         cmap = cm.get_cmap("RdBu").copy()
         cmap.set_over("black")
         cmap.set_under("black")
         for i, tau in enumerate(self.tau_array):
+            vmin = np.min(tau_eigenvec[i])
+            vmax = np.max(tau_eigenvec[i])
             for j in range(num_eigv):
                 array = np.full(self.histogram.shape, np.max(tau_eigenvec[i, :, j]) + 1)
                 index = 0
@@ -448,32 +448,32 @@ if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
     # ------------------- MAZE ------------------
-    # my_maze = Maze((6, 8), images_path=img_path, images_name="mazes", no_branching=False, edge_is_wall=False)
-    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
-    #                            factor_grid=2, m=1, friction=10)
-    # my_maze.visualize()
-    # my_energy.visualize_underlying_maze()
+    my_maze = Maze((6, 8), images_path=img_path, images_name="mazes", no_branching=True, edge_is_wall=True)
+    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
+                               factor_grid=2, m=1, friction=10)
+    my_maze.visualize()
+    my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
-    my_energy = EnergyFromPotential((50, 50), images_path=img_path, images_name="potentials", m=1,
-                                    friction=20)
+    # my_energy = EnergyFromPotential((50, 50), images_path=img_path, images_name="potentials", m=1,
+    #                                 friction=20)
     # ------------------- ATOMS ------------------
     # epsilon = 3
     # sigma = 5
     # atom_1 = Atom((3.3, 20.5), epsilon, sigma)
     # atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     # atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
-    # my_energy = EnergyFromAtoms((20, 40), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 0, 40),
+    # my_energy = EnergyFromAtoms((40, 40), (atom_1, atom_2, atom_3), grid_edges=(0, 40, 0, 40),
     #                             images_name="atoms_big", images_path=img_path, friction=10)
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=8, which="LR")
     my_energy.visualize_eigenvalues()
     my_energy.visualize_rates_matrix()
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
-    to_save_trajectory = False
-    my_simulation.integrate(N=int(1e7), dt=0.01, save_trajectory=to_save_trajectory)
+    to_save_trajectory = True
+    my_simulation.integrate(N=int(1e5), dt=0.1, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
