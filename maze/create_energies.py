@@ -375,8 +375,12 @@ class EnergyFromMaze(Energy):
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
+        self.grid_x, self.grid_y = self._prepare_grid(factor=10)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
+        self.h = 2 / (self.size[0])
+        self.S = 2 / (self.size[1])
+        self.V = 2 / (self.size[0]) * 2 / (self.size[1])
         self.spline = tck
         self.energy_cutoff = 5
         self.deltas = np.ones(len(self.size), dtype=int)

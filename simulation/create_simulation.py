@@ -44,7 +44,7 @@ class Simulation:
         self.N = N
         self.D = self.energy.D
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
-        if type(energy) == EnergyFromPotential:
+        if type(energy) == EnergyFromPotential or type(energy) == EnergyFromMaze:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500])
         else:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
@@ -78,6 +78,8 @@ class Simulation:
         # the time step and number of steps can be redefined for every simulation
         if dt:
             self.dt = dt
+            if type(self.energy) == EnergyFromMaze and self.dt > 0.01:
+                print("Warning! Chosen dt possibly too large for mazes!")
         if N:
             self.N = N
         self.histogram = np.zeros(self.energy.size)
@@ -448,9 +450,9 @@ if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
     # ------------------- MAZE ------------------
-    my_maze = Maze((6, 8), images_path=img_path, images_name="mazes", no_branching=True, edge_is_wall=True)
+    my_maze = Maze((8, 8), images_path=img_path, images_name="mazes", no_branching=True, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
-                               factor_grid=2, m=1, friction=10)
+                               factor_grid=2, m=1, friction=1)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
@@ -467,13 +469,13 @@ if __name__ == '__main__':
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_eigenvectors_in_maze(num=8, which="LR")
+    my_energy.visualize_eigenvectors_in_maze(num=8, which="SR", sigma=0)
     my_energy.visualize_eigenvalues()
     my_energy.visualize_rates_matrix()
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="LR")
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
-    to_save_trajectory = True
-    my_simulation.integrate(N=int(1e5), dt=0.1, save_trajectory=to_save_trajectory)
+    to_save_trajectory = False
+    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
