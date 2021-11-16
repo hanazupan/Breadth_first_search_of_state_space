@@ -44,7 +44,10 @@ class Simulation:
         self.N = N
         self.D = self.energy.D
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
-        self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
+        if type(energy) == EnergyFromPotential:
+            self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
+        else:
+            self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
@@ -446,20 +449,21 @@ if __name__ == '__main__':
     img_path = "images/"
     # ------------------- MAZE ------------------
     # my_maze = Maze((6, 8), images_path=img_path, images_name="mazes", no_branching=False, edge_is_wall=False)
-    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name, m=1, friction=20, T=1600)
+    # my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
+    #                            factor_grid=2, m=1, friction=10)
     # my_maze.visualize()
     # my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
-    # my_energy = EnergyFromPotential((20, 30), images_path=img_path, images_name="potentials", m=1,
-    #                                 friction=20, T=200)
+    my_energy = EnergyFromPotential((50, 50), images_path=img_path, images_name="potentials", m=1,
+                                    friction=20)
     # ------------------- ATOMS ------------------
-    epsilon = 3.18
-    sigma = 5
-    atom_1 = Atom((3.3, 20.5), epsilon, sigma)
-    atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
-    atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
-    my_energy = EnergyFromAtoms((40, 40), (atom_1, atom_2, atom_3), grid_edges=(-1, 40, 0, 40),
-                                images_name="atoms_big", images_path=img_path, friction=10)
+    # epsilon = 3
+    # sigma = 5
+    # atom_1 = Atom((3.3, 20.5), epsilon, sigma)
+    # atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
+    # atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
+    # my_energy = EnergyFromAtoms((20, 40), (atom_1, atom_2, atom_3), grid_edges=(0, 20, 0, 40),
+    #                             images_name="atoms_big", images_path=img_path, friction=10)
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()

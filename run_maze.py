@@ -1,8 +1,8 @@
 """
-Try to run, for exymple: main.py --size (40,40) --animate y --graph y --matrix y --name test --path Images/
+Try to run, for example: run_maze.py --size (40,40) --animate y --graph y --matrix y --name test --path Images/
 """
-from create_mazes import Maze
-from explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
+from maze.create_mazes import Maze
+from maze.explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 from ast import literal_eval
 import argparse
 
