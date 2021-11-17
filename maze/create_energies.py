@@ -56,18 +56,21 @@ class Energy(AbstractEnergy):
         # diffusion coefficient
         self.D = kB * self.temperature / self.m / self.friction
         # in preparation
+        self.grid_start = 0
+        self.grid_end = 5
+        self.grid_full_len = self.grid_end - self.grid_start
         self.rates_matrix = None
         self.grid_x = None
         self.grid_y = None
         self.explorer = None
 
     def _prepare_grid(self, factor=1) -> tuple:
-        cell_step_x = 2 / (self.size[0] * factor)
-        cell_step_y = 2 / (self.size[1] * factor)
-        start_x = -1 + cell_step_x / 2
-        end_x = 1 - cell_step_x / 2
-        start_y = -1 + cell_step_y / 2
-        end_y = 1 - cell_step_y / 2
+        cell_step_x = self.grid_full_len / (self.size[0] * factor)
+        cell_step_y = self.grid_full_len / (self.size[1] * factor)
+        start_x = self.grid_start + cell_step_x / 2
+        end_x = self.grid_end - cell_step_x / 2
+        start_y = self.grid_start + cell_step_y / 2
+        end_y = self.grid_end - cell_step_y / 2
         size_x, size_y = complex(self.size[0]), complex(self.size[1])
         return np.mgrid[start_x:end_x:factor*size_x, start_y:end_y:factor*size_y]
 
@@ -270,16 +273,21 @@ class Energy(AbstractEnergy):
             cmap = cm.get_cmap("RdBu").copy()
             cmap.set_over("black")
             cmap.set_under("black")
-            ax[0].imshow(self.energies, cmap=cmap, vmax=self.energy_cutoff)
+            ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
             ax[0].set_title("Energy surface", fontsize=7)
             accesible = self.explorer.get_sorted_accessible_cells()
             len_acc = len(accesible)
             assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
+            vmax = np.max(eigenvec[:, :num+1])
+            vmin = np.min(eigenvec[:, :num+1])
             for i in range(1, num+1):
-                array = np.full(self.size, np.max(eigenvec[:, i-1])+1)
+                array = np.full(self.size, vmax+1)
                 for index, cell in enumerate(accesible):
-                    array[cell] = eigenvec[index, i-1]
-                ax[i].imshow(array, cmap=cmap, vmax=np.max(eigenvec[:, :num+1]), vmin=np.min(eigenvec[:, :num+1]))
+                    if eigenvec[index, 0] > 0:
+                        array[cell] = eigenvec[index, i - 1]
+                    else:
+                        array[cell] = - eigenvec[index, i - 1]
+                ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
                 ax[i].set_title(f"Eigenvector {i}", fontsize=7)
             plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")
             plt.close()
@@ -378,11 +386,11 @@ class EnergyFromMaze(Energy):
         self.grid_x, self.grid_y = self._prepare_grid(factor=10)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
-        self.h = 2 / self.size[0]
-        self.S = 2 / self.size[1]
-        self.V = 2 / self.size[0] * 2 / self.size[1]
+        self.h = self.grid_full_len / self.size[0]
+        self.S = self.grid_full_len / self.size[1]
+        self.V = self.grid_full_len / self.size[0] * self.grid_full_len / self.size[1]
         self.spline = tck
-        self.energy_cutoff = 5
+        self.energy_cutoff = 8
         self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_x_derivative(self, point: tuple) -> float:
@@ -424,9 +432,10 @@ class EnergyFromPotential(Energy):
         self.energy_cutoff = 10
         self.deltas = np.ones(len(self.size), dtype=int)
         self.pbc = False
-        self.h = 2 / (self.size[0])
-        self.S = 2 / (self.size[1])
-        self.V = 2 / (self.size[0]) * 2 / (self.size[1])
+        self.h = self.grid_full_len / (self.size[0])
+        self.S = self.grid_full_len / (self.size[1])
+        self.V = self.grid_full_len / (self.size[0]) * self.grid_full_len / (self.size[1])
+
 
     def square_well(self, x, y, a=5, b=10):
         return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2

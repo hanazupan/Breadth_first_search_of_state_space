@@ -8,7 +8,7 @@ from maze.create_mazes import Maze  # need this import
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from matplotlib import cm
+from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
 import time
 
@@ -47,7 +47,7 @@ class Simulation:
         if type(energy) == EnergyFromPotential:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500])
         elif type(energy) == EnergyFromMaze:
-            self.tau_array = np.array([5, 10, 15, 20, 50])
+            self.tau_array = np.array([5, 10, 50, 100, 150])
         else:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
         # prepare empty objects
@@ -66,7 +66,6 @@ class Simulation:
         ymin = self.energy.grid_y[0, 0] - self.step_y / 2
         ymax = self.energy.grid_y[-1, -1] + self.step_y / 2
         self.grid_edges = (xmin, xmax, ymin, ymax)
-        print("grid edges ", self.grid_edges)
 
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False):
         """
@@ -330,9 +329,12 @@ class Simulation:
                 for m in range(self.histogram.shape[0]):
                     for n in range(self.histogram.shape[1]):
                         if self.energy.is_accessible((m, n)):
-                            array[m, n] = tau_eigenvec[i, index, j]
+                            if tau_eigenvec[i, 0, 0] > 0:
+                                array[m, n] = tau_eigenvec[i, index, j]
+                            else:
+                                array[m, n] = - tau_eigenvec[i, index, j]
                             index += 1
-                ax[i][j].imshow(array, cmap=cmap, vmax=vmax, vmin=vmin)
+                ax[i][j].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
                 ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7)
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
@@ -354,14 +356,20 @@ class Simulation:
         tau_eigenvals = tau_eigenvals.T
         fig, ax = plt.subplots(1, 1)
         colors_circle = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
+        #normalizing_factor = np.array(-self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[1, :])))[-2]
         for j in range(1, num_eigv):
-            to_plot = -self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[j, :]))
-            ax.plot(self.tau_array * self.dt, to_plot, label=f"its {j}", color=colors_circle[j])
+            to_plot_abs = np.array(-self.tau_array * self.dt / np.log(np.abs(tau_eigenvals[j, :])))
+            #to_plot_rel = to_plot_abs/normalizing_factor
+            ax.plot(self.tau_array * self.dt, to_plot_abs, label=f"its {j}", color=colors_circle[j])
         if np.any(rates_eigenvalues):
+            #normalizing_factor = -1/rates_eigenvalues[1]
             for j in range(1, len(rates_eigenvalues)):
-                ax.plot(self.tau_array * self.dt, [-1/rates_eigenvalues[j] for _ in self.tau_array],
+                absolute_its = np.array([-1/rates_eigenvalues[j] for _ in self.tau_array])
+                #relative_its = absolute_its/normalizing_factor
+                ax.plot(self.tau_array * self.dt, absolute_its,
                         color="black", ls="--")
         ax.legend()
+        ax.set_ylim([0, 3])
         ax.fill_between(self.tau_array * self.dt, self.tau_array*self.dt, color="grey", alpha=0.5)
         fig.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
         plt.close()
@@ -453,9 +461,9 @@ if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
     # ------------------- MAZE ------------------
-    my_maze = Maze((8, 8), images_path=img_path, images_name="mazes", no_branching=True, edge_is_wall=True)
+    my_maze = Maze((15, 15), images_path=img_path, images_name="test3", no_branching=False, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
-                               factor_grid=2, m=1, friction=10)
+                               factor_grid=1, m=1, friction=1)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
@@ -472,23 +480,23 @@ if __name__ == '__main__':
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
-    my_energy.visualize_eigenvectors_in_maze(num=8, which="SR", sigma=0)
-    my_energy.visualize_eigenvalues()
-    my_energy.visualize_rates_matrix()
-    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
+    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+    #my_energy.visualize_eigenvalues()
+    #my_energy.visualize_rates_matrix()
+    e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6, which="LR")
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
     to_save_trajectory = False
-    my_simulation.integrate(N=int(5e6), dt=0.01, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(5e7), dt=0.001, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
         my_simulation.visualize_trajectory()
     my_simulation.get_transitions_matrix(noncorr=True)
-    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(8, which="LR")
-    my_simulation.visualize_transition_matrices()
-    my_simulation.visualize_eigenvec(8, which="LR")
-    my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
-    my_simulation.visualize_eigenvalues()
+    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(6, which="LR")
+    #my_simulation.visualize_transition_matrices()
+    my_simulation.visualize_eigenvec(6, which="LR")
+    my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=e_eigval)
+    #my_simulation.visualize_eigenvalues()
     # ----------   TIMING -----------------
     end_time = time.time()
     duration = end_time - start_time

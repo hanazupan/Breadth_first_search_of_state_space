@@ -1,5 +1,8 @@
 """
 Try to run, for example: python3 run_maze.py --size "(40,40)" --animate y --graph y --name test --path images/
+
+For presentation:
+python3 run_maze.py --size "(15,15)" --animate y --explorer all --name pres_maze --path presentation/presentation_img/
 """
 from maze.create_mazes import Maze
 from maze.explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
@@ -16,11 +19,19 @@ parser.add_argument('--path', metavar='p', type=str, nargs='?',
 parser.add_argument('--animate', metavar='a', type=str, nargs='?',
                     default='n', help='Produce animations?')
 parser.add_argument('--explorer', metavar='e', type=str, nargs='?',
-                    default='bfs', help='Algorithm for exploration of the maze (bfs, dijkstra)?')
+                    default='bfs', help='Algorithm for exploration of the maze (bfs, dfs, dijkstra, all)?')
 parser.add_argument('--graph', metavar='g', type=str, nargs='?',
                     default='n', help='Produce graph image?')
 parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
                     default='y', help='Produce maze image?')
+
+
+def explore(explorer, type_explorer, animate, args):
+    if animate:
+        explorer.explore_and_animate()
+        print(f"Animation Maze exploration will be saved in: {args.path}{type_explorer}_{args.name}.gif")
+    else:
+        explorer.explore()
 
 
 def create_and_explore_maze(args):
@@ -37,27 +48,18 @@ def create_and_explore_maze(args):
     if args.visualize != "n":
         maze.visualize()
         print(f"Visualization of Maze will be saved in: {args.path}maze_{args.name}.png")
-    # exploration
-    if args.explorer == "bfs":
+    # exploration and animation
+    if args.explorer == "bfs" or args.explorer == "all":
         explorer = BFSExplorer(maze)
-    elif args.explorer == "dijkstra":
+        explore(explorer, "bfs", animate, args)
+    if args.explorer == "dijkstra" or args.explorer == "all":
         explorer = DijkstraExplorer(maze)
+        explore(explorer, "dijkstra", animate, args)
         explorer.visualize_distances()
         print(f"Visualization of distances will be saved in: {args.path}distances_{args.name}.png")
-    elif args.explorer == "dfs":
+    if args.explorer == "dfs" or args.explorer == "all":
         explorer = DFSExplorer(maze)
-    else:
-        raise ValueError("Not a valid Explorer.")
-    if animate:
-        explorer.explore_and_animate()
-        if args.explorer == "bfs":
-            print(f"Animation Maze exploration will be saved in: {args.path}bfs_{args.name}.gif")
-        elif args.explorer == "dfs":
-            print(f"Animation Maze exploration will be saved in: {args.path}dfs_{args.name}.gif")
-        else:
-            print(f"Animation Maze exploration will be saved in: {args.path}dijkstra_{args.name}.gif")
-    else:
-        explorer.explore()
+        explore(explorer, "dfs", animate, args)
     # graph
     if args.graph != "n":
         print(f"Visualization of Graph will be saved in: {args.path}{args.explorer}_graph_{args.name}.png")
