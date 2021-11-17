@@ -44,8 +44,10 @@ class Simulation:
         self.N = N
         self.D = self.energy.D
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
-        if type(energy) == EnergyFromPotential or type(energy) == EnergyFromMaze:
+        if type(energy) == EnergyFromPotential:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500])
+        elif type(energy) == EnergyFromMaze:
+            self.tau_array = np.array([5, 10, 15, 20, 50])
         else:
             self.tau_array = np.array([5, 10, 50, 100, 150, 200, 250, 350, 500, 700, 1000])
         # prepare empty objects
@@ -64,6 +66,7 @@ class Simulation:
         ymin = self.energy.grid_y[0, 0] - self.step_y / 2
         ymax = self.energy.grid_y[-1, -1] + self.step_y / 2
         self.grid_edges = (xmin, xmax, ymin, ymax)
+        print("grid edges ", self.grid_edges)
 
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False):
         """
@@ -452,7 +455,7 @@ if __name__ == '__main__':
     # ------------------- MAZE ------------------
     my_maze = Maze((8, 8), images_path=img_path, images_name="mazes", no_branching=True, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
-                               factor_grid=2, m=1, friction=1)
+                               factor_grid=2, m=1, friction=10)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
@@ -475,7 +478,7 @@ if __name__ == '__main__':
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(8, which="SR", sigma=0)
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
     to_save_trajectory = False
-    my_simulation.integrate(N=int(1e6), dt=0.001, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(5e6), dt=0.01, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:

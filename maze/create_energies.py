@@ -378,9 +378,9 @@ class EnergyFromMaze(Energy):
         self.grid_x, self.grid_y = self._prepare_grid(factor=10)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
-        self.h = 2 / (self.size[0])
-        self.S = 2 / (self.size[1])
-        self.V = 2 / (self.size[0]) * 2 / (self.size[1])
+        self.h = 2 / self.size[0]
+        self.S = 2 / self.size[1]
+        self.V = 2 / self.size[0] * 2 / self.size[1]
         self.spline = tck
         self.energy_cutoff = 5
         self.deltas = np.ones(len(self.size), dtype=int)
@@ -677,8 +677,9 @@ if __name__ == '__main__':
     # my_energy = EnergyFromAtoms((50, 60), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
     #                             images_name="atoms", images_path=img_path)
     # ------------------- MAZES -----------------------
-    my_maze = Maze((6, 9), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=True)
-    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="mazes", friction=10)
+    my_maze = Maze((9, 9), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=True)
+    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
+    print(my_energy.grid_x)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL -----------------------
