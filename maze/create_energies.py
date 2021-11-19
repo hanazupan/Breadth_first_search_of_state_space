@@ -249,26 +249,26 @@ class Energy(AbstractEnergy):
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
-            fig, ax = plt.subplots(1, num + 1, sharey="row", figsize=(full_width, full_width/(num+1)))
+            fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
             cmap = cm.get_cmap("RdBu").copy()
-            cmap.set_over("black")
-            cmap.set_under("black")
-            ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
-            ax[0].set_title("Energy surface", fontsize=7)
+            # cmap.set_over("black")
+            # cmap.set_under("black")
+            # ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
+            # ax[0].set_title("Energy surface", fontsize=7, fontweight="bold")
             accesible = self.explorer.get_sorted_accessible_cells()
             len_acc = len(accesible)
             assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
             vmax = np.max(eigenvec[:, :num+1])
             vmin = np.min(eigenvec[:, :num+1])
-            for i in range(1, num+1):
+            for i in range(num):
                 array = np.full(self.size, vmax+1)
                 for index, cell in enumerate(accesible):
                     if eigenvec[index, 0] > 0:
-                        array[cell] = eigenvec[index, i - 1]
+                        array[cell] = eigenvec[index, i]
                     else:
-                        array[cell] = - eigenvec[index, i - 1]
+                        array[cell] = - eigenvec[index, i]
                 ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
-                ax[i].set_title(f"Eigenvector {i}", fontsize=7)
+                ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
             plt.savefig(self.images_path + f"{self.images_name}_eigenvectors_sqra.png")
             plt.close()
 
@@ -281,14 +281,14 @@ class Energy(AbstractEnergy):
         num = self.rates_matrix.shape[0] - 2
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LR")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
+            fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
             xs = np.linspace(0, 1, num=num)
             plt.scatter(xs, eigenval, s=5, c="black")
             for i, eigenw in enumerate(eigenval):
                 plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
             plt.hlines(0, 0, 1)
-            plt.title("Eigenvalues")
-            plt.gca().axes.get_xaxis().set_visible(False)
+            ax.set_ylabel("Eigenvalues (SqRA)")
+            ax.axes.get_xaxis().set_visible(False)
             plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_sqra.png")
             plt.close()
 
@@ -308,20 +308,6 @@ class Energy(AbstractEnergy):
             self._add_colorbar(fig, ax, im)
             ax.set_title("Rates matrix")
             fig.savefig(self.images_path + f"{self.images_name}_rates_matrix.png")
-            plt.close()
-
-    def visualize_boltzmann(self):
-        """
-        Visualizes both the energies and the Boltzmann distribution on that energy surface.
-        """
-        boltzmanns = self.get_boltzmann()
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
-            ax.plot(boltzmanns)
-            ax.set_xlabel("Accessible cell index")
-            ax.set_ylabel("Relative cell population")
-            ax.set_title("Boltzmann distribution")
-            fig.savefig(self.images_path + f"{self.images_name}_boltzmann.png")
             plt.close()
 
     def save_information(self):
@@ -426,6 +412,9 @@ class EnergyFromPotential(Energy):
         super().__init__(images_path, images_name, m, friction, T)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
+        self.grid_start = -1
+        self.grid_end = 1
+        self.grid_full_len = self.grid_end - self.grid_start
         self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)
         self.energy_cutoff = 10

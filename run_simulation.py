@@ -28,7 +28,7 @@ parser.add_argument('--num_atoms', metavar='na', type=str, nargs='?',
 parser.add_argument('--duration', metavar='d', type=str, nargs='?',
                     default='1e6', help='How many time steps in the simulation?')
 parser.add_argument('--time_step', metavar='ts', type=str, nargs='?',
-                    default='0.1', help='What should the time step be?')
+                    default='0.01', help='What should the time step be?')
 parser.add_argument('--compare', metavar='c', type=str, nargs='?',
                     default='y', help='Compare to SqRA?')
 
@@ -46,9 +46,9 @@ def produce_energies(args):
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name)
+        my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name)
+        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True)
         my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name)
     elif args.type == "atoms":
         atoms = []
@@ -78,7 +78,7 @@ def produce_energies(args):
         print("Producing images ...")
         my_energy.visualize()
         my_energy.visualize_3d()
-        my_energy.visualize_eigenvectors_in_maze(num=8, which="LR")
+        my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
         my_energy.visualize_eigenvalues()
         end_visualization_time = time.time()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
@@ -103,27 +103,27 @@ def produce_simulation(args, energy):
     end_simulation_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_simulation_time)
     print(f" -> time for simulation: {hours}h {minutes}min {seconds}s.")
+    my_simulation.save_information()
     # visualization
     if args.visualize != "n":
         print("Calculating the MSM ...")
-        my_simulation.get_transitions_matrix(noncorr=True)
+        my_simulation.get_transitions_matrix()
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_simulation_time, end_matrix_time)
         print(f" -> time for MSM: {hours}h {minutes}min {seconds}s.")
         print("Producing images ...")
         my_simulation.visualize_hist_2D()
         my_simulation.visualize_population_per_energy()
-        my_simulation.visualize_eigenvec(8, which="LR")
+        my_simulation.visualize_eigenvec(6, which="LR")
         if args.compare != "n":
-            e_eigval, e_eigvec = energy.get_eigenval_eigenvec(8, which="LR")
-            my_simulation.visualize_its(num_eigv=8, which="LR", rates_eigenvalues=e_eigval)
+            e_eigval, e_eigvec = energy.get_eigenval_eigenvec(6, which="LR")
+            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=e_eigval)
         else:
-            my_simulation.visualize_its(num_eigv=8, which="LR")
+            my_simulation.visualize_its(num_eigv=6, which="LR")
         my_simulation.visualize_eigenvalues()
         end_visualization_time = time.time()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")
-    my_simulation.save_information()
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
     print(f"-------- Total Simulation time: {hours}h {minutes}min {seconds}s. --------")
