@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
+#from numba import jit
 import time
 from datetime import datetime
 
@@ -57,6 +58,8 @@ class Simulation:
         self.traj_x = []
         self.traj_y = []
         self.traj_cell = []
+        self.eigenvals = []
+        self.eigenvec = []
         self.transition_matrices = None
         # everything to do with the grid
         self.step_x = self.energy.grid_x[1, 0] - self.energy.grid_x[0, 0]
@@ -215,6 +218,7 @@ class Simulation:
         Returns:
             an array of transition matrices
         """
+        start_msm = time.time()
         if tau_array:
             self.tau_array = tau_array
 
@@ -230,9 +234,12 @@ class Simulation:
         # now we are creating transitions matrix only for accessible cells - already ordered
         acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
                      if self.energy.is_accessible((i, j))]
+        cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
         all_cells = len(acc_cells)
+        #self.transition_matrices = [dok_matrix((all_cells, all_cells)) for _ in range(len(self.tau_array))]
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(self.tau_array):
+            count_per_cell = {(i, j, m, n): 0 for i, j in cells for m, n in cells}
             if not noncorr:
                 window_cell = window(self.traj_cell, int(tau))
             else:
@@ -240,21 +247,25 @@ class Simulation:
             for cell_slice in window_cell:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
-                # this is again because we use only accessible cells (subject to change)
-                if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)):
-                    i = acc_cells.index(tuple(start_cell))
-                    j = acc_cells.index(tuple(end_cell))
-                    try:
-                        self.transition_matrices[tau_i, i, j] += 1
-                        # enforce detailed balance
-                        self.transition_matrices[tau_i, j, i] += 1
-                    except IndexError:
-                        assert not self.energy.pbc,\
-                            "If PBC used, all points on a trajectory should fit in the histogram!"
+                count_per_cell[(start_cell[0], start_cell[1], end_cell[0], end_cell[1])] += 1
+            for key, value in count_per_cell.items():
+                a, b, c, d = key
+                start_cell = (a, b)
+                end_cell = (c, d)
+                if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)) and \
+                        value != 0:
+                    i = acc_cells.index(start_cell)
+                    j = acc_cells.index(end_cell)
+                    self.transition_matrices[tau_i][i, j] += value
+                    # enforce detailed balance
+                    self.transition_matrices[tau_i][j, i] += value
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
+        #sums = [ts.sum(axis=0) for ts in self.transition_matrices]
+        #self.transition_matrices =[ts.multiply(1/sums[i]) for i, ts in enumerate(self.transition_matrices)]
         sums[sums == 0] = 1
         self.transition_matrices = self.transition_matrices / sums
+        print(f"MSM time: {time.time()-start_msm}")
         return self.transition_matrices
 
     def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs) -> tuple:
@@ -268,7 +279,7 @@ class Simulation:
             (eigenval, eigenvec) a tuple of eigenvalues and eigenvectors, first num_eigv given for all tau-s
         """
         tau_eigenvals = np.zeros((len(self.tau_array), num_eigv))
-        tau_eigenvec = np.zeros((len(self.tau_array), len(self.transition_matrices[0]), num_eigv))
+        tau_eigenvec = np.zeros((len(self.tau_array), self.transition_matrices[0].shape[0], num_eigv))
         for i, tau in enumerate(self.tau_array):
             tm = self.transition_matrices[i].T
             eigenval, eigenvec = eigs(tm, num_eigv, **kwargs)
@@ -281,6 +292,8 @@ class Simulation:
             tau_eigenvals[i] = eigenval.real
             eigenvec = eigenvec[:, idx]
             tau_eigenvec[i] = eigenvec
+        self.eigenvals = tau_eigenvals
+        self.eigenvec = tau_eigenvec
         return tau_eigenvals, tau_eigenvec
 
     ############################################################################
@@ -356,7 +369,10 @@ class Simulation:
             rates_eigenvalues: if not None, provide a list of SqRA eigenvalues so that it is possible to
                                plot ITS of SqRA as dashed lines for comparison
         """
-        tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
+        if len(self.eigenvals[0]) >= num_eigv:
+            tau_eigenvals, tau_eigenvec = self.eigenvals, self.eigenvec
+        else:
+            tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
         tau_eigenvals = tau_eigenvals.T
         fig, ax = plt.subplots(1, 1)
         colors_circle = ["blue", "red", "green", "orange", "black", "yellow", "purple", "pink"]
@@ -487,9 +503,9 @@ if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
     # ------------------- MAZE ------------------
-    my_maze = Maze((10, 10), images_path=img_path, images_name="test7", no_branching=False, edge_is_wall=True)
+    my_maze = Maze((8, 8), images_path=img_path, images_name="test19", no_branching=True, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
-                               factor_grid=2, m=1, friction=1)
+                               factor_grid=1, m=1, friction=10)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
@@ -511,15 +527,15 @@ if __name__ == '__main__':
     #my_energy.visualize_rates_matrix()
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6, which="LR")
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
+    print(f"Performing a simulation named {my_simulation.images_name}.")
     to_save_trajectory = False
-    my_simulation.integrate(N=int(1e7), dt=0.01, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(1e6), dt=0.01, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
         my_simulation.visualize_trajectory()
     my_simulation.save_information()
-    my_simulation.get_transitions_matrix(noncorr=True)
-    s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(6, which="LR")
+    my_simulation.get_transitions_matrix(noncorr=False)
     #my_simulation.visualize_transition_matrices()
     my_simulation.visualize_eigenvec(6, which="LR")
     my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=e_eigval)
