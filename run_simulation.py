@@ -123,6 +123,7 @@ def produce_simulation(args, energy):
         end_visualization_time = time.time()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")
+    my_simulation.save_information()
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
     print(f"-------- Total Simulation time: {hours}h {minutes}min {seconds}s. --------")

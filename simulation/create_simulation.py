@@ -11,6 +11,7 @@ from tqdm import tqdm
 from matplotlib import cm, colors
 from scipy.sparse.linalg import eigs
 import time
+from datetime import datetime
 
 DIM_LANDSCAPE = (7.25, 4.45)
 DIM_PORTRAIT = (3.45, 4.45)
@@ -303,7 +304,7 @@ class Simulation:
             plt.hlines(0, 0, 1)
             plt.title("Eigenvalues")
             plt.gca().axes.get_xaxis().set_visible(False)
-            plt.savefig(self.images_path + f"eigenvalues_msm_{self.images_name}.png")
+            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_msm.png")
             plt.close()
 
     def visualize_eigenvec(self, num_eigv: int = 6, **kwargs):
@@ -313,14 +314,16 @@ class Simulation:
             num_eigv: number of eigenvectors to visualize
             **kwargs: named arguments to forward to eigs()
         """
+        taus_to_plot = 5
         tau_eigenvals, tau_eigenvec = self.get_eigenval_eigenvec(num_eigv=num_eigv, **kwargs)
         full_width = DIM_LANDSCAPE[0]
-        fig, ax = plt.subplots(len(self.tau_array), num_eigv, sharey="row",
-                               figsize=(full_width, full_width/num_eigv*len(self.tau_array)))
+        fig, ax = plt.subplots(len(self.tau_array[:taus_to_plot]), num_eigv, sharey="row",
+                               figsize=(full_width, full_width/num_eigv*len(self.tau_array[:taus_to_plot])))
         cmap = cm.get_cmap("RdBu").copy()
         cmap.set_over("black")
         cmap.set_under("black")
-        for i, tau in enumerate(self.tau_array):
+        # show max first taus_to_plot (5) taus
+        for i, tau in enumerate(self.tau_array[:taus_to_plot]):
             vmin = np.min(tau_eigenvec[i])
             vmax = np.max(tau_eigenvec[i])
             for j in range(num_eigv):
@@ -329,7 +332,8 @@ class Simulation:
                 for m in range(self.histogram.shape[0]):
                     for n in range(self.histogram.shape[1]):
                         if self.energy.is_accessible((m, n)):
-                            if tau_eigenvec[i, 0, 0] > 0:
+                            # if the first tau is negative, inverse all of them (for consistency)
+                            if np.sum(tau_eigenvec[i, :, 0]) > 0:
                                 array[m, n] = tau_eigenvec[i, index, j]
                             else:
                                 array[m, n] = - tau_eigenvec[i, index, j]
@@ -339,7 +343,7 @@ class Simulation:
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7)
                 ax[i][j].axes.get_xaxis().set_visible(False)
                 ax[i][j].set_yticklabels([])
-        fig.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        fig.savefig(self.images_path + f"{self.images_name}_eigenvectors_msm.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def visualize_its(self, num_eigv: int = 6, rates_eigenvalues=None, **kwargs):
@@ -369,9 +373,9 @@ class Simulation:
                 ax.plot(self.tau_array * self.dt, absolute_its,
                         color="black", ls="--")
         ax.legend()
-        ax.set_ylim([0, 3])
+        ax.set_ylim([0, -1/rates_eigenvalues[1]*2])
         ax.fill_between(self.tau_array * self.dt, self.tau_array*self.dt, color="grey", alpha=0.5)
-        fig.savefig(self.images_path + f"implied_timescales_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        fig.savefig(self.images_path + f"{self.images_name}_implied_timescales.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def visualize_transition_matrices(self):
@@ -389,7 +393,7 @@ class Simulation:
             ax[i].axes.get_xaxis().set_visible(False)
             ax[i].axes.get_yaxis().set_visible(False)
             ax[i].set_title(f"tau = {self.tau_array[i]}", fontsize=7)
-        plt.savefig(self.images_path + f"trans_mat_{self.images_name}.png", bbox_inches='tight', dpi=1200)
+        plt.savefig(self.images_path + f"{self.images_name}_trans_mat.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def visualize_hist_2D(self):
@@ -402,7 +406,7 @@ class Simulation:
             cmap = cm.get_cmap("RdBu").copy()
             im = plt.imshow(self.histogram, cmap=cmap)
             fig.colorbar(im, ax=ax)
-            ax.figure.savefig(self.images_path + f"hist_2D_{self.images_name}.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_hist_2D.png")
             plt.close()
 
     def visualize_sim_Boltzmann(self):
@@ -418,7 +422,7 @@ class Simulation:
             ax.set_xlabel("Accessible cell index")
             ax.set_ylabel("Relative cell visitation frequency")
             ax.set_title("Simulated Boltzmann distribution")
-            fig.savefig(self.images_path + f"sim_boltzmann_{self.images_name}.png")
+            fig.savefig(self.images_path + f"{self.images_name}_sim_boltzmann.png")
             plt.close()
 
     def visualize_population_per_energy(self):
@@ -442,7 +446,7 @@ class Simulation:
                     if E_population[1][j-1] < e <= E_population[1][j]:
                         E_pop[i] = E_population[0][j-1]
             plt.hist(energies, bins=25, weights=np.array(population)/E_pop, histtype='step')
-            plt.savefig(self.images_path + f"population_per_energy_{self.images_name}.png")
+            plt.savefig(self.images_path + f"{self.images_name}_population_per_energy.png")
             plt.close()
 
     def visualize_trajectory(self):
@@ -453,17 +457,39 @@ class Simulation:
             plt.subplots(1, 1, figsize=self.energy.size)
             plt.scatter(self.traj_y, self.traj_x, marker="o", c="black", s=1)
             plt.gca().invert_yaxis()
-            plt.savefig(self.images_path + f"traj_{self.images_name}.png")
+            plt.savefig(self.images_path + f"{self.images_name}_trajectory.png")
             plt.close()
+
+    def save_information(self):
+        with open(self.images_path + f"{self.images_name}_summary.txt", "w") as f:
+            describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms"}
+            f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
+            f.write(f"# Time of execution: {datetime.now()}\n")
+            f.write(f"# --------- PARAMETERS ----------\n")
+            f.write(f"energy type = {describe_types[type(self.energy)]}\n")
+            f.write(f"energy cutoff = {self.energy.energy_cutoff}\n")
+            f.write(f"size = {self.energy.size}\n")
+            f.write(f"grid_edges = {self.grid_edges}\n")
+            f.write(f"step_x = {self.step_x}\n")
+            f.write(f"step_y = {self.step_y}\n")
+            f.write(f"images path = {self.images_path}\n")
+            f.write(f"images name = {self.images_name}\n")
+            f.write(f"mass = {self.m}\n")
+            f.write(f"friction = {self.friction}\n")
+            f.write(f"temperature = {self.temperature}\n")
+            f.write(f"D = {self.D}\n")
+            f.write(f"N = {self.N}\n")
+            f.write(f"dt = {self.dt}\n")
+            f.write(f"tau_array = {self.tau_array}\n")
 
 
 if __name__ == '__main__':
     start_time = time.time()
     img_path = "images/"
     # ------------------- MAZE ------------------
-    my_maze = Maze((15, 15), images_path=img_path, images_name="test3", no_branching=False, edge_is_wall=True)
+    my_maze = Maze((10, 10), images_path=img_path, images_name="test7", no_branching=False, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
-                               factor_grid=1, m=1, friction=1)
+                               factor_grid=2, m=1, friction=1)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
@@ -486,11 +512,12 @@ if __name__ == '__main__':
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6, which="LR")
     my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
     to_save_trajectory = False
-    my_simulation.integrate(N=int(5e7), dt=0.001, save_trajectory=to_save_trajectory)
+    my_simulation.integrate(N=int(1e7), dt=0.01, save_trajectory=to_save_trajectory)
     my_simulation.visualize_hist_2D()
     my_simulation.visualize_population_per_energy()
     if to_save_trajectory:
         my_simulation.visualize_trajectory()
+    my_simulation.save_information()
     my_simulation.get_transitions_matrix(noncorr=True)
     s_eigval, s_eigvec = my_simulation.get_eigenval_eigenvec(6, which="LR")
     #my_simulation.visualize_transition_matrices()

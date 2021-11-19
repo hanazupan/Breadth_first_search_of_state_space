@@ -7,8 +7,8 @@ maze/playground.py
 *.png
 *.gif
 
-!Maze/Example_images/*.png
-!Maze/Example_images/*.gif
+images/
+img_to_save/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
