@@ -16,6 +16,7 @@ from scipy.sparse import csr_matrix
 from scipy.interpolate import bisplev
 import seaborn as sns
 import pandas as pd
+from datetime import datetime
 from mpl_toolkits import mplot3d  # a necessary import
 
 # DEFINING BOLTZMANN CONSTANT
@@ -215,7 +216,7 @@ class Energy(AbstractEnergy):
             cmap = cm.get_cmap("RdBu").copy()
             im = plt.imshow(self.energies, cmap=cmap, **kwargs)
             self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"energy_{self.images_name}.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_energy.png")
             plt.close()
             return ax
 
@@ -232,30 +233,9 @@ class Energy(AbstractEnergy):
                             cmap='RdBu_r', edgecolor='none', **kwargs)
             ax.set_xlabel("x")
             ax.set_ylabel("y")
-            ax.figure.savefig(self.images_path + f"3D_energy_{self.images_name}.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_3D_energy.png")
             plt.close()
             return ax
-
-    def visualize_eigenvectors(self, num: int = 3, **kwargs):
-        """
-        Visualize the eigenvectors of rate matrix.
-
-        Args:
-            num: int, how many eigenvectors to display
-        """
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
-        # sort the eigenvectors according to value of eigenvalues
-        with plt.style.context('Stylesheets/not_animation.mplstyle'):
-            full_width = DIM_LANDSCAPE[0]
-            fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
-            xs = np.linspace(-0.5, 0.5, num=len(eigenvec))
-            for i in range(num):
-                # plot eigenvectors corresponding to the largest (most negative) eigenvalues
-                ax[i].plot(xs, eigenvec[:, i])
-                ax[i].set_title(f"Eigenvector {i+1}", fontsize=7)
-                ax[i].axes.get_xaxis().set_visible(False)
-            plt.savefig(self.images_path + f"eigenvectors_{self.images_name}.png", bbox_inches='tight', dpi=1200)
-            plt.close()
 
     def visualize_eigenvectors_in_maze(self, num: int = 3, **kwargs):
         """
@@ -269,27 +249,27 @@ class Energy(AbstractEnergy):
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
         with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
             full_width = DIM_LANDSCAPE[0]
-            fig, ax = plt.subplots(1, num + 1, sharey="row", figsize=(full_width, full_width/(num+1)))
+            fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
             cmap = cm.get_cmap("RdBu").copy()
-            cmap.set_over("black")
-            cmap.set_under("black")
-            ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
-            ax[0].set_title("Energy surface", fontsize=7)
+            # cmap.set_over("black")
+            # cmap.set_under("black")
+            # ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
+            # ax[0].set_title("Energy surface", fontsize=7, fontweight="bold")
             accesible = self.explorer.get_sorted_accessible_cells()
             len_acc = len(accesible)
             assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
             vmax = np.max(eigenvec[:, :num+1])
             vmin = np.min(eigenvec[:, :num+1])
-            for i in range(1, num+1):
+            for i in range(num):
                 array = np.full(self.size, vmax+1)
                 for index, cell in enumerate(accesible):
                     if eigenvec[index, 0] > 0:
-                        array[cell] = eigenvec[index, i - 1]
+                        array[cell] = eigenvec[index, i]
                     else:
-                        array[cell] = - eigenvec[index, i - 1]
+                        array[cell] = - eigenvec[index, i]
                 ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
-                ax[i].set_title(f"Eigenvector {i}", fontsize=7)
-            plt.savefig(self.images_path + f"eigenvectors_in_maze_{self.images_name}.png")
+                ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
+            plt.savefig(self.images_path + f"{self.images_name}_eigenvectors_sqra.png")
             plt.close()
 
     def visualize_eigenvalues(self):
@@ -301,15 +281,15 @@ class Energy(AbstractEnergy):
         num = self.rates_matrix.shape[0] - 2
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LR")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
+            fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
             xs = np.linspace(0, 1, num=num)
             plt.scatter(xs, eigenval, s=5, c="black")
             for i, eigenw in enumerate(eigenval):
                 plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
             plt.hlines(0, 0, 1)
-            plt.title("Eigenvalues")
-            plt.gca().axes.get_xaxis().set_visible(False)
-            plt.savefig(self.images_path + f"eigenvalues_{self.images_name}.png")
+            ax.set_ylabel("Eigenvalues (SqRA)")
+            ax.axes.get_xaxis().set_visible(False)
+            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_sqra.png")
             plt.close()
 
     def visualize_rates_matrix(self):
@@ -327,22 +307,27 @@ class Energy(AbstractEnergy):
             im = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
             self._add_colorbar(fig, ax, im)
             ax.set_title("Rates matrix")
-            fig.savefig(self.images_path + f"rates_matrix_{self.images_name}.png")
+            fig.savefig(self.images_path + f"{self.images_name}_rates_matrix.png")
             plt.close()
 
-    def visualize_boltzmann(self):
-        """
-        Visualizes both the energies and the Boltzmann distribution on that energy surface.
-        """
-        boltzmanns = self.get_boltzmann()
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
-            ax.plot(boltzmanns)
-            ax.set_xlabel("Accessible cell index")
-            ax.set_ylabel("Relative cell population")
-            ax.set_title("Boltzmann distribution")
-            fig.savefig(self.images_path + f"boltzmann_{self.images_name}.png")
-            plt.close()
+    def save_information(self):
+        with open(self.images_path + f"{self.images_name}_summary.txt", "w") as f:
+            describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms",
+                              Energy: "not determined"}
+            f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
+            f.write(f"# Time of execution: {datetime.now()}\n")
+            f.write(f"# --------- PARAMETERS ----------\n")
+            f.write(f"energy type = {describe_types[type(self)]}\n")
+            f.write(f"energy cutoff = {self.energy_cutoff}\n")
+            f.write(f"size = {self.size}\n")
+            f.write(f"grid_start = {self.grid_start}\n")
+            f.write(f"grid_end = {self.grid_end}\n")
+            f.write(f"images path = {self.images_path}\n")
+            f.write(f"images name = {self.images_name}\n")
+            f.write(f"mass = {self.m}\n")
+            f.write(f"friction = {self.friction}\n")
+            f.write(f"temperature = {self.temperature}\n")
+            f.write(f"D = {self.D}\n")
 
 
 class EnergyFromMaze(Energy):
@@ -383,7 +368,7 @@ class EnergyFromMaze(Energy):
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.grid_x, self.grid_y = self._prepare_grid(factor=10)
+        self.grid_x, self.grid_y = self._prepare_grid(factor=5)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.h = self.grid_full_len / self.size[0]
@@ -411,7 +396,7 @@ class EnergyFromMaze(Energy):
             fig, ax = plt.subplots(1, 1)
             im = plt.imshow(self.underlying_maze, **lims)
             self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"underlying_maze_{self.images_name}.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_underlying_maze.png")
             plt.close()
 
 
@@ -427,6 +412,9 @@ class EnergyFromPotential(Energy):
         super().__init__(images_path, images_name, m, friction, T)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
+        self.grid_start = -1
+        self.grid_end = 1
+        self.grid_full_len = self.grid_end - self.grid_start
         self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)
         self.energy_cutoff = 10
@@ -666,7 +654,7 @@ class EnergyFromAtoms(Energy):
                 range_y_grid = self.grid_edges[3] - self.grid_edges[2]
                 ax.scatter((atom.position[1]-self.grid_edges[2])*self.size[1]/range_y_grid,
                            (atom.position[0]-self.grid_edges[0])*self.size[0]/range_x_grid, marker="o", c="white")
-            ax.figure.savefig(self.images_path + f"energy_with_cutoff_{self.images_name}.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_energy_with_cutoff.png")
             plt.close()
             return ax
     
@@ -704,4 +692,5 @@ if __name__ == '__main__':
     my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
+    my_energy.save_information()
 

@@ -92,6 +92,7 @@ def produce_energies(args):
         else:
             hours, minutes, seconds = report_time(end_setup_time, end_animation_time)
         print(f" -> time for animations: {hours}h {minutes}min {seconds}s.")
+    my_energy.save_information()
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
     print(f"Finished. Total time: {hours}h {minutes}min {seconds}s.")
