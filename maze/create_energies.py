@@ -17,14 +17,11 @@ from scipy.interpolate import bisplev
 import seaborn as sns
 import pandas as pd
 from datetime import datetime
+from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT
 from mpl_toolkits import mplot3d  # a necessary import
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
-
-DIM_LANDSCAPE = (7.25, 4.45)
-DIM_PORTRAIT = (3.45, 4.45)
-DIM_SQUARE = (4.45, 4.45)
 
 
 class Energy(AbstractEnergy):
@@ -423,7 +420,6 @@ class EnergyFromPotential(Energy):
         self.h = self.grid_full_len / (self.size[0])
         self.S = self.grid_full_len / (self.size[1])
         self.V = self.grid_full_len / (self.size[0]) * self.grid_full_len / (self.size[1])
-
 
     def square_well(self, x, y, a=5, b=10):
         return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2

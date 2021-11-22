@@ -1,0 +1,5 @@
+DIM_LANDSCAPE = (7.25, 4.45)
+DIM_PORTRAIT = (3.45, 4.45)
+DIM_SQUARE = (4.45, 4.45)
+IMG_PATH = "images/"
+DATA_PATH = "data/"
