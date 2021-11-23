@@ -121,6 +121,7 @@ class Energy(AbstractEnergy):
             # TODO: create an Energy method that gets a cell from index of accessible and vice versa
             cell_i = self.explorer.get_cell_from_adj(r)
             cell_j = self.explorer.get_cell_from_adj(c)
+            # TODO: should here be += or =?
             self.rates_matrix[r, c] += self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):

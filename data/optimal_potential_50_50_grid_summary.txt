@@ -1,0 +1,18 @@
+# Simulation performed with the script simulation.create_simulation.py.
+# Time of execution: 2021-11-23 16:55:56.812309
+# --------- PARAMETERS ----------
+energy type = double_well
+energy cutoff = 10
+size = (50, 50)
+grid_edges = (-1.0, 1.0, -1.0, 1.0)
+step_x = 0.040000000000000036
+step_y = 0.040000000000000036
+images path = images/
+images name = optimal_potential_50_50_grid
+mass = 1
+friction = 30
+temperature = 293
+D = 0.08120458863333332
+N = 50000000
+dt = 0.001
+tau_array = [   5    7   10   20   30   50   70  100  150  250  500  700 1000]

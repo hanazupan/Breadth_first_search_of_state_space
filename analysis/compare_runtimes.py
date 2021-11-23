@@ -8,6 +8,7 @@ import seaborn as sns
 import numpy as np
 import time
 import gc
+from tqdm import tqdm
 
 sns.set_style("ticks")
 
@@ -90,36 +91,52 @@ def scan_cutoffs(e_type="potential"):
     Returns:
 
     """
-    if type == "potential":
-        e_cutoffs = np.linspace(0.5, 5.5, num=100)
-    else:
-        e_cutoffs = np.linspace(0, 15, num=50)
-        size = (10, 10)
-        my_maze = Maze(size=size, images_path=IMG_PATH)
+    num_eigv = 8
     friction = 10
-    all_eigenvalues = [f"Eigenvalue {i}" for i in range(6)]
+    if e_type.startswith("potential"):
+        e_cutoffs = np.linspace(0.5, 5.5, num=101)
+        size = (30, 30)
+        my_energy = EnergyFromPotential(size=size, images_path=IMG_PATH, friction=friction)
+    elif e_type.startswith("maze"):
+        e_cutoffs = np.linspace(2, 18, num=51)
+        size = (15, 15)
+        my_maze = Maze(size=size, images_path=IMG_PATH, edge_is_wall=True)
+        my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=IMG_PATH)
+    else:
+        e_cutoffs = np.linspace(-2, 10, num=51)
+        size = (20, 20)
+        atoms = []
+        num_atoms = 3
+        for i in range(num_atoms):
+            x_coo = -10 + 20*np.random.rand()
+            y_coo = -10 + 20*np.random.rand()
+            epsilon = np.random.choice([1, 3, 5, 10])
+            sigma = np.random.choice([2, 4, 6])
+            atom = Atom((x_coo, y_coo), epsilon, sigma)
+            atoms.append(atom)
+        atoms = tuple(atoms)
+        my_energy = EnergyFromAtoms(size=size, atoms=atoms, grid_edges=(-12, 12, -12, 12), images_path=IMG_PATH)
+    all_eigenvalues = [f"Eigenvalue {i}" for i in range(num_eigv)]
     data = pd.DataFrame(columns=["Num. of cells", "Cutoff", "% explored cells", "Time [s]"]+all_eigenvalues)
-    for i, cutoff in enumerate(e_cutoffs):
+    for i, cutoff in tqdm(enumerate(e_cutoffs)):
         name = f"scan_cutoff_{e_type}_{i}"
         start_sqra_time = time.time()
-        if type == "potential":
-            size = (30, 30)
-            my_energy = EnergyFromPotential(size=size, images_path=IMG_PATH, images_name=name, friction=friction)
-        else:
-            my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=IMG_PATH, images_name=name)
+        my_energy.images_name = name
+        my_energy.explorer = None
+        my_energy.rates_matrix = None
         my_energy.energy_cutoff = cutoff
         my_energy.get_rates_matix()
-        eigenval, eigenvec = my_energy.get_eigenval_eigenvec(6, which="LR")
+        eigenval, eigenvec = my_energy.get_eigenval_eigenvec(num_eigv, which="LR")
         end_sqra_time = time.time()
-        dict_values = {f"Eigenvalue {i}": eigv for i, eigv in enumerate(eigenval)}
-        dict_values.update({"Num. of cells": size[0]*size[1], "Cutoff": my_energy.energy_cutoff,
-                            "% explored cells": len(set(my_energy.explorer.get_sorted_accessible_cells()))/(size[0]*size[1])*100,
-                            "Time [s]": end_sqra_time - start_sqra_time})
+        dict_values = {f"Eigenvalue {i+1}": eigv for i, eigv in enumerate(eigenval)}
+        percentage_explored = len(my_energy.explorer.get_sorted_accessible_cells())/(my_energy.size[0]*my_energy.size[1])*100
+        dict_values.update({"Num. of cells": my_energy.size[0]*my_energy.size[1], "Cutoff": my_energy.energy_cutoff,
+                            "% explored cells": percentage_explored, "Time [s]": end_sqra_time - start_sqra_time})
         data = data.append(dict_values, ignore_index=True)
-        if i%10 == 0:
-            my_energy.visualize_eigenvectors_in_maze(6, which="LR")
-        del my_energy
-        gc.collect()
+        #visualize every 10-th energy surface/its eigenvectors
+        if i % 10 == 0:
+            my_energy.visualize_eigenvectors_in_maze(8, which="LR")
+            my_energy.save_information()
     name_file = DATA_PATH+f"scan_cutoff_{e_type}.csv"
     data.to_csv(path_or_buf=name_file)
 
@@ -127,17 +144,18 @@ def scan_cutoffs(e_type="potential"):
 def plot_scan_cutoff(file_path, e_type):
     data = pd.read_csv(file_path)
     fig, ax1 = plt.subplots(1, 1)
-    all_eigenvalues = [f"Eigenvalue {i}" for i in range(6)]
+    all_eigenvalues = [f"Eigenvalue {i+1}" for i in range(6)]
+    plt.legend(loc="lower right")
     for i, eigenvalue in enumerate(all_eigenvalues):
-        sns.lineplot(x="Cutoff", y=eigenvalue, data=data, label=f"Eigenvalue {i}", ax=ax1)
+        sns.lineplot(x="Cutoff", y=eigenvalue, data=data, label=f"Eigenvalue {i+1}", ax=ax1)
     ax1.set_ylabel("Eigenvalues")
     ax2 = ax1.twinx()
-    sns.lineplot(x="Cutoff", y="% explored cells", data=data, label="% explored", color="black", ax=ax2)
+    sns.lineplot(x="Cutoff", y="% explored cells", data=data, label="% explored", color="black", ax=ax2, legend=False)
     plt.savefig(IMG_PATH+f"scan_cutoff_{e_type}")
 
 
 if __name__ == '__main__':
-    #compare_grids_double_well()
-    #plot_time_comp(DATA_PATH+"compare_grids_double_well.csv")
-    scan_cutoffs(e_type="maze")
-    plot_scan_cutoff(DATA_PATH+"scan_cutoff_maze.csv", "maze")
+    names = ["potential1", "maze5", "atoms"]
+    for name in names:
+        scan_cutoffs(e_type=name)
+        plot_scan_cutoff(DATA_PATH+f"scan_cutoff_{name}.csv", name)
