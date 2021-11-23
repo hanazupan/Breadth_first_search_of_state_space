@@ -13,18 +13,15 @@ from scipy.sparse.linalg import eigs
 import seaborn as sns
 import time
 from datetime import datetime
+from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT, DATA_PATH, IMG_PATH
 
 sns.set_style("ticks")
-
-DIM_LANDSCAPE = (7.25, 4.45)
-DIM_PORTRAIT = (3.45, 4.45)
-DIM_SQUARE = (4.45, 4.45)
 
 
 class Simulation:
 
     def __init__(self, energy: Energy, dt: float = 0.01, N: int = int(1e7),
-                 images_path: str = "./", images_name: str = "simulation"):
+                 images_path: str = IMG_PATH, images_name: str = "simulation"):
         """
         Class Simulation intended to run simulations on the Energy object using Euler–Maruyama integration
         as well as performing Markov State Modelling (MSM) and calculate eigenvectors and eigenvalues of so
@@ -49,7 +46,7 @@ class Simulation:
         self.D = self.energy.D
         # TODO: tau array should probably be calculated (what are appropriate values?) and not pre-determined
         if type(energy) == EnergyFromPotential:
-            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 120, 150])
+            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 250, 500, 700, 1000])
         elif type(energy) == EnergyFromMaze:
             self.tau_array = np.array([5, 10, 50, 100, 150])
         else:
@@ -103,7 +100,12 @@ class Simulation:
             x_n, y_n = self._euler_maruyama(x_n, y_n)
             if self.energy.pbc:
                 x_n, y_n = self._point_within_bound((x_n, y_n))
-            cell = self._point_to_cell((x_n, y_n))
+                cell = self._point_to_cell((x_n, y_n))
+            elif not (self.grid_edges[0] <= x_n <= self.grid_edges[1]) or not\
+                    (self.grid_edges[2] <= y_n <= self.grid_edges[3]):
+                cell = (-1, -1)
+            else:
+                cell = self._point_to_cell((x_n, y_n))
             # if cell fits into the histogram
             if np.all([0 <= cell[k] < self.histogram.shape[k] for k in range(len(self.histogram.shape))]):
                 self.histogram[cell] += 1
@@ -394,24 +396,6 @@ class Simulation:
         fig.savefig(self.images_path + f"{self.images_name}_implied_timescales.png", bbox_inches='tight', dpi=1200)
         plt.close()
 
-    def visualize_transition_matrices(self):
-        """
-        Plot the transition matrices corresponding to different taus.
-        """
-        if not np.any(self.transition_matrices):
-            self.get_transitions_matrix()
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, len(self.transition_matrices), sharey="row")
-        for i, tm in enumerate(self.transition_matrices):
-            vmax = np.max(tm)
-            vmin = np.min(tm)
-            ax[i].imshow(tm, cmap="RdBu_r", vmin=vmin, vmax=vmax)
-            ax[i].axes.get_xaxis().set_visible(False)
-            ax[i].axes.get_yaxis().set_visible(False)
-            ax[i].set_title(f"tau = {self.tau_array[i]}", fontsize=7)
-        plt.savefig(self.images_path + f"{self.images_name}_trans_mat.png", bbox_inches='tight', dpi=1200)
-        plt.close()
-
     def visualize_hist_2D(self):
         """
         Plot the histogram of the simulation. Should correspond to the 2D Boltzmann distribution of the energy
@@ -471,7 +455,7 @@ class Simulation:
             plt.close()
 
     def save_information(self):
-        with open(self.images_path + f"{self.images_name}_summary.txt", "w") as f:
+        with open(DATA_PATH + f"{self.images_name}_summary.txt", "w") as f:
             describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms"}
             f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
             f.write(f"# Time of execution: {datetime.now()}\n")
@@ -495,15 +479,14 @@ class Simulation:
 
 if __name__ == '__main__':
     start_time = time.time()
-    img_path = "images/"
     # ------------------- MAZE ------------------
-    my_maze = Maze((8, 8), images_path=img_path, images_name="test20", no_branching=True, edge_is_wall=True)
-    my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name=my_maze.images_name,
+    my_maze = Maze((8, 8), images_name="test20", no_branching=True, edge_is_wall=True)
+    my_energy = EnergyFromMaze(my_maze, images_name=my_maze.images_name,
                                factor_grid=1, m=1, friction=30)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL ------------------
-    # my_energy = EnergyFromPotential((50, 50), images_path=img_path, images_name="potentials", m=1,
+    # my_energy = EnergyFromPotential((50, 50), images_name="potentials", m=1,
     #                                 friction=20)
     # ------------------- ATOMS ------------------
     # epsilon = 3
@@ -512,7 +495,7 @@ if __name__ == '__main__':
     # atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     # atom_3 = Atom((9.3, 35.3), epsilon/5, sigma)
     # my_energy = EnergyFromAtoms((40, 40), (atom_1, atom_2, atom_3), grid_edges=(0, 40, 0, 40),
-    #                             images_name="atoms_big", images_path=img_path, friction=10)
+    #                             images_name="atoms_big", friction=10)
     # ------------------- GENERAL FUNCTIONS ------------------
     # my_energy.visualize_boltzmann()
     my_energy.visualize()
@@ -520,7 +503,7 @@ if __name__ == '__main__':
     #my_energy.visualize_eigenvalues()
     #my_energy.visualize_rates_matrix()
     e_eigval, e_eigvec = my_energy.get_eigenval_eigenvec(6, which="LR")
-    my_simulation = Simulation(my_energy, images_path=img_path, images_name=my_energy.images_name)
+    my_simulation = Simulation(my_energy, images_name=my_energy.images_name)
     print(f"Performing a simulation named {my_simulation.images_name}.")
     to_save_trajectory = False
     my_simulation.integrate(N=int(1e6), dt=0.01, save_trajectory=to_save_trajectory)

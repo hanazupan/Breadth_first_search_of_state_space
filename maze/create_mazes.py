@@ -113,6 +113,14 @@ class AbstractEnergy(ABC):
             if self.is_accessible(n):
                 yield n
 
+    def get_accessible(self) -> list:
+        all_accessible = []
+        for i in range(self.energies.shape[0]):
+            for j in range(self.energies.shape[1]):
+                if self.is_accessible((i, j)):
+                    all_accessible.append((i, j))
+        return all_accessible
+
     def get_energy(self, cell: tuple) -> float:
         """
         Returns the energy of the cell.
