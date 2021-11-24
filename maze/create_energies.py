@@ -121,7 +121,6 @@ class Energy(AbstractEnergy):
             # TODO: create an Energy method that gets a cell from index of accessible and vice versa
             cell_i = self.explorer.get_cell_from_adj(r)
             cell_j = self.explorer.get_cell_from_adj(c)
-            # TODO: should here be += or =?
             self.rates_matrix[r, c] += self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
@@ -410,8 +409,8 @@ class EnergyFromPotential(Energy):
         super().__init__(images_path, images_name, m, friction, T)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
-        self.grid_start = -1
-        self.grid_end = 1
+        self.grid_start = -1.4
+        self.grid_end = 1.4
         self.grid_full_len = self.grid_end - self.grid_start
         self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)

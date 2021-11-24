@@ -240,7 +240,7 @@ class Simulation:
         cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
         all_cells = len(acc_cells)
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
-        for tau_i, tau in enumerate(self.tau_array):
+        for tau_i, tau in enumerate(tqdm(self.tau_array)):
             count_per_cell = {(i, j, m, n): 0 for i, j in cells for m, n in cells}
             if not noncorr:
                 window_cell = window(self.traj_cell, int(tau))

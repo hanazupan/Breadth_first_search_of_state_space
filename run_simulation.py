@@ -46,7 +46,7 @@ def produce_energies(args):
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=30)
+        my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True)
         my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1)
