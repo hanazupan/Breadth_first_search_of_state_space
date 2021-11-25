@@ -3,7 +3,7 @@ maze/Images/
 Maze/*.gif
 Maze/*.png
 maze/playground.py
-
+presentation/
 *.png
 *.gif
 playground.py

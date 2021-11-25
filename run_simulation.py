@@ -62,7 +62,7 @@ def produce_energies(args):
             atoms.append(atom)
         atoms = tuple(atoms)
         my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, grid_edges=(-12, 12, -12, 12), images_path=args.path,
-                                    images_name=args.name)
+                                    images_name=args.name, friction=1, m=1)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
     end_setup_time = time.time()

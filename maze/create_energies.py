@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, diags
 from scipy.interpolate import bisplev
 import seaborn as sns
 import pandas as pd
@@ -101,7 +101,7 @@ class Energy(AbstractEnergy):
         return min(self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.temperature))),
                    self.D * self.S / self.h / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(kB*self.temperature))))
 
-    def _calculate_rates_matrix(self):
+    def _calculate_rates_matrix(self, selected_explorer):
         """
         Explores the self.energies matrix using breadth-first search, t.i. starting in a random accessible
         (energy < energy_cutoff) cell and then exploring accessible neighbours of the cell. This creates an adjacency
@@ -109,8 +109,19 @@ class Energy(AbstractEnergy):
         value is saved in the ij-position of the rates_matrix. The diagonal elements of rates_matrix are determined
         so that the rowsum of rates_matrix = 0.
         """
-        self.explorer = BFSExplorer(self)
-        adj_matrix = self.explorer.get_adjacency_matrix()
+        if selected_explorer == "bfs":
+            self.explorer = BFSExplorer(self)
+            adj_matrix = self.explorer.get_adjacency_matrix()
+        elif selected_explorer == "dfs":
+            self.explorer = DFSExplorer(self)
+            adj_matrix = self.explorer.get_adjacency_matrix()
+        else:
+            self.explorer = "other"
+            self.energy_cutoff = np.max(self.energies) + 1
+            full_len = self.size[0]*self.size[1]
+            ones = [1]*full_len
+            adj_matrix = diags((ones, ones, ones, ones), offsets=(1, self.size[0], -1, -self.size[0]),
+                               shape=(full_len, full_len))
         self.adj_matrix = adj_matrix
         self.rates_matrix = np.zeros(adj_matrix.shape)
         # get the adjacent elements
@@ -119,15 +130,19 @@ class Energy(AbstractEnergy):
             # important! Index in adj cell is not the same as index in self.energies because non-accessible
             # cells are skipped! Will not work if you use node_to_cell!
             # TODO: create an Energy method that gets a cell from index of accessible and vice versa
-            cell_i = self.explorer.get_cell_from_adj(r)
-            cell_j = self.explorer.get_cell_from_adj(c)
+            if selected_explorer == "bfs" or selected_explorer == "dfs":
+                cell_i = self.explorer.get_cell_from_adj(r)
+                cell_j = self.explorer.get_cell_from_adj(c)
+            else:
+                cell_i = self.node_to_cell(r)
+                cell_j = self.node_to_cell(c)
             self.rates_matrix[r, c] += self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
         self.rates_matrix = csr_matrix(self.rates_matrix)
 
-    def get_rates_matix(self) -> np.ndarray:
+    def get_rates_matix(self, explorer: str = "bfs") -> np.ndarray:
         """
         Get (and create if not yet created) the rate matrix of the energy surface.
 
@@ -138,7 +153,7 @@ class Energy(AbstractEnergy):
             ValueError: if there are no self.energies
         """
         if not self.explorer:
-            self._calculate_rates_matrix()
+            self._calculate_rates_matrix(explorer)
         return self.rates_matrix
 
     ############################################################################
@@ -400,7 +415,8 @@ class EnergyFromMaze(Energy):
 class EnergyFromPotential(Energy):
 
     def __init__(self, size: tuple = (12, 16), images_path: str = "./",
-                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
+                 grid_start=-1.4, grid_end = 1.4):
         """
         Initiate an energy surface with a 2D potential well.
         Grid x is the same for the first row, changes row for row.
@@ -409,8 +425,8 @@ class EnergyFromPotential(Energy):
         super().__init__(images_path, images_name, m, friction, T)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
-        self.grid_start = -1.4
-        self.grid_end = 1.4
+        self.grid_start = grid_start
+        self.grid_end = grid_end
         self.grid_full_len = self.grid_end - self.grid_start
         self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)

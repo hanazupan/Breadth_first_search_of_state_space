@@ -50,7 +50,7 @@ class Simulation:
         elif type(energy) == EnergyFromMaze:
             self.tau_array = np.array([5, 10, 50, 100, 150])
         else:
-            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 200, 250, 350, 500, 700, 1000])
+            self.tau_array = np.array([10, 20, 50, 70, 100, 250, 500, 700, 1000, 1500, 2000, 2500, 3000])
         # prepare empty objects
         self.histogram = np.zeros(self.energy.size)
         self.outside_hist = 0
@@ -238,7 +238,8 @@ class Simulation:
         acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
                      if self.energy.is_accessible((i, j))]
         cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
-        all_cells = len(acc_cells)
+        #all_cells = len(acc_cells)
+        all_cells = len(cells)
         self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
         for tau_i, tau in enumerate(tqdm(self.tau_array)):
             count_per_cell = {(i, j, m, n): 0 for i, j in cells for m, n in cells}
@@ -254,13 +255,15 @@ class Simulation:
                 a, b, c, d = key
                 start_cell = (a, b)
                 end_cell = (c, d)
-                if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)) and \
-                        value != 0:
-                    i = acc_cells.index(start_cell)
-                    j = acc_cells.index(end_cell)
-                    self.transition_matrices[tau_i][i, j] += value
-                    # enforce detailed balance
-                    self.transition_matrices[tau_i][j, i] += value
+                #if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)) and \
+                #        value != 0:
+                #i = acc_cells.index(start_cell)
+                #j = acc_cells.index(end_cell)
+                i = cells.index(start_cell)
+                j = cells.index(end_cell)
+                self.transition_matrices[tau_i][i, j] += value
+                # enforce detailed balance
+                self.transition_matrices[tau_i][j, i] += value
         # divide each row of each matrix by the sum of that row
         sums = self.transition_matrices.sum(axis=-1, keepdims=True)
         sums[sums == 0] = 1
@@ -344,12 +347,12 @@ class Simulation:
                 must_flip = np.sum(tau_eigenvec[i, :, 0])
                 for m in range(self.histogram.shape[0]):
                     for n in range(self.histogram.shape[1]):
-                        if self.energy.is_accessible((m, n)):
-                            if must_flip > 0 or (j+1) % 2 == 0:
-                                array[m, n] = tau_eigenvec[i, index, j]
-                            else:
-                                array[m, n] = - tau_eigenvec[i, index, j]
-                            index += 1
+                        #if self.energy.is_accessible((m, n)):
+                        if must_flip > 0 or (j+1) % 2 == 0:
+                            array[m, n] = tau_eigenvec[i, index, j]
+                        else:
+                            array[m, n] = - tau_eigenvec[i, index, j]
+                        index += 1
                 ax[i][j].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
                 ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7, fontweight="bold")
                 ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7, fontweight="bold")
