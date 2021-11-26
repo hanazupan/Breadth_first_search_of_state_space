@@ -16,6 +16,7 @@ from datetime import datetime
 from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT, DATA_PATH, IMG_PATH
 
 sns.set_style("ticks")
+sns.set_context("talk")
 
 
 class Simulation:
@@ -48,7 +49,7 @@ class Simulation:
         if type(energy) == EnergyFromPotential:
             self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 250, 500, 700, 1000])
         elif type(energy) == EnergyFromMaze:
-            self.tau_array = np.array([5, 10, 50, 100, 150])
+            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 100])
         else:
             self.tau_array = np.array([10, 20, 50, 70, 100, 250, 500, 700, 1000, 1500, 2000, 2500, 3000])
         # prepare empty objects

@@ -20,6 +20,9 @@ from datetime import datetime
 from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT
 from mpl_toolkits import mplot3d  # a necessary import
 
+sns.set_style("ticks")
+sns.set_context("talk")
+
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
 
@@ -242,7 +245,7 @@ class Energy(AbstractEnergy):
         with plt.style.context('Stylesheets/not_animation.mplstyle'):
             ax = plt.axes(projection='3d')
             ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
-                            cmap='RdBu_r', edgecolor='none', **kwargs)
+                            cmap='RdBu', edgecolor='none', **kwargs)
             ax.set_xlabel("x")
             ax.set_ylabel("y")
             ax.figure.savefig(self.images_path + f"{self.images_name}_3D_energy.png")
@@ -367,6 +370,7 @@ class EnergyFromMaze(Energy):
         # dense grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
         z = maze.energies.copy()
+        z = z * 10
         # change some random zeroes into -1 and -2
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
@@ -374,20 +378,19 @@ class EnergyFromMaze(Energy):
                 z[cell] = -1
             for _ in range(int(0.04 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -2
-        z = z * 10
+                z[cell] = -4
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.grid_x, self.grid_y = self._prepare_grid(factor=5)
+        self.grid_x, self.grid_y = self._prepare_grid(factor=2)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.h = self.grid_full_len / self.size[0]
         self.S = self.grid_full_len / self.size[1]
         self.V = self.grid_full_len / self.size[0] * self.grid_full_len / self.size[1]
         self.spline = tck
-        self.energy_cutoff = 8
+        self.energy_cutoff = 15
         self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_x_derivative(self, point: tuple) -> float:

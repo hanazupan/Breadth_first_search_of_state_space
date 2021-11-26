@@ -4,6 +4,7 @@ Maze/*.gif
 Maze/*.png
 maze/playground.py
 presentation/
+report/
 *.png
 *.gif
 playground.py

@@ -48,8 +48,8 @@ def produce_energies(args):
     if args.type == "potential":
         my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True)
-        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1)
+        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=True)
+        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=2, friction=5)
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -76,6 +76,8 @@ def produce_energies(args):
         hours, minutes, seconds = report_time(end_setup_time, end_matrix_time)
         print(f" -> time for rates matrix: {hours}h {minutes}min {seconds}s.")
         print("Producing images ...")
+        if args.type == "maze":
+            my_energy.visualize_underlying_maze()
         my_energy.visualize()
         my_energy.visualize_3d()
         my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")

@@ -1,12 +1,12 @@
 # Simulation performed with the script simulation.create_simulation.py.
-# Time of execution: 2021-11-23 15:52:27.423499
+# Time of execution: 2021-11-26 09:31:38.045856
 # --------- PARAMETERS ----------
 energy type = maze
 energy cutoff = 8
-size = (50, 50)
+size = (60, 60)
 grid_edges = (-6.938893903907228e-18, 5.0, -6.938893903907228e-18, 5.0)
-step_x = 0.10000000000000002
-step_y = 0.10000000000000002
+step_x = 0.08333333333333334
+step_y = 0.08333333333333334
 images path = images/
 images name = test_mazes
 mass = 1
@@ -14,5 +14,5 @@ friction = 10
 temperature = 293
 D = 0.2436137659
 N = 10000000
-dt = 0.001
+dt = 0.008
 tau_array = [  5  10  50 100 150]
