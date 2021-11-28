@@ -49,7 +49,7 @@ def produce_energies(args):
         my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=2, friction=5)
+        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1, friction=5)
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -80,18 +80,29 @@ def produce_energies(args):
             my_energy.visualize_underlying_maze()
         my_energy.visualize()
         my_energy.visualize_3d()
+        e_val, e_vec = my_energy.get_eigenval_eigenvec(6, which="LR")
         my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
         my_energy.visualize_eigenvalues()
         end_visualization_time = time.time()
+        if args.type == "maze":
+            my_energy.images_name +="_cutof"
+            my_energy.energy_cutoff = 7
+            my_energy.explorer = None
+            my_energy.rates_matrix = None
+            my_energy.get_rates_matix()
+
+            e_val_cutoff, e_vec_cutoff = my_energy.get_eigenval_eigenvec(6, which="LR")
+            my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
+            my_energy.visualize_eigenvalues()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
     print(f"-------- Total Energy time: {hours}h {minutes}min {seconds}s. --------")
-    return my_energy
+    return my_energy, e_val, e_val_cutoff
 
 
-def produce_simulation(args, energy):
+def produce_simulation(args, energy, eigenval1, eigenval2):
     print("Setting up the Simulation object ...")
     start_time = time.time()
     my_simulation = Simulation(energy, images_path=args.path, images_name=args.name)
@@ -119,7 +130,9 @@ def produce_simulation(args, energy):
         my_simulation.visualize_eigenvec(6, which="LR")
         if args.compare != "n":
             e_eigval, e_eigvec = energy.get_eigenval_eigenvec(6, which="LR")
-            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=e_eigval)
+            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=eigenval1)
+            my_simulation.images_name += "_cutoff"
+            my_simulation.visualize_its(6, which="LR", rates_eigenvalues=eigenval2)
         else:
             my_simulation.visualize_its(num_eigv=6, which="LR")
         my_simulation.visualize_eigenvalues()
@@ -133,5 +146,5 @@ def produce_simulation(args, energy):
 
 if __name__ == '__main__':
     my_args = parser.parse_args()
-    energy_object = produce_energies(my_args)
-    produce_simulation(my_args, energy_object)
+    energy_object, val1, val2  = produce_energies(my_args)
+    produce_simulation(my_args, energy_object, val1, val2)

@@ -370,7 +370,6 @@ class EnergyFromMaze(Energy):
         # dense grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
         z = maze.energies.copy()
-        z = z * 10
         # change some random zeroes into -1 and -2
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
@@ -378,7 +377,8 @@ class EnergyFromMaze(Energy):
                 z[cell] = -1
             for _ in range(int(0.04 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -4
+                z[cell] = -2
+        z = z*10
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
