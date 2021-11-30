@@ -3,11 +3,13 @@ maze/Images/
 Maze/*.gif
 Maze/*.png
 maze/playground.py
-
+presentation/
+report/
 *.png
 *.gif
-
+playground.py
 images/
+data/
 img_to_save/
 
 # Byte-compiled / optimized / DLL files

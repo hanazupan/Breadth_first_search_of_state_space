@@ -12,13 +12,16 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, diags
 from scipy.interpolate import bisplev
 import seaborn as sns
 import pandas as pd
 from datetime import datetime
 from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT
 from mpl_toolkits import mplot3d  # a necessary import
+
+sns.set_style("ticks")
+sns.set_context("talk")
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
@@ -27,7 +30,7 @@ kB = 0.008314463  # kJ/mol/K
 class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
-                 temperature: float = 293):
+                 temperature: float = 293, grid_start=0, grid_end=5):
         """
         An Energy object has an array in which energies at the midpoint of cells are saved. It also has general
         thermodynamic/atomic properties (mass, friction, temperature) and geometric properties (area between cells,
@@ -54,8 +57,8 @@ class Energy(AbstractEnergy):
         # diffusion coefficient
         self.D = kB * self.temperature / self.m / self.friction
         # in preparation
-        self.grid_start = 0
-        self.grid_end = 5
+        self.grid_start = grid_start
+        self.grid_end = grid_end
         self.grid_full_len = self.grid_end - self.grid_start
         self.rates_matrix = None
         self.grid_x = None
@@ -101,7 +104,7 @@ class Energy(AbstractEnergy):
         return min(self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.temperature))),
                    self.D * self.S / self.h / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(kB*self.temperature))))
 
-    def _calculate_rates_matrix(self):
+    def _calculate_rates_matrix(self, selected_explorer):
         """
         Explores the self.energies matrix using breadth-first search, t.i. starting in a random accessible
         (energy < energy_cutoff) cell and then exploring accessible neighbours of the cell. This creates an adjacency
@@ -109,8 +112,19 @@ class Energy(AbstractEnergy):
         value is saved in the ij-position of the rates_matrix. The diagonal elements of rates_matrix are determined
         so that the rowsum of rates_matrix = 0.
         """
-        self.explorer = BFSExplorer(self)
-        adj_matrix = self.explorer.get_adjacency_matrix()
+        if selected_explorer == "bfs":
+            self.explorer = BFSExplorer(self)
+            adj_matrix = self.explorer.get_adjacency_matrix()
+        elif selected_explorer == "dfs":
+            self.explorer = DFSExplorer(self)
+            adj_matrix = self.explorer.get_adjacency_matrix()
+        else:
+            self.explorer = "other"
+            self.energy_cutoff = np.max(self.energies) + 1
+            full_len = self.size[0]*self.size[1]
+            ones = [1]*full_len
+            adj_matrix = diags((ones, ones, ones, ones), offsets=(1, self.size[0], -1, -self.size[0]),
+                               shape=(full_len, full_len))
         self.adj_matrix = adj_matrix
         self.rates_matrix = np.zeros(adj_matrix.shape)
         # get the adjacent elements
@@ -119,16 +133,19 @@ class Energy(AbstractEnergy):
             # important! Index in adj cell is not the same as index in self.energies because non-accessible
             # cells are skipped! Will not work if you use node_to_cell!
             # TODO: create an Energy method that gets a cell from index of accessible and vice versa
-            cell_i = self.explorer.get_cell_from_adj(r)
-            cell_j = self.explorer.get_cell_from_adj(c)
-            # TODO: should here be += or =?
+            if selected_explorer == "bfs" or selected_explorer == "dfs":
+                cell_i = self.explorer.get_cell_from_adj(r)
+                cell_j = self.explorer.get_cell_from_adj(c)
+            else:
+                cell_i = self.node_to_cell(r)
+                cell_j = self.node_to_cell(c)
             self.rates_matrix[r, c] += self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
         self.rates_matrix = csr_matrix(self.rates_matrix)
 
-    def get_rates_matix(self) -> np.ndarray:
+    def get_rates_matix(self, explorer: str = "bfs") -> np.ndarray:
         """
         Get (and create if not yet created) the rate matrix of the energy surface.
 
@@ -139,7 +156,7 @@ class Energy(AbstractEnergy):
             ValueError: if there are no self.energies
         """
         if not self.explorer:
-            self._calculate_rates_matrix()
+            self._calculate_rates_matrix(explorer)
         return self.rates_matrix
 
     ############################################################################
@@ -228,7 +245,7 @@ class Energy(AbstractEnergy):
         with plt.style.context('Stylesheets/not_animation.mplstyle'):
             ax = plt.axes(projection='3d')
             ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
-                            cmap='RdBu_r', edgecolor='none', **kwargs)
+                            cmap='RdBu', edgecolor='none', **kwargs)
             ax.set_xlabel("x")
             ax.set_ylabel("y")
             ax.figure.savefig(self.images_path + f"{self.images_name}_3D_energy.png")
@@ -253,7 +270,10 @@ class Energy(AbstractEnergy):
             # cmap.set_under("black")
             # ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
             # ax[0].set_title("Energy surface", fontsize=7, fontweight="bold")
-            accesible = self.explorer.get_sorted_accessible_cells()
+            try:
+                accesible = self.explorer.get_sorted_accessible_cells()
+            except AttributeError:
+                accesible = [(i, j) for i in range(self.energies.shape[0]) for j in range(self.energies.shape[1])]
             len_acc = len(accesible)
             assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
             vmax = np.max(eigenvec[:, :num+1])
@@ -331,7 +351,8 @@ class Energy(AbstractEnergy):
 class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = "./",
-                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
+                 grid_start=0, grid_end=5):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -343,7 +364,7 @@ class EnergyFromMaze(Energy):
             factor_grid: int, how many times more points for interpolation than in original maze
                          (note: factor_grid > 2 produces very localized min/max)
         """
-        super().__init__(images_path, images_name, m, friction, T)
+        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end)
         # interpolation only available for 2D mazes
         if len(maze.size) != 2:
             raise ValueError("Maze does not have the right dimensionality.")
@@ -354,26 +375,26 @@ class EnergyFromMaze(Energy):
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
+        z = z * 10
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -1
+                z[cell] = -5
             for _ in range(int(0.04 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -2
-        z = z * 10
+                z[cell] = -10
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.grid_x, self.grid_y = self._prepare_grid(factor=5)
+        self.grid_x, self.grid_y = self._prepare_grid(factor=1)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.h = self.grid_full_len / self.size[0]
         self.S = self.grid_full_len / self.size[1]
         self.V = self.grid_full_len / self.size[0] * self.grid_full_len / self.size[1]
         self.spline = tck
-        self.energy_cutoff = 8
+        self.energy_cutoff = 15
         self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_x_derivative(self, point: tuple) -> float:
@@ -401,7 +422,8 @@ class EnergyFromMaze(Energy):
 class EnergyFromPotential(Energy):
 
     def __init__(self, size: tuple = (12, 16), images_path: str = "./",
-                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
+                 grid_start=-1.4, grid_end = 1.4):
         """
         Initiate an energy surface with a 2D potential well.
         Grid x is the same for the first row, changes row for row.
@@ -410,8 +432,8 @@ class EnergyFromPotential(Energy):
         super().__init__(images_path, images_name, m, friction, T)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
-        self.grid_start = -1
-        self.grid_end = 1
+        self.grid_start = grid_start
+        self.grid_end = grid_end
         self.grid_full_len = self.grid_end - self.grid_start
         self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)
