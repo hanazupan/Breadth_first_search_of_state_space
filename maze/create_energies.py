@@ -30,7 +30,7 @@ kB = 0.008314463  # kJ/mol/K
 class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
-                 temperature: float = 293):
+                 temperature: float = 293, grid_start=0, grid_end=5):
         """
         An Energy object has an array in which energies at the midpoint of cells are saved. It also has general
         thermodynamic/atomic properties (mass, friction, temperature) and geometric properties (area between cells,
@@ -57,8 +57,8 @@ class Energy(AbstractEnergy):
         # diffusion coefficient
         self.D = kB * self.temperature / self.m / self.friction
         # in preparation
-        self.grid_start = 0
-        self.grid_end = 5
+        self.grid_start = grid_start
+        self.grid_end = grid_end
         self.grid_full_len = self.grid_end - self.grid_start
         self.rates_matrix = None
         self.grid_x = None
@@ -270,7 +270,10 @@ class Energy(AbstractEnergy):
             # cmap.set_under("black")
             # ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
             # ax[0].set_title("Energy surface", fontsize=7, fontweight="bold")
-            accesible = self.explorer.get_sorted_accessible_cells()
+            try:
+                accesible = self.explorer.get_sorted_accessible_cells()
+            except AttributeError:
+                accesible = [(i, j) for i in range(self.energies.shape[0]) for j in range(self.energies.shape[1])]
             len_acc = len(accesible)
             assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
             vmax = np.max(eigenvec[:, :num+1])
@@ -348,7 +351,8 @@ class Energy(AbstractEnergy):
 class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = "./",
-                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
+                 grid_start=0, grid_end=5):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -360,7 +364,7 @@ class EnergyFromMaze(Energy):
             factor_grid: int, how many times more points for interpolation than in original maze
                          (note: factor_grid > 2 produces very localized min/max)
         """
-        super().__init__(images_path, images_name, m, friction, T)
+        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end)
         # interpolation only available for 2D mazes
         if len(maze.size) != 2:
             raise ValueError("Maze does not have the right dimensionality.")
@@ -371,19 +375,19 @@ class EnergyFromMaze(Energy):
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
+        z = z * 10
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -1
+                z[cell] = -5
             for _ in range(int(0.04 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -2
-        z = z*10
+                z[cell] = -10
         self.underlying_maze = z
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.grid_x, self.grid_y = self._prepare_grid(factor=2)
+        self.grid_x, self.grid_y = self._prepare_grid(factor=1)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.h = self.grid_full_len / self.size[0]

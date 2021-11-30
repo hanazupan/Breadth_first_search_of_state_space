@@ -48,8 +48,9 @@ def produce_energies(args):
     if args.type == "potential":
         my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1, friction=5)
+        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=False)
+        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1, friction=5,
+                                   grid_start=-10, grid_end=10)
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -71,7 +72,7 @@ def produce_energies(args):
     # visualization
     if args.visualize != "n" and args.compare != "n":
         print("Calculating the rates matrix ...")
-        my_energy.get_rates_matix()
+        my_energy.get_rates_matix(explorer="none")
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_setup_time, end_matrix_time)
         print(f" -> time for rates matrix: {hours}h {minutes}min {seconds}s.")
@@ -86,7 +87,7 @@ def produce_energies(args):
         end_visualization_time = time.time()
         if args.type == "maze":
             my_energy.images_name +="_cutof"
-            my_energy.energy_cutoff = 7
+            my_energy.energy_cutoff = 8
             my_energy.explorer = None
             my_energy.rates_matrix = None
             my_energy.get_rates_matix()

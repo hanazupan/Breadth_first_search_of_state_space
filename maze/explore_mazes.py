@@ -231,7 +231,7 @@ class DFSExplorer(Explorer):
         adjacency matrix of the maze. The algorithm does this:
         1. Find a random accessible cell in the maze, mark it as visited and accessible
         2. Add all neighbours to the stack
-        3. While queue not empty:
+        3. While stack not empty:
             1. Take the last element from the stack
             2. Mark all its unvisited neighbours as visited
             3. Mark all its accessible neighbours as accessible and add them to the stack

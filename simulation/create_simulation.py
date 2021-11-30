@@ -49,7 +49,8 @@ class Simulation:
         if type(energy) == EnergyFromPotential:
             self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 250, 500, 700, 1000])
         elif type(energy) == EnergyFromMaze:
-            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 100, 500, 700, 1000])
+            #
+            self.tau_array = np.array([5, 7, 10, 20, 30, 10, 50, 100, 500, 700, 1000, 1500, 2000, 2500, 3000])
         else:
             self.tau_array = np.array([10, 20, 50, 70, 100, 250, 500, 700, 1000, 1500, 2000, 2500, 3000])
         # prepare empty objects
@@ -335,6 +336,7 @@ class Simulation:
         full_width = DIM_LANDSCAPE[0]
         fig, ax = plt.subplots(len(self.tau_array[:taus_to_plot]), num_eigv, sharey="row",
                                figsize=(full_width, full_width/num_eigv*len(self.tau_array[:taus_to_plot])))
+        # TODO: plot better taus
         cmap = cm.get_cmap("RdBu").copy()
         cmap.set_over("black")
         cmap.set_under("black")

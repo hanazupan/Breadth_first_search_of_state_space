@@ -100,14 +100,31 @@ def compare_time_double_well(e_type="potential"):
         size = (num_cells, num_cells)
         my_energy = EnergyFromPotential(size=size, images_path=img_compare_path, friction=friction,
                                         grid_start=-2.5, grid_end=2.5)
+    elif e_type.startswith("maze"):
+        cutoffs = np.linspace(5, 13, num=21)
+        size = (40, 40)
+        my_maze = Maze(size=size, images_path=img_compare_path, edge_is_wall=True, no_branching=False)
+        my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=img_compare_path, factor_grid=1,
+                                   grid_start=-1, grid_end=1)
     else:
-        cutoffs = np.linspace(3, 15, num=31)
-        size = (15, 15)
-        my_maze = Maze(size=size, images_path=img_compare_path, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=img_compare_path, factor_grid=2)
+        cutoffs = np.linspace(-2, 10, num=51)
+        additional = np.array([20, 23, 25, 28, 30, 35, 40, 45, 50])
+        cutoffs = np.concatenate((cutoffs, additional))
+        size = (30, 30)
+        atoms = []
+        num_atoms = 4
+        for i in range(num_atoms):
+            x_coo = -10 + 20*np.random.rand()
+            y_coo = -10 + 20*np.random.rand()
+            epsilon = np.random.choice([1, 3, 5, 10])
+            sigma = np.random.choice([2, 4, 6])
+            atom = Atom((x_coo, y_coo), epsilon, sigma)
+            atoms.append(atom)
+        atoms = tuple(atoms)
+        my_energy = EnergyFromAtoms(size=size, atoms=atoms, grid_edges=(-12, 12, -12, 12), images_path=img_compare_path)
     for j, co in enumerate(tqdm(cutoffs)):
         my_energy.images_name = f"cutoff_{int(co)}_{e_type}"
-        for i in range(5):
+        for i in range(1):
             # option 3 - no cutoff, no explorer
             full_time, eigenval_ss = run_double_well(my_energy, "none", co)
             # option 1 - cutoff 5 and bfs explorer
@@ -173,7 +190,7 @@ def scan_cutoffs(e_type="potential"):
         my_maze = Maze(size=size, images_path=img_compare_path, edge_is_wall=True, no_branching=True)
         my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=img_compare_path)
     else:
-        e_cutoffs = np.linspace(-2, 10, num=51)
+        e_cutoffs = np.linspace(-1, 10, num=21)
         additional = np.array([20, 23, 25, 28, 30, 35, 40, 45, 50])
         e_cutoffs = np.concatenate((e_cutoffs, additional))
         size = (30, 30)
@@ -215,7 +232,7 @@ def scan_cutoffs(e_type="potential"):
 
 def plot_scan_cutoff(file_path, e_type):
     data = pd.read_csv(file_path)
-    data = data.loc[data["% explored"] > 10]
+    data = data.loc[data["% explored"] > 20]
     fig, ax1 = plt.subplots(1, 1)
     all_eigenvalues = [f"Eigenvalue {i+1}" for i in range(4)]
     for i, eigenvalue in enumerate(all_eigenvalues):
@@ -229,7 +246,7 @@ def plot_scan_cutoff(file_path, e_type):
 
 
 if __name__ == '__main__':
-    names = ["maze12"]
+    names = ["maze19"]
     for name in names:
         #scan_cutoffs(e_type=name)
         #compare_time_double_well(e_type=name)
