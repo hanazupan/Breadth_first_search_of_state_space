@@ -115,10 +115,9 @@ def time_comparison_explorers(e_type: str = "potential"):
     my_energy.visualize_eigenvectors_in_maze(4, which="LR")
 
 
-
 def plot_time_comparison_explorers(file_path, name):
     data = pd.read_csv(file_path)
-    #data = data.loc[data["Cutoff"] > 7]
+    data = data.loc[data["Cutoff"] > 7]
     fig, ax = plt.subplots(1, 1)
     sns.lineplot(x="Cutoff", y="BFS time [s]", data=data, label="BFS",
                  ax=ax, ci="sd")
@@ -146,7 +145,7 @@ def plot_time_comparison_explorers(file_path, name):
 
 def plot_scan_cutoff(file_path, e_type):
     data = pd.read_csv(file_path)
-    #data = data.loc[data["Cutoff"] > 7]
+    data = data.loc[data["Cutoff"] > 7]
     fig, ax1 = plt.subplots(1, 1)
     all_eigenvalues = [f"Eigenvalue {i+1}" for i in range(6)]
     all_ss_eigenvalues = [f"Eigenvalue Full SS {i+1}" for i in range(6)]
@@ -166,6 +165,6 @@ def plot_scan_cutoff(file_path, e_type):
 if __name__ == '__main__':
     names = ["maze25"]
     for name in names:
-        time_comparison_explorers(e_type=name)
+        #time_comparison_explorers(e_type=name)
         plot_time_comparison_explorers(DATA_PATH + f"time_comparison_explorers_{name}.csv", name)
         plot_scan_cutoff(DATA_PATH+f"time_comparison_explorers_{name}.csv", name)

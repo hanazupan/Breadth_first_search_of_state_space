@@ -30,7 +30,8 @@ kB = 0.008314463  # kJ/mol/K
 class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
-                 temperature: float = 293, grid_start=0, grid_end=5):
+                 temperature: float = 293, grid_start: float = 0, grid_end: float = 5, cutoff: float = 5,
+                 size: tuple = (20, 20)):
         """
         An Energy object has an array in which energies at the midpoint of cells are saved. It also has general
         thermodynamic/atomic properties (mass, friction, temperature) and geometric properties (area between cells,
@@ -43,27 +44,34 @@ class Energy(AbstractEnergy):
             friction: friction coefficient (for now assumed constant)
             T: temperature
         """
-        # energy cutoff is generally 5, at least for mazes
-        cutoff = 5
-        # for now assume uniform, square cells so that geom. parameters = 1
-        super().__init__(None, cutoff, None, None, images_path, images_name)
-        self.h = 1
-        self.S = 1
-        self.V = 1
+        super().__init__(energies=None, energy_cutoff=cutoff, deltas=None, size=size, images_path=images_path,
+                         images_name=images_name)
+        #self.h = 1
+        #self.S = 1
+        #self.V = 1
         # and let´s assume room temperature
         self.temperature = temperature  # 293K <==> 20°C
         self.m = m
         self.friction = friction
         # diffusion coefficient
         self.D = kB * self.temperature / self.m / self.friction
-        # in preparation
+        # empty objects
+        self.rates_matrix = None
+        self.explorer = None
+        # prepare for the grid
         self.grid_start = grid_start
         self.grid_end = grid_end
         self.grid_full_len = self.grid_end - self.grid_start
-        self.rates_matrix = None
-        self.grid_x = None
-        self.grid_y = None
-        self.explorer = None
+        self.grid_x, self.grid_y = self._prepare_grid()
+        # prepare geometry
+        self._prepare_geometry()
+
+    def _prepare_geometry(self):
+        # distances between centers of cells: (horizontal, vertical)
+        self.hs = (self.grid_full_len / self.size[0], self.grid_full_len / self.size[1])
+        # surface areas between cells: (horizontal, vertical)
+        self.Ss = (self.grid_full_len / self.size[0], self.grid_full_len / self.size[1])
+        self.V = np.prod(np.array(self.hs))  # volume of cells
 
     def _prepare_grid(self, factor=1) -> tuple:
         cell_step_x = self.grid_full_len / (self.size[0] * factor)
@@ -361,7 +369,7 @@ class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = "./",
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start=0, grid_end=5):
+                 grid_start: float = 0, grid_end: float = 5, cutoff: float = 15):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -370,21 +378,21 @@ class EnergyFromMaze(Energy):
         Args:
             maze: a maze object that should be changed into an energy surface.
             add_noise: boolean, if False, the maze is not changed, if True, some of 0s in the maze -> -1 or -2
-            factor_grid: int, how many times more points for interpolation than in original maze
-                         (note: factor_grid > 2 produces very localized min/max)
+            factor_grid: int, how many times more points for discretization than in original maze
         """
-        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end)
+        super().__init__(images_path=images_path, images_name=images_name, m=m, friction=friction, temperature=T,
+                         grid_start=grid_start, grid_end=grid_end, cutoff=cutoff, size=maze.size)
         # interpolation only available for 2D mazes
         if len(maze.size) != 2:
             raise ValueError("Maze does not have the right dimensionality.")
-        self.size = maze.size
+        #self.size = maze.size
         # sparse grid
-        x_edges, y_edges = self._prepare_grid()
+        #x_edges, y_edges = self._prepare_grid()
         # dense grid
-        self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
+        #self.grid_x, self.grid_y = self._prepare_grid(factor=1)
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
-        z = z * 10
+        z = z * 10   # TODO: test increasing the energy of walls
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
@@ -394,16 +402,18 @@ class EnergyFromMaze(Energy):
                 z[cell] = -10
         self.underlying_maze = z
         m = max(maze.size)
-        tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
+        tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.grid_x, self.grid_y = self._prepare_grid(factor=2)
+        # WARNING! We change the size, so need to update geometry and the grid
+        self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
-        self.h = self.grid_full_len / self.size[0]
-        self.S = self.grid_full_len / self.size[1]
-        self.V = self.grid_full_len / self.size[0] * self.grid_full_len / self.size[1]
+        self._prepare_geometry()
+        #self.h = self.grid_full_len / self.size[0]
+        #self.S = self.grid_full_len / self.size[1]
+        #self.V = self.grid_full_len / self.size[0] * self.grid_full_len / self.size[1]
         self.spline = tck
-        self.energy_cutoff = 15
+        #self.energy_cutoff = 15
         self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_x_derivative(self, point: tuple) -> float:
@@ -432,26 +442,26 @@ class EnergyFromPotential(Energy):
 
     def __init__(self, size: tuple = (12, 16), images_path: str = "./",
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start=-1.4, grid_end = 1.4):
+                 grid_start: float = -1.4, grid_end: float = 1.4, cutoff: float = 10):
         """
         Initiate an energy surface with a 2D potential well.
         Grid x is the same for the first row, changes row for row.
         Grid y changes column for column.
         """
-        super().__init__(images_path, images_name, m, friction, T)
+        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end, cutoff)
         self.size = size
         # making sure that the grid is set up in the middle of the cell
-        self.grid_start = grid_start
-        self.grid_end = grid_end
-        self.grid_full_len = self.grid_end - self.grid_start
-        self.grid_x, self.grid_y = self._prepare_grid()
+        #self.grid_start = grid_start
+        #self.grid_end = grid_end
+        #self.grid_full_len = self.grid_end - self.grid_start
+        #self.grid_x, self.grid_y = self._prepare_grid()
         self.energies = self.square_well(self.grid_x, self.grid_y)
-        self.energy_cutoff = 10
+        #self.energy_cutoff = 10
         self.deltas = np.ones(len(self.size), dtype=int)
         self.pbc = False
-        self.h = self.grid_full_len / (self.size[0])
-        self.S = self.grid_full_len / (self.size[1])
-        self.V = self.grid_full_len / (self.size[0]) * self.grid_full_len / (self.size[1])
+        #self.h = self.grid_full_len / (self.size[0])
+        #self.S = self.grid_full_len / (self.size[1])
+        #self.V = self.grid_full_len / (self.size[0]) * self.grid_full_len / (self.size[1])
 
     def square_well(self, x, y, a=5, b=10):
         return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2
@@ -576,14 +586,15 @@ class Atom:
 class EnergyFromAtoms(Energy):
 
     def __init__(self, size: tuple, atoms: tuple, images_path: str = "./", grid_edges: tuple or None = None,
-                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293):
+                 images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
+                 grid_start: float = -1.4, grid_end: float = 1.4, cutoff: float = 30):
         """
         Initiate an energy surface with LJ potentials induced by atoms placed on the surface.
         Atoms must be placed on positions between 0 and size.
         Grid x is the same for the first row, changes row for row.
         Grid y changes column for column.
         """
-        super().__init__(images_path, images_name, m, friction, T)
+        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end, cutoff)
         self.atoms = atoms
         self.epsilon = np.max([atom.epsilon for atom in atoms])
         # plotting is problematic if including only one atom and not prescribing where the grid starts and ends
