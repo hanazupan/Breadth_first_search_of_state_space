@@ -341,7 +341,7 @@ class Maze(AbstractEnergy):
         """
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             ax = plt.imshow(self.energies, cmap="Greys")
-            ax.figure.savefig(self.images_path + f"{self.images_name}_maze.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_maze.pdf")
             plt.close()
 
 

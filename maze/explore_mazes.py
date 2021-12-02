@@ -75,7 +75,7 @@ class Explorer(ABC):
         plt.figure()
         nx.draw(self.graph, **kwargs)
         plt.savefig(self.maze.images_path +
-                    f"{self.maze.images_name}_{self.explorer_name}_graph.png", bbox_inches='tight', dpi=1200)
+                    f"{self.maze.images_name}_{self.explorer_name}_graph.pdf", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def get_adjacency_matrix(self, save=False) -> csr_matrix:
@@ -397,7 +397,7 @@ class DijkstraExplorer(Explorer):
             for x, y in self.path[1:-1]:
                 plt.plot(y, x, marker="o", color="white", markeredgecolor="k", linewidth=0.5, markersize=4)
             plt.imshow(array_to_plot, cmap=my_cmap, vmin=0.5, vmax=max_value+1)
-            plt.savefig(self.maze.images_path + f"{self.maze.images_name}_distances.png", dpi=1200)
+            plt.savefig(self.maze.images_path + f"{self.maze.images_name}_distances.pdf", dpi=1200)
             plt.close()
 
     def _dijkstra_algorithm(self) -> Sequence:

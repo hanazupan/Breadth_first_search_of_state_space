@@ -45,7 +45,9 @@ def produce_energies(args):
         my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name)
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name)
+        my_maze.visualize()
         my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name)
+        my_energy.visualize_underlying_maze()
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)

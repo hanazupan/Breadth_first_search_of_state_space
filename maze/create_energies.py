@@ -231,7 +231,7 @@ class Energy(AbstractEnergy):
             cmap = cm.get_cmap("RdBu").copy()
             im = plt.imshow(self.energies, cmap=cmap, **kwargs)
             self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"{self.images_name}_energy.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_energy.pdf")
             plt.close()
             return ax
 
@@ -248,7 +248,7 @@ class Energy(AbstractEnergy):
                             cmap='RdBu', edgecolor='none', **kwargs)
             ax.set_xlabel("x")
             ax.set_ylabel("y")
-            ax.figure.savefig(self.images_path + f"{self.images_name}_3D_energy.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_3D_energy.pdf")
             plt.close()
             return ax
 
@@ -287,7 +287,7 @@ class Energy(AbstractEnergy):
                         array[cell] = - eigenvec[index, i]
                 ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
                 ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
-            plt.savefig(self.images_path + f"{self.images_name}_eigenvectors_sqra.png")
+            plt.savefig(self.images_path + f"{self.images_name}_eigenvectors_sqra.pdf")
             plt.close()
 
     def visualize_eigenvalues(self):
@@ -307,7 +307,7 @@ class Energy(AbstractEnergy):
             plt.hlines(0, 0, 1)
             ax.set_ylabel("Eigenvalues (SqRA)")
             ax.axes.get_xaxis().set_visible(False)
-            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_sqra.png")
+            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_sqra.pdf")
             plt.close()
 
     def visualize_rates_matrix(self):
@@ -325,7 +325,7 @@ class Energy(AbstractEnergy):
             im = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
             self._add_colorbar(fig, ax, im)
             ax.set_title("Rates matrix")
-            fig.savefig(self.images_path + f"{self.images_name}_rates_matrix.png")
+            fig.savefig(self.images_path + f"{self.images_name}_rates_matrix.pdf")
             plt.close()
 
     def save_information(self):
@@ -387,7 +387,7 @@ class EnergyFromMaze(Energy):
         m = max(maze.size)
         tck = interpolate.bisplrep(x_edges, y_edges, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
-        self.grid_x, self.grid_y = self._prepare_grid(factor=1)
+        self.grid_x, self.grid_y = self._prepare_grid(factor=2)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self.h = self.grid_full_len / self.size[0]
@@ -415,7 +415,7 @@ class EnergyFromMaze(Energy):
             fig, ax = plt.subplots(1, 1)
             im = plt.imshow(self.underlying_maze, **lims)
             self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"{self.images_name}_underlying_maze.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_underlying_maze.pdf")
             plt.close()
 
 
@@ -673,7 +673,7 @@ class EnergyFromAtoms(Energy):
                 range_y_grid = self.grid_edges[3] - self.grid_edges[2]
                 ax.scatter((atom.position[1]-self.grid_edges[2])*self.size[1]/range_y_grid,
                            (atom.position[0]-self.grid_edges[0])*self.size[0]/range_x_grid, marker="o", c="white")
-            ax.figure.savefig(self.images_path + f"{self.images_name}_energy_with_cutoff.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_energy_with_cutoff.pdf")
             plt.close()
             return ax
     

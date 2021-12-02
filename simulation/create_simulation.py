@@ -321,7 +321,7 @@ class Simulation:
             plt.hlines(0, 0, 1)
             ax.set_ylabel("Eigenvalues (MSM)")
             ax.axes.get_xaxis().set_visible(False)
-            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_msm.png")
+            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_msm.pdf")
             plt.close()
 
     def visualize_eigenvec(self, num_eigv: int = 6, **kwargs):
@@ -362,7 +362,7 @@ class Simulation:
                 ax[i][j].axes.get_xaxis().set_visible(False)
                 ax[i][j].set_yticks([])
                 ax[i][j].set_yticklabels([])
-        fig.savefig(self.images_path + f"{self.images_name}_eigenvectors_msm.png", bbox_inches='tight', dpi=1200)
+        fig.savefig(self.images_path + f"{self.images_name}_eigenvectors_msm.pdf", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def visualize_its(self, num_eigv: int = 6, rates_eigenvalues=None, **kwargs):
@@ -399,7 +399,7 @@ class Simulation:
         tau_array_with_zero.append(0)
         tau_array_with_zero.sort()
         ax.fill_between(tau_array_with_zero, tau_array_with_zero, color="grey", alpha=0.5)
-        fig.savefig(self.images_path + f"{self.images_name}_implied_timescales.png", bbox_inches='tight', dpi=1200)
+        fig.savefig(self.images_path + f"{self.images_name}_implied_timescales.pdf", bbox_inches='tight', dpi=1200)
         plt.close()
 
     def visualize_hist_2D(self):
@@ -414,7 +414,7 @@ class Simulation:
             sns.heatmap(self.histogram, cmap=cmap, fmt='.2f',
                         square=True, ax=ax, yticklabels=[], xticklabels=[])
             #fig.colorbar(im, ax=ax)
-            ax.figure.savefig(self.images_path + f"{self.images_name}_hist_2D.png")
+            ax.figure.savefig(self.images_path + f"{self.images_name}_hist_2D.pdf")
             plt.close()
 
     def visualize_population_per_energy(self):
@@ -446,7 +446,7 @@ class Simulation:
             #plt.hist(energies, bins=25, weights=population/E_pop, histtype='step')
             ax.set_xlabel("Cell energy")
             ax.set_ylabel("Relative cell population")
-            plt.savefig(self.images_path + f"{self.images_name}_population_per_energy.png")
+            plt.savefig(self.images_path + f"{self.images_name}_population_per_energy.pdf")
             plt.close()
 
     def visualize_trajectory(self):
@@ -457,7 +457,7 @@ class Simulation:
             plt.subplots(1, 1, figsize=self.energy.size)
             plt.scatter(self.traj_y, self.traj_x, marker="o", c="black", s=1)
             plt.gca().invert_yaxis()
-            plt.savefig(self.images_path + f"{self.images_name}_trajectory.png")
+            plt.savefig(self.images_path + f"{self.images_name}_trajectory.pdf")
             plt.close()
 
     def save_information(self):

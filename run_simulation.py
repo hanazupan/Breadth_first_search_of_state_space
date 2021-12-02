@@ -48,21 +48,21 @@ def produce_energies(args):
     if args.type == "potential":
         my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=False)
+        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=True)
         my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1, friction=5,
                                    grid_start=-10, grid_end=10)
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
         for i in range(args.num_atoms):
-            x_coo = -10 + 20*np.random.rand()
-            y_coo = -10 + 20*np.random.rand()
+            x_coo = 0 + 10*np.random.rand()
+            y_coo = 0 + 10*np.random.rand()
             epsilon = np.random.choice([1, 3, 5, 10])
-            sigma = np.random.choice([2, 4, 6])
+            sigma = np.random.choice([1, 2, 3])
             atom = Atom((x_coo, y_coo), epsilon, sigma)
             atoms.append(atom)
         atoms = tuple(atoms)
-        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, grid_edges=(-12, 12, -12, 12), images_path=args.path,
+        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, grid_edges=(0, 10, 0, 10), images_path=args.path,
                                     images_name=args.name, friction=1, m=1)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
@@ -103,7 +103,7 @@ def produce_energies(args):
     return my_energy, e_val, e_val_cutoff
 
 
-def produce_simulation(args, energy, eigenval1, eigenval2):
+def produce_simulation(args, energy, val, val_cutoff):
     print("Setting up the Simulation object ...")
     start_time = time.time()
     my_simulation = Simulation(energy, images_path=args.path, images_name=args.name)
@@ -131,9 +131,9 @@ def produce_simulation(args, energy, eigenval1, eigenval2):
         my_simulation.visualize_eigenvec(6, which="LR")
         if args.compare != "n":
             e_eigval, e_eigvec = energy.get_eigenval_eigenvec(6, which="LR")
-            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=eigenval1)
+            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=val)
             my_simulation.images_name += "_cutoff"
-            my_simulation.visualize_its(6, which="LR", rates_eigenvalues=eigenval2)
+            my_simulation.visualize_its(6, which="LR", rates_eigenvalues=val_cutoff)
         else:
             my_simulation.visualize_its(num_eigv=6, which="LR")
         my_simulation.visualize_eigenvalues()
