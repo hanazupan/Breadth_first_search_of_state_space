@@ -142,3 +142,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+scratch/Atomic_surface.ipynb
+scratch/potential2D.ipynb
+scratch/rectangular_sparse.ipynb
