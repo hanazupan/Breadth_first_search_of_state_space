@@ -71,7 +71,7 @@ def time_comparison_explorers(e_type: str = "potential"):
         #additional = np.array([20, 23, 25, 28, 30, 35, 40, 45, 50])
         #cutoffs = np.concatenate((cutoffs, additional))
         atoms = []
-        num_atoms = 2  #TODO: increase
+        num_atoms = 8  #TODO: increase
         for i in range(num_atoms):
             x_coo = 0 + 10*np.random.rand()
             y_coo = 0 + 10*np.random.rand()
@@ -118,7 +118,7 @@ def time_comparison_explorers(e_type: str = "potential"):
 
 def plot_time_comparison_explorers(file_path, name):
     data = pd.read_csv(file_path)
-    #data = data.loc[data["Cutoff"] > 5]
+    #data = data.loc[data["Cutoff"] > 7]
     fig, ax = plt.subplots(1, 1)
     sns.lineplot(x="Cutoff", y="BFS time [s]", data=data, label="BFS",
                  ax=ax, ci="sd")
@@ -146,7 +146,7 @@ def plot_time_comparison_explorers(file_path, name):
 
 def plot_scan_cutoff(file_path, e_type):
     data = pd.read_csv(file_path)
-    #data = data.loc[data["Cutoff"] > 5]
+    #data = data.loc[data["Cutoff"] > 7]
     fig, ax1 = plt.subplots(1, 1)
     all_eigenvalues = [f"Eigenvalue {i+1}" for i in range(6)]
     all_ss_eigenvalues = [f"Eigenvalue Full SS {i+1}" for i in range(6)]
@@ -164,8 +164,8 @@ def plot_scan_cutoff(file_path, e_type):
 
 
 if __name__ == '__main__':
-    names = ["maze23", "atoms28"]
+    names = ["maze25"]
     for name in names:
-        #time_comparison_explorers(e_type=name)
+        time_comparison_explorers(e_type=name)
         plot_time_comparison_explorers(DATA_PATH + f"time_comparison_explorers_{name}.csv", name)
         plot_scan_cutoff(DATA_PATH+f"time_comparison_explorers_{name}.csv", name)

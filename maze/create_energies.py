@@ -123,8 +123,17 @@ class Energy(AbstractEnergy):
             self.energy_cutoff = np.max(self.energies) + 1
             full_len = self.size[0]*self.size[1]
             ones = [1]*full_len
-            adj_matrix = diags((ones, ones, ones, ones), offsets=(1, self.size[0], -1, -self.size[0]),
-                               shape=(full_len, full_len))
+            # if PBC, the offseted diagonals of neighbours continue on another diagonal
+            if self.pbc:
+                adj_matrix = diags((ones, ones, ones, ones, ones, ones, ones, ones),
+                                   offsets=(1, self.size[0], -1, -self.size[0],
+                                            full_len - self.size[0], - full_len + self.size[0],
+                                            full_len - 1, - full_len + 1),
+                                   shape=(full_len, full_len))
+            else:
+                adj_matrix = diags((ones, ones, ones, ones),
+                                   offsets=(1, self.size[0], -1, -self.size[0]),
+                                   shape=(full_len, full_len))
         self.adj_matrix = adj_matrix
         self.rates_matrix = np.zeros(adj_matrix.shape)
         # get the adjacent elements
