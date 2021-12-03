@@ -10,15 +10,13 @@ obtain visualizations, animations, graphs and/or adjacency matrices of a maze, r
 
 Using optional flags like:
  - `--size "(20, 30)"` to control the size of the maze (default="(20, 20)")
- - `--name new_maze` to change the names of saved files (default="default")
- - `--path images/` to control where generated files are saved (default="./")
  - `--explorer dijkstra` to change the exploration algorithm (default="bfs")
  - `--animate` to save the animations (default="n")
  - `--visualize` to save the image of the maze (default="y")
  - `--graph` to save the image of the graph
 
 Some examples to try:
- - `python3 run_maze.py --size "(40,40)" --animate y --graph y --name test --path images/`
+ - `python3 run_maze.py --size "(40,40)" --animate y --graph y`
 
 ## Energy surfaces
 It is possible to create an energy surface from a maze using a 2D spline
@@ -34,16 +32,14 @@ run the driver script `run_energy.py` as
 Using optional flags like:
  - `--type atoms` to define the type of energy surface (default="potential")
  - `--size "(20, 30)"` to control the discretization of the surface (default="(20, 20)")
- - `--name new_surface` to change the names of saved files (default="default")
- - `--path images/` to control where generated files are saved (default="./")
  - `--animate y` to create and save all animations (default="n")
  - `--visualize y` to create and save all plots (default="y")
  - `--num_atoms 4` to determine how many atoms to position on the surface (only for type==`atoms`)
 
 Some examples to try:
- - `python3 run_energy.py --type potential --size "(40, 40)" --name test_potential --path images/`
- - `python3 run_energy.py --type maze --size "(15, 20)" --name test_maze --path images/`
- - `python3 run_energy.py --type atoms --size "(15,15)" --num_atoms 4 --name test_atoms --path images/`
+ - `python3 run_energy.py --type potential --size "(40, 40)"`
+ - `python3 run_energy.py --type maze --size "(15, 20)"`
+ - `python3 run_energy.py --type atoms --size "(15,15)" --num_atoms 4`
 
 ## Simulations on surfaces
 After an energy surface is created, it is also possible to run a simulation
@@ -56,8 +52,6 @@ on any type of energy surface, run the driver script `run_simulation.py` as
 Using optional flags like:
  - `--type atoms` to define the type of energy surface (default="potential")
  - `--size "(20, 30)"` to control the discretization of the surface (default="(20, 20)")
- - `--name new_surface` to change the names of saved files (default="default")
- - `--path images/` to control where generated files are saved (default="./")
  - `--visualize y` to create and save all plots (default="y")
  - `--num_atoms 4` to determine how many atoms to position on the surface (only for type==`atoms`)
  - `--duration 1e7` to set the number of time steps (default=1e6)
@@ -65,6 +59,6 @@ Using optional flags like:
 - `-- compare n` to determine whether the Energy plots should also be computed for comparison
 
 Some examples to try:
- - `python3 run_simulation.py --type potential --size "(40, 40)" --name test_potential --path images/ --compare n`
- - `python3 run_simulation.py --type maze --size "(15, 20)" --name test_maze --path images/ --duration 1e7`
- - `ython3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --name test_atoms --path images/ --time_step 0.1`
+ - `python3 run_simulation.py --type potential --size "(40, 40)" --compare n`
+ - `python3 run_simulation.py --type maze --size "(15, 20)" --duration 1e7`
+ - `ython3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --time_step 0.1`

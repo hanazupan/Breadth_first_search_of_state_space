@@ -1,11 +1,12 @@
 """
 Try to run, for example:
-python3 run_simulation.py --type potential --size "(40, 40)" --name test_potential --path images/ --compare n
-python3 run_simulation.py --type maze --size "(15, 20)" --name test_maze --path images/ --duration 1e7
-python3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --name test_atoms --path images/ --time_step 0.1
+python3 run_simulation.py --type potential --size "(40, 40)" --compare n
+python3 run_simulation.py --type maze --size "(15, 20)" --duration 1e7
+python3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --time_step 0.1
 """
 from maze.create_mazes import Maze
 from maze.create_energies import EnergyFromPotential, EnergyFromMaze, EnergyFromAtoms, Atom
+from run_energy import determine_name
 from simulation.create_simulation import Simulation
 import numpy as np
 from ast import literal_eval
@@ -17,10 +18,6 @@ parser.add_argument('--type', metavar='t', type=str, nargs='?',
                     default="potential", help='Select the type of energy surface (potential, maze, atoms).')
 parser.add_argument('--size', metavar='s', type=str, nargs='?',
                     default="(20, 20)", help='Select the size of the energy surface.')
-parser.add_argument('--name', metavar='n', type=str, nargs='?',
-                    default='energy', help='Provide a name for saved images and animations.')
-parser.add_argument('--path', metavar='p', type=str, nargs='?',
-                    default='./', help='Provide a path where images and animations will be saved.')
 parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
                     default='y', help='Produce all plots? (y/n)')
 parser.add_argument('--num_atoms', metavar='na', type=str, nargs='?',
@@ -42,15 +39,16 @@ def report_time(start, end):
 
 
 def produce_energies(args):
+    name = determine_name(args)
     print("Setting up the Energy object ...")
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name, friction=10)
+        my_energy = EnergyFromPotential(size=args.size, images_path="images/potentials/", images_name=name, friction=10)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name, factor_grid=1, friction=5,
-                                   grid_start=-10, grid_end=10)
+        my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name, edge_is_wall=True, no_branching=True)
+        my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name, factor_grid=1, friction=5,
+                                   grid_start=(-10, -10), grid_end=(10, 10))
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -62,8 +60,8 @@ def produce_energies(args):
             atom = Atom((x_coo, y_coo), epsilon, sigma)
             atoms.append(atom)
         atoms = tuple(atoms)
-        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, grid_edges=(0, 10, 0, 10), images_path=args.path,
-                                    images_name=args.name, friction=1, m=1)
+        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, images_path="images/atoms/", grid_start=(0, 0),
+                                    grid_end=(10, 10), images_name=name, friction=1, m=1)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
     end_setup_time = time.time()
@@ -72,7 +70,7 @@ def produce_energies(args):
     # visualization
     if args.visualize != "n" and args.compare != "n":
         print("Calculating the rates matrix ...")
-        my_energy.get_rates_matix(explorer="none")
+        my_energy.get_rates_matix()
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_setup_time, end_matrix_time)
         print(f" -> time for rates matrix: {hours}h {minutes}min {seconds}s.")
@@ -81,32 +79,22 @@ def produce_energies(args):
             my_energy.visualize_underlying_maze()
         my_energy.visualize()
         my_energy.visualize_3d()
-        e_val, e_vec = my_energy.get_eigenval_eigenvec(6, which="LR")
+        my_energy.get_eigenval_eigenvec(6, which="LR")
         my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
         my_energy.visualize_eigenvalues()
         end_visualization_time = time.time()
-        if args.type == "maze":
-            my_energy.images_name +="_cutof"
-            my_energy.energy_cutoff = 8
-            my_energy.explorer = None
-            my_energy.rates_matrix = None
-            my_energy.get_rates_matix()
-
-            e_val_cutoff, e_vec_cutoff = my_energy.get_eigenval_eigenvec(6, which="LR")
-            my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-            my_energy.visualize_eigenvalues()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
     print(f"-------- Total Energy time: {hours}h {minutes}min {seconds}s. --------")
-    return my_energy, e_val, e_val_cutoff
+    return my_energy
 
 
-def produce_simulation(args, energy, val, val_cutoff):
+def produce_simulation(args, energy):
     print("Setting up the Simulation object ...")
     start_time = time.time()
-    my_simulation = Simulation(energy, images_path=args.path, images_name=args.name)
+    my_simulation = Simulation(energy, images_path=energy.images_path, images_name=energy.images_name)
     args.duration = int(float(args.duration))
     args.time_step = float(args.time_step)
     end_setup_time = time.time()
@@ -131,9 +119,7 @@ def produce_simulation(args, energy, val, val_cutoff):
         my_simulation.visualize_eigenvec(6, which="LR")
         if args.compare != "n":
             e_eigval, e_eigvec = energy.get_eigenval_eigenvec(6, which="LR")
-            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=val)
-            my_simulation.images_name += "_cutoff"
-            my_simulation.visualize_its(6, which="LR", rates_eigenvalues=val_cutoff)
+            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=e_eigval)
         else:
             my_simulation.visualize_its(num_eigv=6, which="LR")
         my_simulation.visualize_eigenvalues()
@@ -147,5 +133,5 @@ def produce_simulation(args, energy, val, val_cutoff):
 
 if __name__ == '__main__':
     my_args = parser.parse_args()
-    energy_object, val1, val2  = produce_energies(my_args)
-    produce_simulation(my_args, energy_object, val1, val2)
+    energy_object = produce_energies(my_args)
+    produce_simulation(my_args, energy_object)

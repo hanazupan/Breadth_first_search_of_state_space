@@ -1,8 +1,8 @@
 """
 Try to run, for example:
-python3 run_energy.py --type potential --size "(40, 40)" --name test_potential --path images/
-python3 run_energy.py --type maze --size "(15, 20)" --name test_maze --path images/
-python3 run_energy.py --type atoms --size "(15,15)" --num_atoms 4 --name test_atoms --path images/
+python3 run_energy.py --type potential --size "(40, 40)"
+python3 run_energy.py --type maze --size "(15, 20)"
+python3 run_energy.py --type atoms --size "(15,15)" --num_atoms 4
 """
 from maze.create_mazes import Maze
 from maze.create_energies import EnergyFromPotential, EnergyFromMaze, EnergyFromAtoms, Atom
@@ -11,16 +11,13 @@ import numpy as np
 from ast import literal_eval
 import argparse
 import time
+from os.path import exists
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--type', metavar='t', type=str, nargs='?',
                     default="potential", help='Select the type of energy surface (potential, maze, atoms).')
 parser.add_argument('--size', metavar='s', type=str, nargs='?',
                     default="(20, 20)", help='Select the size of the energy surface.')
-parser.add_argument('--name', metavar='n', type=str, nargs='?',
-                    default='energy', help='Provide a name for saved images and animations.')
-parser.add_argument('--path', metavar='p', type=str, nargs='?',
-                    default='./', help='Provide a path where images and animations will be saved.')
 parser.add_argument('--animate', metavar='a', type=str, nargs='?',
                     default='n', help='Produce animations? (y/n)')
 parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
@@ -37,30 +34,54 @@ def report_time(start, end):
     return hours, minutes, seconds
 
 
+def determine_name(args):
+    # set the name of the file
+    name_int = 0
+    if args.type == "potential":
+        name = f"potential{name_int:03d}"
+        while exists("images/potentials/" + name + "_energy.pdf"):
+            name_int += 1
+            name = f"potential{name_int:03d}"
+    elif args.type == "maze":
+        name = f"maze{name_int:03d}"
+        while exists("images/mazes/" + name + "_energy.pdf"):
+            name_int += 1
+            name = f"maze{name_int:03d}"
+    elif args.type == "atoms":
+        name = f"atoms{name_int:03d}"
+        while exists("images/atoms/" + name + "_energy_with_cutoff.pdf"):
+            name_int += 1
+            name = f"atoms{name_int:03d}"
+    else:
+        raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
+    return name
+
+
 def produce_energies(args):
+    name = determine_name(args)
     print("Setting up the Energy object ...")
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path=args.path, images_name=args.name)
+        my_energy = EnergyFromPotential(size=args.size, images_path="images/potentials/", images_name=name)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=args.path, images_name=args.name)
+        my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name)
         my_maze.visualize()
-        my_energy = EnergyFromMaze(my_maze, images_path=args.path, images_name=args.name)
+        my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name)
         my_energy.visualize_underlying_maze()
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
         for i in range(args.num_atoms):
-            x_coo = -10 + 20*np.random.rand()
-            y_coo = -10 + 20*np.random.rand()
+            x_coo = 10*np.random.rand()
+            y_coo = 10*np.random.rand()
             epsilon = np.random.choice([1, 3, 5, 10])
-            sigma = np.random.choice([2, 4, 6])
+            sigma = np.random.choice([1, 2, 3])
             atom = Atom((x_coo, y_coo), epsilon, sigma)
             atoms.append(atom)
         atoms = tuple(atoms)
-        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, grid_edges=(-12, 12, -12, 12), images_path=args.path,
-                                    images_name=args.name)
+        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, grid_start=(0, 0), grid_end=(10, 10),
+                                    images_path="images/atoms/", images_name=name)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
     end_setup_time = time.time()
