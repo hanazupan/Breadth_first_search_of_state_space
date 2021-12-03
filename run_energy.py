@@ -59,6 +59,7 @@ def determine_name(args):
 
 def produce_energies(args):
     name = determine_name(args)
+    print(f"Given the name: {name}")
     print("Setting up the Energy object ...")
     start_time = time.time()
     args.size = literal_eval(args.size)
