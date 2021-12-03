@@ -30,7 +30,7 @@ kB = 0.008314463  # kJ/mol/K
 class Energy(AbstractEnergy):
 
     def __init__(self, images_path: str = "./", images_name: str = "energy", m: float = 1, friction: float = 10,
-                 temperature: float = 293, grid_start: float = 0, grid_end: float = 5, cutoff: float = 5,
+                 temperature: float = 293, grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 5,
                  size: tuple = (20, 20)):
         """
         An Energy object has an array in which energies at the midpoint of cells are saved. It also has general
@@ -44,11 +44,8 @@ class Energy(AbstractEnergy):
             friction: friction coefficient (for now assumed constant)
             T: temperature
         """
-        super().__init__(energies=None, energy_cutoff=cutoff, deltas=None, size=size, images_path=images_path,
+        super().__init__(energies=None, energy_cutoff=cutoff, size=size, images_path=images_path,
                          images_name=images_name)
-        #self.h = 1
-        #self.S = 1
-        #self.V = 1
         # and let´s assume room temperature
         self.temperature = temperature  # 293K <==> 20°C
         self.m = m
@@ -61,25 +58,25 @@ class Energy(AbstractEnergy):
         # prepare for the grid
         self.grid_start = grid_start
         self.grid_end = grid_end
-        self.grid_full_len = self.grid_end - self.grid_start
+        self.grid_full_len = tuple(np.array(self.grid_end) - np.array(self.grid_start))
         self.grid_x, self.grid_y = self._prepare_grid()
         # prepare geometry
         self._prepare_geometry()
 
     def _prepare_geometry(self):
         # distances between centers of cells: (horizontal, vertical)
-        self.hs = (self.grid_full_len / self.size[0], self.grid_full_len / self.size[1])
+        self.hs = (self.grid_full_len[0] / self.size[0], self.grid_full_len[1] / self.size[1])
         # surface areas between cells: (horizontal, vertical)
-        self.Ss = (self.grid_full_len / self.size[0], self.grid_full_len / self.size[1])
+        self.Ss = (self.grid_full_len[1] / self.size[1], self.grid_full_len[0] / self.size[0])
         self.V = np.prod(np.array(self.hs))  # volume of cells
 
     def _prepare_grid(self, factor=1) -> tuple:
-        cell_step_x = self.grid_full_len / (self.size[0] * factor)
-        cell_step_y = self.grid_full_len / (self.size[1] * factor)
-        start_x = self.grid_start + cell_step_x / 2
-        end_x = self.grid_end - cell_step_x / 2
-        start_y = self.grid_start + cell_step_y / 2
-        end_y = self.grid_end - cell_step_y / 2
+        cell_step_x = self.grid_full_len[0] / (self.size[0] * factor)
+        cell_step_y = self.grid_full_len[1] / (self.size[1] * factor)
+        start_x = self.grid_start[0] + cell_step_x / 2
+        end_x = self.grid_end[0] - cell_step_x / 2
+        start_y = self.grid_start[1] + cell_step_y / 2
+        end_y = self.grid_end[1] - cell_step_y / 2
         size_x, size_y = complex(self.size[0]), complex(self.size[1])
         return np.mgrid[start_x:end_x:factor*size_x, start_y:end_y:factor*size_y]
 
@@ -109,8 +106,18 @@ class Energy(AbstractEnergy):
         """
         energy_i = self.get_energy(cell_i)
         energy_j = self.get_energy(cell_j)
-        return min(self.D * self.S / self.h / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(kB*self.temperature))),
-                   self.D * self.S / self.h / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(kB*self.temperature))))
+        # 0 if vertical neighbours, 1 if horizontal neighbours
+        if self.are_neighbours(cell_i, cell_j, axis=0):
+            n_dim = 0
+        elif self.are_neighbours(cell_i, cell_j, axis=1):
+            n_dim = 1
+        else:
+            raise ValueError("Trying to calculate Q_ij for non-neighbours!")
+        Q_ij = self.D * self.Ss[n_dim] / self.hs[n_dim] / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(
+                kB*self.temperature)))
+        limit = self.D * self.Ss[n_dim] / self.hs[n_dim] / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(
+                kB*self.temperature)))
+        return min(Q_ij, limit)
 
     def _calculate_rates_matrix(self, selected_explorer):
         """
@@ -283,10 +290,6 @@ class Energy(AbstractEnergy):
             full_width = DIM_LANDSCAPE[0]
             fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
             cmap = cm.get_cmap("RdBu").copy()
-            # cmap.set_over("black")
-            # cmap.set_under("black")
-            # ax[0].imshow(self.energies, cmap=cmap, norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff))
-            # ax[0].set_title("Energy surface", fontsize=7, fontweight="bold")
             try:
                 accesible = self.explorer.get_sorted_accessible_cells()
             except AttributeError:
@@ -312,7 +315,7 @@ class Energy(AbstractEnergy):
         Visualize the eigenvalues of rate matrix.
         """
         if not self.explorer:
-            self._calculate_rates_matrix()
+            self._calculate_rates_matrix(selected_explorer="bfs")
         num = self.rates_matrix.shape[0] - 2
         eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LR")
         with plt.style.context(['Stylesheets/not_animation.mplstyle']):
@@ -335,7 +338,7 @@ class Energy(AbstractEnergy):
             ValueError: if there are no self.energies
         """
         if not self.explorer:
-            self._calculate_rates_matrix()
+            self._calculate_rates_matrix(selected_explorer="bfs")
         with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
             norm = colors.TwoSlopeNorm(vcenter=0)
             fig, ax = plt.subplots(1, 1, figsize=DIM_SQUARE)
@@ -346,7 +349,14 @@ class Energy(AbstractEnergy):
             plt.close()
 
     def save_information(self):
-        with open(self.images_path + f"{self.images_name}_summary.txt", "w") as f:
+        data_path = "data/energy_summaries/"
+        if type(self) == EnergyFromPotential:
+            data_path += "potentials/"
+        elif type(self) == EnergyFromMaze:
+            data_path += "mazes/"
+        elif type(self) == EnergyFromAtoms:
+            data_path += "atoms/"
+        with open(data_path + f"{self.images_name}_summary.txt", "w") as f:
             describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms",
                               Energy: "not determined"}
             f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
@@ -369,7 +379,7 @@ class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = "./",
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: float = 0, grid_end: float = 5, cutoff: float = 15):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 15):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -385,11 +395,6 @@ class EnergyFromMaze(Energy):
         # interpolation only available for 2D mazes
         if len(maze.size) != 2:
             raise ValueError("Maze does not have the right dimensionality.")
-        #self.size = maze.size
-        # sparse grid
-        #x_edges, y_edges = self._prepare_grid()
-        # dense grid
-        #self.grid_x, self.grid_y = self._prepare_grid(factor=1)
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
         z = z * 10   # TODO: test increasing the energy of walls
@@ -409,12 +414,7 @@ class EnergyFromMaze(Energy):
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self._prepare_geometry()
-        #self.h = self.grid_full_len / self.size[0]
-        #self.S = self.grid_full_len / self.size[1]
-        #self.V = self.grid_full_len / self.size[0] * self.grid_full_len / self.size[1]
         self.spline = tck
-        #self.energy_cutoff = 15
-        self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_x_derivative(self, point: tuple) -> float:
         return bisplev(point[0], point[1], self.spline, dx=1)  # do not change, this is correct
@@ -442,26 +442,16 @@ class EnergyFromPotential(Energy):
 
     def __init__(self, size: tuple = (12, 16), images_path: str = "./",
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: float = -1.4, grid_end: float = 1.4, cutoff: float = 10):
+                 grid_start: tuple = (-1.4, -1.4), grid_end: tuple = (1.4, 1.4), cutoff: float = 10):
         """
         Initiate an energy surface with a 2D potential well.
         Grid x is the same for the first row, changes row for row.
         Grid y changes column for column.
         """
-        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end, cutoff)
-        self.size = size
-        # making sure that the grid is set up in the middle of the cell
-        #self.grid_start = grid_start
-        #self.grid_end = grid_end
-        #self.grid_full_len = self.grid_end - self.grid_start
-        #self.grid_x, self.grid_y = self._prepare_grid()
+        super().__init__(images_path=images_path, images_name=images_name, m=m, friction=friction, temperature=T,
+                         grid_start=grid_start, grid_end=grid_end, cutoff=cutoff, size=size)
         self.energies = self.square_well(self.grid_x, self.grid_y)
-        #self.energy_cutoff = 10
-        self.deltas = np.ones(len(self.size), dtype=int)
         self.pbc = False
-        #self.h = self.grid_full_len / (self.size[0])
-        #self.S = self.grid_full_len / (self.size[1])
-        #self.V = self.grid_full_len / (self.size[0]) * self.grid_full_len / (self.size[1])
 
     def square_well(self, x, y, a=5, b=10):
         return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2
@@ -585,46 +575,26 @@ class Atom:
 
 class EnergyFromAtoms(Energy):
 
-    def __init__(self, size: tuple, atoms: tuple, images_path: str = "./", grid_edges: tuple or None = None,
+    def __init__(self, size: tuple, atoms: tuple, images_path: str = "./",
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: float = -1.4, grid_end: float = 1.4, cutoff: float = 30):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (12, 12), cutoff: float = 30):
         """
         Initiate an energy surface with LJ potentials induced by atoms placed on the surface.
         Atoms must be placed on positions between 0 and size.
         Grid x is the same for the first row, changes row for row.
         Grid y changes column for column.
         """
-        super().__init__(images_path, images_name, m, friction, T, grid_start, grid_end, cutoff)
+
         self.atoms = atoms
         self.epsilon = np.max([atom.epsilon for atom in atoms])
         # plotting is problematic if including only one atom and not prescribing where the grid starts and ends
         if len(self.atoms) < 2:
-            if not grid_edges:
-                raise AttributeError("Add at least two atoms or use grid_edges!")
-        self.size = size
+            raise AttributeError("Add at least two atoms!")
         # cutoff is 4* max epsilon
-        self.energy_cutoff = np.max([4*atom.epsilon for atom in atoms])
-        # create the grid, determine grid edges automatically if not given
-        x_positions = [atom.position[0] for atom in self.atoms]
-        y_positions = [atom.position[1] for atom in self.atoms]
-        if grid_edges:
-            xmin, xmax, ymin, ymax = grid_edges
-        else:
-            # if grid edges not given, create a grid a bit larger than what covers all atoms
-            xmin = 0.9*np.min(x_positions)
-            xmax = 1.1*np.max(x_positions)
-            ymin = 0.9*np.min(y_positions)
-            ymax = 1.1*np.max(y_positions)
-        size_x, size_y = complex(self.size[0]), complex(self.size[1])
-        self.grid_x, self.grid_y = np.mgrid[xmin:xmax:size_x, ymin:ymax:size_y]
-        self.step_x = self.grid_x[1, 0] - self.grid_x[0, 0]
-        self.step_y = self.grid_y[0, 1] - self.grid_y[0, 0]
-        # xmin, xmax, ymin, ymax - NOT middle of cells, but actual min/max
-        xmin = self.grid_x[0, 0] - self.step_x / 2
-        xmax = self.grid_x[-1, -1] + self.step_x / 2
-        ymin = self.grid_y[0, 0] - self.step_y / 2
-        ymax = self.grid_y[-1, -1] + self.step_y / 2
-        self.grid_edges = (xmin, xmax, ymin, ymax)
+        energy_cutoff = np.max([4*atom.epsilon for atom in atoms])
+        self.grid_edges = (grid_start[0], grid_end[0], grid_start[1], grid_end[1])
+        super().__init__(images_path=images_path, images_name=images_name, m=m, friction=friction, temperature=T,
+                         grid_start=grid_start, grid_end=grid_end, cutoff=energy_cutoff, size=size)
         # calculate energies by looping over contributions of all atoms and adding them up
         self.energies = np.zeros(self.size)
         for i in range(self.size[0]):
@@ -634,7 +604,6 @@ class EnergyFromAtoms(Energy):
                 point_y = self.grid_y[i, j]
                 self.energies[i, j] = self.get_full_potential((point_x, point_y))
         self.energies[self.energies > 4*self.epsilon] = 4*self.epsilon
-        self.deltas = np.ones(len(self.size), dtype=int)
 
     def get_full_potential(self, point: tuple) -> float:
         full_potential = 0
@@ -689,8 +658,8 @@ class EnergyFromAtoms(Energy):
             # if you want labels: yticklabels=[f"{ind:.2f}" for ind in df.index]
             # xticklabels=[f"{col:.2f}" for col in df.columns]
             for atom in self.atoms:
-                range_x_grid = self.grid_edges[1] - self.grid_edges[0]
-                range_y_grid = self.grid_edges[3] - self.grid_edges[2]
+                range_x_grid = self.grid_full_len[0]  #self.grid_edges[1] - self.grid_edges[0]
+                range_y_grid = self.grid_full_len[1]  #self.grid_edges[3] - self.grid_edges[2]
                 ax.scatter((atom.position[1]-self.grid_edges[2])*self.size[1]/range_y_grid,
                            (atom.position[0]-self.grid_edges[0])*self.size[0]/range_x_grid, marker="o", c="white")
             ax.figure.savefig(self.images_path + f"{self.images_name}_energy_with_cutoff.pdf")
@@ -710,12 +679,11 @@ if __name__ == '__main__':
     # atom_1 = Atom((3.3, 20.5), my_epsilon, my_sigma)
     # atom_2 = Atom((14.3, 9.3), my_epsilon, my_sigma-2)
     # atom_3 = Atom((5.3, 45.3), my_epsilon/5, my_sigma)
-    # my_energy = EnergyFromAtoms((50, 60), (atom_1, atom_2, atom_3), grid_edges=(-8, 20, 5, 50),
+    # my_energy = EnergyFromAtoms((50, 60), (atom_1, atom_2, atom_3), grid_start=(-8, 5), grid_end=(20, 50),
     #                             images_name="atoms", images_path=img_path)
     # ------------------- MAZES -----------------------
     my_maze = Maze((9, 9), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
-    print(my_energy.grid_x)
     my_maze.visualize()
     my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL -----------------------

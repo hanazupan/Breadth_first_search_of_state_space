@@ -7,7 +7,7 @@ from .create_mazes import Maze
 from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 
 all_algorithms = ["Prim", "random"]
-img_path = "images/"
+img_path = "images/tests/"
 
 
 def test_init():

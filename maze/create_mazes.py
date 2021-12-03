@@ -20,7 +20,7 @@ class AbstractEnergy(ABC):
     There is some energy cutoff that makes some cells accessible and others not.
     """
 
-    def __init__(self, energies: np.ndarray or None, energy_cutoff: float, deltas: np.ndarray or None,
+    def __init__(self, energies: np.ndarray or None, energy_cutoff: float,
                  size: tuple or None, images_path: str = "./", images_name: str = "abst_energy"):
         """
         Initialize some properties of all Energy objects.
@@ -28,13 +28,11 @@ class AbstractEnergy(ABC):
         Args:
             energies: stores an array with energies
             energy_cutoff: cells with energy strictly below that value are accessible
-            deltas: distances between cells in all dimensions
             size: tuple containing the size of all dimensions
             images_path: string, path where any generated images/videos will be saved
             images_name: string, identifier of all images/videos generated from this maze object
         """
         self.energies = energies
-        self.deltas = deltas
         self.size = size
         self.energy_cutoff = energy_cutoff
         self.pbc = True                      # whether to use periodic boundary conditions
@@ -77,6 +75,19 @@ class AbstractEnergy(ABC):
         cell[0] = node
         return tuple(cell)
 
+    def are_neighbours(self, cell1, cell2, axis=None):
+        neighbours1 = []
+        for n in self.get_neighbours(cell1):
+            neighbours1.append(n)
+        if cell2 not in neighbours1:
+            return False
+        if axis is None:
+            return True
+        else:
+            one_bigger = cell1[axis] == (cell2[axis] + 1) % self.size[axis]
+            one_smaller = cell1[axis] == (cell2[axis] - 1) % self.size[axis]
+            return one_bigger or one_smaller
+
     def get_neighbours(self, cell: tuple) -> Sequence:
         """
         Genarator that gives neighbours of the argument cell, using periodic boundary conditions if self.pbc.
@@ -89,11 +100,11 @@ class AbstractEnergy(ABC):
         """
         for i, coo in enumerate(cell):
             neig_cel = np.array(cell)
-            neig_cel[i] = (cell[i] - self.deltas[i]) % self.size[i]
+            neig_cel[i] = (cell[i] - 1) % self.size[i]
             # if no periodic boundaries, there is no -1 neighbour of the first cell
             if self.pbc or coo != 0:
                 yield tuple(neig_cel)
-            plus_one = (cell[i] + self.deltas[i]) % self.size[i]
+            plus_one = (cell[i] + 1) % self.size[i]
             neig_cel[i] = plus_one
             # if no periodic boundaries, there is no 0 neighbour of the last cell
             if self.pbc or coo != self.size[i] - 1:
@@ -181,10 +192,10 @@ class AbstractEnergy(ABC):
         for i, _ in enumerate(central):
             if central[i] == known_hall[i]:
                 pass
-            elif (central[i] + self.deltas[i]) % self.size[i] == known_hall[i]:
-                neig_cel[i] = (neig_cel[i] - self.deltas[i]) % self.size[i]
-            elif (central[i] - self.deltas[i]) % self.size[i] == known_hall[i]:
-                neig_cel[i] = (neig_cel[i] + self.deltas[i]) % self.size[i]
+            elif (central[i] + 1) % self.size[i] == known_hall[i]:
+                neig_cel[i] = (neig_cel[i] - 1) % self.size[i]
+            elif (central[i] - 1) % self.size[i] == known_hall[i]:
+                neig_cel[i] = (neig_cel[i] + 1) % self.size[i]
             else:
                 raise ValueError("Opposite cell nonexistent: central and known_hall are not neighbouring cells.")
         assert tuple(neig_cel) != known_hall
@@ -211,13 +222,11 @@ class Maze(AbstractEnergy):
         """
 
         self.algorithm = algorithm
-        # deltas are distances between neighbours in all directions
-        deltas = np.ones(len(size), dtype=int)
         cutoff = 1
         # in the beginning all maze cells are unassigned
         energies = np.full(size, 2, dtype=int)
-        # super takes care of: initializing energies, energy_cutoff, deltas, size, images_path, images_name
-        super().__init__(energies, cutoff, deltas, size, images_path, images_name)
+        # super takes care of: initializing energies, energy_cutoff, size, images_path, images_name
+        super().__init__(energies, cutoff, size, images_path, images_name)
         # start the generation of a maze
         if algorithm == 'handmade1':
             self._create_handmade1()
@@ -401,7 +410,7 @@ class MazeAnimation:
                                        repeat=False, interval=10, save_count=height * width)
         # fps determines how fast the video when saved
         writergif = animation.PillowWriter(fps=50)
-        anim.save(self.energies.images_path + f"{name_addition}_{self.energies.images_name}.gif", writer=writergif)
+        anim.save(self.energies.images_path + f"{self.energies.images_name}_{name_addition}.gif", writer=writergif)
         plt.close()
 
     def animate_building_maze(self, **kwargs):

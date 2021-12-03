@@ -12,7 +12,7 @@ from tqdm import tqdm
 sns.set_style("ticks")
 sns.set_context("talk")
 
-img_compare_path = IMG_PATH + "compare_runtimes/"
+img_compare_path = IMG_PATH + "analysis/"
 
 
 def run_energy(my_energy: Energy, my_explorer: str, cutoff: float) -> tuple:
@@ -56,7 +56,7 @@ def time_comparison_explorers(e_type: str = "potential"):
         additional = np.array([150, 200, 250, 300, 350, 400])
         cutoffs = np.concatenate((cutoffs, additional))
         my_energy = EnergyFromPotential(size=(50, 50), images_path=img_compare_path, friction=friction,
-                                        grid_start=-2.5, grid_end=2.5)
+                                        grid_start=(-2.5, -2.5), grid_end=(2.5, 2.5))
     elif e_type.startswith("maze"):
         cutoffs = np.linspace(5, 9, num=11)
         additional = np.linspace(10.5, 15, num=11)
@@ -64,7 +64,7 @@ def time_comparison_explorers(e_type: str = "potential"):
         my_maze = Maze(size=(25, 25), images_path=img_compare_path, edge_is_wall=True, no_branching=True)
         my_maze.visualize()
         my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=img_compare_path, factor_grid=1,
-                                   grid_start=-1, grid_end=1)
+                                   grid_start=(-1, -1), grid_end=(1, 1))
         my_energy.visualize()
     else:
         cutoffs = np.linspace(-2, 19, num=21)
@@ -80,7 +80,7 @@ def time_comparison_explorers(e_type: str = "potential"):
             atom = Atom((x_coo, y_coo), epsilon, sigma)
             atoms.append(atom)
         atoms = tuple(atoms)
-        my_energy = EnergyFromAtoms(size=(25, 25), atoms=atoms, grid_edges=(0, 10, 0, 10),
+        my_energy = EnergyFromAtoms(size=(25, 25), atoms=atoms, grid_start=(0, 0), grid_end=(10, 10),
                                     images_path=img_compare_path)
         my_energy.visualize()
     # loop over cutoff

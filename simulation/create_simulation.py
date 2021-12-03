@@ -461,7 +461,14 @@ class Simulation:
             plt.close()
 
     def save_information(self):
-        with open(DATA_PATH + f"{self.images_name}_summary.txt", "w") as f:
+        data_path = DATA_PATH + "simulation_summaries/"
+        if type(self.energy) == EnergyFromPotential:
+            data_path += "potentials/"
+        elif type(self.energy) == EnergyFromMaze:
+            data_path += "mazes/"
+        elif type(self.energy) == EnergyFromAtoms:
+            data_path += "atoms/"
+        with open(data_path + f"{self.images_name}_summary.txt", "w") as f:
             describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms"}
             f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
             f.write(f"# Time of execution: {datetime.now()}\n")
