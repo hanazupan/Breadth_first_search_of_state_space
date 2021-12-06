@@ -39,17 +39,17 @@ def determine_name(args):
     name_int = 0
     if args.type == "potential":
         name = f"potential{name_int:03d}"
-        while exists("images/potentials/" + name + "_energy.pdf"):
+        while exists("data/energy_summaries/potentials/" + name + "_summary.txt"):
             name_int += 1
             name = f"potential{name_int:03d}"
     elif args.type == "maze":
         name = f"maze{name_int:03d}"
-        while exists("images/mazes/" + name + "_energy.pdf"):
+        while exists("data/energy_summaries/mazes/" + name + "_summary.txt"):
             name_int += 1
             name = f"maze{name_int:03d}"
     elif args.type == "atoms":
         name = f"atoms{name_int:03d}"
-        while exists("images/atoms/" + name + "_energy_with_cutoff.pdf"):
+        while exists("data/energy_summaries/atoms/" + name + "_summary.txt"):
             name_int += 1
             name = f"atoms{name_int:03d}"
     else:
@@ -67,9 +67,8 @@ def produce_energies(args):
         my_energy = EnergyFromPotential(size=args.size, images_path="images/potentials/", images_name=name)
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name)
-        my_maze.visualize()
         my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name)
-        my_energy.visualize_underlying_maze()
+        #my_energy.visualize_underlying_maze()
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -96,8 +95,8 @@ def produce_energies(args):
         hours, minutes, seconds = report_time(end_setup_time, end_matrix_time)
         print(f" -> time for rates matrix: {hours}h {minutes}min {seconds}s.")
         print("Producing images ...")
-        my_energy.visualize()
-        my_energy.visualize_3d()
+        #my_energy.visualize()
+        #my_energy.visualize_3d()
         my_energy.visualize_eigenvectors_in_maze(num=8, which="LR")
         my_energy.visualize_eigenvalues()
         end_visualization_time = time.time()
@@ -116,7 +115,6 @@ def produce_energies(args):
         else:
             hours, minutes, seconds = report_time(end_setup_time, end_animation_time)
         print(f" -> time for animations: {hours}h {minutes}min {seconds}s.")
-    my_energy.save_information()
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
     print(f"Finished. Total time: {hours}h {minutes}min {seconds}s.")

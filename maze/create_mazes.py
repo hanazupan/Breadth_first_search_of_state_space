@@ -11,7 +11,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
+from datetime import datetime
 from matplotlib import colors, cm
+from plotting.read_files import read_summary_file
+
+path_data_mazes = "data/mazes/"
 
 
 class AbstractEnergy(ABC):
@@ -222,6 +226,8 @@ class Maze(AbstractEnergy):
         """
 
         self.algorithm = algorithm
+        self.no_branching = no_branching
+        self.edge_is_wall = edge_is_wall
         cutoff = 1
         # in the beginning all maze cells are unassigned
         energies = np.full(size, 2, dtype=int)
@@ -240,8 +246,18 @@ class Maze(AbstractEnergy):
                     pass
         elif algorithm == 'random':
             self.energies = np.random.randint(0, 2, size=self.size)
+        elif algorithm == "from_file":
+            self.energies = np.load(path_data_mazes + "maze_" + images_name + ".npy")
+            dict_properties = read_summary_file(images_name)
+            self.images_name = images_name
+            self.images_path = dict_properties["images path"]
+            self.size = dict_properties["size"]
+            self.edge_is_wall = dict_properties["edge_is_wall"]
+            self.no_branching = dict_properties["no_branching"]
         else:
             raise AttributeError("Not a valid algorithm choice.")
+        np.save(path_data_mazes + f"maze_{self.images_name}", self.energies)
+        self.save_information()
 
     def __repr__(self) -> str:
         """
@@ -287,7 +303,7 @@ class Maze(AbstractEnergy):
             self.energies[cell] = 1
             wall_list.append(cell)
 
-        if kwargs["edge_is_wall"]:
+        if self.edge_is_wall:
             # works only for 2D
             self.energies[0, :] = 1
             self.energies[-1, :] = 1
@@ -344,19 +360,22 @@ class Maze(AbstractEnergy):
         # to get the final image for animation with no unassigned cells
         yield self.energies
 
-    def visualize(self):
-        """
-        Visualize the maze with black squares (walls) and white squares (halls).
-        """
-        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
-            ax = plt.imshow(self.energies, cmap="Greys")
-            ax.figure.savefig(self.images_path + f"{self.images_name}_maze.pdf")
-            plt.close()
+    def save_information(self):
+        with open("data/mazes_summaries/" + f"{self.images_name}_summary.txt", "w") as f:
+            f.write(f"# Simulation performed with the script maze.create_mazes.py.\n")
+            f.write(f"# Time of execution: {datetime.now()}\n")
+            f.write(f"# --------- PARAMETERS ----------\n")
+            f.write(f"energy cutoff = {self.energy_cutoff}\n")
+            f.write(f"size = {self.size}\n")
+            f.write(f"images path = {self.images_path}\n")
+            f.write(f"images name = {self.images_name}\n")
+            f.write(f"no_branching = {self.no_branching}\n")
+            f.write(f"edge_is_wall = {self.edge_is_wall}\n")
 
 
 class MazeAnimation:
 
-    def __init__(self, maze_to_animate: AbstractEnergy):
+    def __init__(self, maze_to_animate: AbstractEnergy or str):
         """
         MazeAnimation class enables creating an animation of a specific algorithm on a maze/energy object.
 
@@ -370,7 +389,12 @@ class MazeAnimation:
         self.iterator = None
         # need to save the iterator value if the iterating function also returns the last value
         self.iterator_value = None
-        self.energies = maze_to_animate
+        if isinstance(maze_to_animate, AbstractEnergy):
+            self.energies = maze_to_animate
+        elif isinstance(maze_to_animate, str):
+            self.energies = Maze((1, 1), algorithm="from_file", images_name=maze_to_animate)
+        else:
+            raise AttributeError("maze_to_animate not of correct type")
         if len(self.energies.size) != 2:
             raise ValueError("Animation only possible for 2D mazes or energies.")
         with plt.style.context('Stylesheets/maze_style.mplstyle'):
@@ -480,4 +504,3 @@ class MazeAnimation:
 if __name__ == '__main__':
     path = "images/"
     maze = Maze((20, 20), images_path=path, images_name="style", animate=True)
-    maze.visualize()

@@ -12,13 +12,14 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
-from scipy.sparse import csr_matrix, diags
+from scipy.sparse import csr_matrix, diags, save_npz
 from scipy.interpolate import bisplev
 import seaborn as sns
 import pandas as pd
 from datetime import datetime
 from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT
 from mpl_toolkits import mplot3d  # a necessary import
+from os.path import exists
 
 sns.set_style("ticks")
 sns.set_context("talk")
@@ -60,8 +61,10 @@ class Energy(AbstractEnergy):
         self.grid_end = grid_end
         self.grid_full_len = tuple(np.array(self.grid_end) - np.array(self.grid_start))
         self.grid_x, self.grid_y = self._prepare_grid()
+        np.savez(f"data/energy_grids/grid_x_y_{self.images_name}", x=self.grid_x, y=self.grid_y)
         # prepare geometry
         self._prepare_geometry()
+        self.save_information()
 
     def _prepare_geometry(self):
         # distances between centers of cells: (horizontal, vertical)
@@ -168,6 +171,7 @@ class Energy(AbstractEnergy):
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
         self.rates_matrix = csr_matrix(self.rates_matrix)
+        save_npz("data/sqra_rates_matrices/" + f"rates_{self.images_name}", self.rates_matrix)
 
     def get_rates_matix(self, explorer: str = "bfs") -> np.ndarray:
         """
@@ -231,50 +235,6 @@ class Energy(AbstractEnergy):
     # -----------------------   VISUALIZATION  ---------------------------------
     ############################################################################
 
-    def _add_colorbar(self, fig, ax, im):
-        """
-        Add a colorbar to the image.
-
-        Args:
-            ax: Axis
-            fig: Figure
-            im: a colorful plot, eg imshow
-        """
-        im_ratio = self.size[0] / self.size[1]
-        fig.colorbar(im, ax=ax, fraction=0.05 * im_ratio, pad=0.04)
-
-    def visualize(self, **kwargs):
-        """
-        Visualizes the array self.energies.
-
-        Raises:
-            ValueError: if there are no self.energies
-        """
-        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, 1)
-            cmap = cm.get_cmap("RdBu").copy()
-            im = plt.imshow(self.energies, cmap=cmap, **kwargs)
-            self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"{self.images_name}_energy.pdf")
-            plt.close()
-            return ax
-
-    def visualize_3d(self, **kwargs):
-        """
-        Visualizes the array self.energies in 3D.
-
-        Raises:
-            ValueError: if there are no self.energies
-        """
-        with plt.style.context('Stylesheets/not_animation.mplstyle'):
-            ax = plt.axes(projection='3d')
-            ax.plot_surface(self.grid_x, self.grid_y, self.energies, rstride=1, cstride=1,
-                            cmap='RdBu', edgecolor='none', **kwargs)
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
-            ax.figure.savefig(self.images_path + f"{self.images_name}_3D_energy.pdf")
-            plt.close()
-            return ax
 
     def visualize_eigenvectors_in_maze(self, num: int = 3, **kwargs):
         """
@@ -330,24 +290,6 @@ class Energy(AbstractEnergy):
             plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_sqra.pdf")
             plt.close()
 
-    def visualize_rates_matrix(self):
-        """
-        Visualizes the array self.rates_matrix.
-
-        Raises:
-            ValueError: if there are no self.energies
-        """
-        if not self.explorer:
-            self._calculate_rates_matrix(selected_explorer="bfs")
-        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
-            norm = colors.TwoSlopeNorm(vcenter=0)
-            fig, ax = plt.subplots(1, 1, figsize=DIM_SQUARE)
-            im = plt.imshow(self.rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
-            self._add_colorbar(fig, ax, im)
-            ax.set_title("Rates matrix")
-            fig.savefig(self.images_path + f"{self.images_name}_rates_matrix.pdf")
-            plt.close()
-
     def save_information(self):
         data_path = "data/energy_summaries/"
         if type(self) == EnergyFromPotential:
@@ -356,10 +298,10 @@ class Energy(AbstractEnergy):
             data_path += "mazes/"
         elif type(self) == EnergyFromAtoms:
             data_path += "atoms/"
-        with open(data_path + f"{self.images_name}_summary.txt", "w") as f:
+        with open(data_path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms",
                               Energy: "not determined"}
-            f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
+            f.write(f"# Simulation performed with the script simulation.create_energies.py.\n")
             f.write(f"# Time of execution: {datetime.now()}\n")
             f.write(f"# --------- PARAMETERS ----------\n")
             f.write(f"energy type = {describe_types[type(self)]}\n")
@@ -406,36 +348,24 @@ class EnergyFromMaze(Energy):
                 cell = maze.find_random_accessible()
                 z[cell] = -10
         self.underlying_maze = z
+        np.save("data/energy_surfaces/" + f"underlaying_maze_{self.images_name}", self.underlying_maze)
         m = max(maze.size)
         tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
         # WARNING! We change the size, so need to update geometry and the grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
+        np.savez(f"data/energy_grids/grid_x_y_{self.images_name}", x=self.grid_x, y=self.grid_y)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self._prepare_geometry()
         self.spline = tck
+        np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
 
     def get_x_derivative(self, point: tuple) -> float:
         return bisplev(point[0], point[1], self.spline, dx=1)  # do not change, this is correct
 
     def get_y_derivative(self, point: tuple) -> float:
         return bisplev(point[0], point[1], self.spline, dy=1)   # do not change, this is correct
-
-    def visualize_underlying_maze(self):
-        """
-        Visualization of the maze (with eventually added noise) from which the Energy object was created.
-
-        Raises:
-            Value error: if there is no self.underlying_maze (if self.from_maze has not been used).
-        """
-        with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
-            lims = dict(cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
-            fig, ax = plt.subplots(1, 1)
-            im = plt.imshow(self.underlying_maze, **lims)
-            self._add_colorbar(fig, ax, im)
-            ax.figure.savefig(self.images_path + f"{self.images_name}_underlying_maze.pdf")
-            plt.close()
 
 
 class EnergyFromPotential(Energy):
@@ -452,6 +382,7 @@ class EnergyFromPotential(Energy):
                          grid_start=grid_start, grid_end=grid_end, cutoff=cutoff, size=size)
         self.energies = self.square_well(self.grid_x, self.grid_y)
         self.pbc = False
+        np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
 
     def square_well(self, x, y, a=5, b=10):
         return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2
@@ -604,6 +535,12 @@ class EnergyFromAtoms(Energy):
                 point_y = self.grid_y[i, j]
                 self.energies[i, j] = self.get_full_potential((point_x, point_y))
         self.energies[self.energies > 4*self.epsilon] = 4*self.epsilon
+        data_path = "data/energy_summaries/atoms/"
+        with open(data_path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+            f.write(f"atom_positions = {[tuple(atom.position) for atom in self.atoms]}\n")
+            f.write(f"epsilons = {[atom.epsilon for atom in atoms]}\n")
+            f.write(f"sigmas = {[atom.sigma for atom in atoms]}\n")
+        np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
 
     def get_full_potential(self, point: tuple) -> float:
         full_potential = 0
@@ -643,33 +580,6 @@ class EnergyFromAtoms(Energy):
             total_derivative += atom.get_dV_dy(point, self.grid_edges)
         return total_derivative
 
-    def visualize(self, **kwargs):
-        """
-        Visualizes the array self.energies. Use same color for all values above cutoff.
-
-        Raises:
-            ValueError: if there are no self.energies
-        """
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, 1)
-            df = pd.DataFrame(data=self.energies, index=self.grid_x[:, 0], columns=self.grid_y[0, :])
-            sns.heatmap(df, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=self.energy_cutoff), fmt='.2f',
-                        square=True, ax=ax, yticklabels=[], xticklabels=[])
-            # if you want labels: yticklabels=[f"{ind:.2f}" for ind in df.index]
-            # xticklabels=[f"{col:.2f}" for col in df.columns]
-            for atom in self.atoms:
-                range_x_grid = self.grid_full_len[0]  #self.grid_edges[1] - self.grid_edges[0]
-                range_y_grid = self.grid_full_len[1]  #self.grid_edges[3] - self.grid_edges[2]
-                ax.scatter((atom.position[1]-self.grid_edges[2])*self.size[1]/range_y_grid,
-                           (atom.position[0]-self.grid_edges[0])*self.size[0]/range_x_grid, marker="o", c="white")
-            ax.figure.savefig(self.images_path + f"{self.images_name}_energy_with_cutoff.pdf")
-            plt.close()
-            return ax
-    
-    def visualize_3d(self, **kwargs):
-        super(EnergyFromAtoms, self).visualize_3d(norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(self.energies),
-                                                                         vmin=-np.max(self.energies)))
-
 
 if __name__ == '__main__':
     img_path = "images/"
@@ -684,8 +594,6 @@ if __name__ == '__main__':
     # ------------------- MAZES -----------------------
     my_maze = Maze((9, 9), images_path=img_path, images_name="testing", no_branching=True, edge_is_wall=True)
     my_energy = EnergyFromMaze(my_maze, images_path=img_path, images_name="testing", friction=10)
-    my_maze.visualize()
-    my_energy.visualize_underlying_maze()
     # ------------------- POTENTIAL -----------------------
     # my_energy = EnergyFromPotential((30, 20), images_path=img_path, images_name="potential", friction=10)
     # ------------------- EXPLORERS -----------------------
@@ -694,9 +602,6 @@ if __name__ == '__main__':
     # me = DFSExplorer(my_energy)
     # me.explore_and_animate()
     # ------------------- GENERAL FUNCTIONS -----------------------
-    my_energy.visualize()
-    my_energy.visualize_3d()
-    my_energy.visualize_rates_matrix()
     my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
     my_energy.visualize_eigenvalues()
     my_energy.save_information()

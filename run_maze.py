@@ -6,6 +6,7 @@ python3 run_maze.py --size "(15,15)" --animate y --explorer all
 """
 from maze.create_mazes import Maze
 from maze.explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
+from plotting.plotting_energies import plot_maze
 from ast import literal_eval
 from os.path import exists
 import argparse
@@ -52,8 +53,8 @@ def create_and_explore_maze(args):
     maze = Maze(args.size, animate=animate, images_name=name, images_path=PATH)
     # visualization
     if args.visualize != "n":
-        maze.visualize()
-        print(f"Visualization of Maze will be saved in: {PATH}maze_{name}.png")
+        plot_maze(name)
+        print(f"Visualization of Maze will be saved in: {PATH}{name}_maze.png")
     # exploration and animation
     if args.explorer == "bfs" or args.explorer == "all":
         explorer = BFSExplorer(maze)
