@@ -7,7 +7,7 @@ Square root approximation is implemented using the rates matrices of those surfa
 # internal imports
 from .create_mazes import Maze, AbstractEnergy
 from .explore_mazes import BFSExplorer, DFSExplorer
-from constants import kB, PATH_IMG_MAZES, PATH_IMG_ATOMS, PATH_IMG_POTENTIALS
+from constants import *
 # standard library
 from abc import abstractmethod
 from datetime import datetime
@@ -53,7 +53,7 @@ class Energy(AbstractEnergy):
         self.grid_end = grid_end
         self.grid_full_len = tuple(np.array(self.grid_end) - np.array(self.grid_start))
         self.grid_x, self.grid_y = self._prepare_grid()
-        np.savez(f"data/energy_grids/grid_x_y_{self.images_name}", x=self.grid_x, y=self.grid_y)
+        np.savez(PATH_ENERGY_GRIDS + f"grid_x_y_{self.images_name}", x=self.grid_x, y=self.grid_y)
         # prepare geometry
         self._prepare_geometry()
         self.save_information()
@@ -171,7 +171,7 @@ class Energy(AbstractEnergy):
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"explorer type = {selected_explorer}\n")
             f.write(f"accessible cells = {self.explorer.get_sorted_accessible_cells()}\n")
-        save_npz("data/sqra_rates_matrices/" + f"rates_{self.images_name}", self.rates_matrix)
+        save_npz(PATH_ENERGY_RATES + f"rates_{self.images_name}", self.rates_matrix)
 
     ############################################################################
     # --------------------------   GETTERS  -----------------------------------
@@ -215,7 +215,7 @@ class Energy(AbstractEnergy):
         idx = eigenval.argsort()[::-1]
         eigenval = eigenval[idx]
         eigenvec = eigenvec[:, idx]
-        np.savez(f"data/sqra_eigenvectors_eigenvalues/eigv_{self.images_name}", eigenval=eigenval, eigenvec=eigenvec)
+        np.savez(PATH_ENERGY_EIGEN + f"eigv_{self.images_name}", eigenval=eigenval, eigenvec=eigenvec)
         return eigenval, eigenvec
 
     ############################################################################
@@ -223,7 +223,7 @@ class Energy(AbstractEnergy):
     ############################################################################
 
     def path_to_summary(self):
-        data_path = "data/energy_summaries/"
+        data_path = PATH_ENERGY_SUMMARY
         if type(self) == EnergyFromPotential:
             data_path += "potentials/"
         elif type(self) == EnergyFromMaze:
@@ -287,18 +287,18 @@ class EnergyFromMaze(Energy):
                 cell = maze.find_random_accessible()
                 z[cell] = -10
         self.underlying_maze = z
-        np.save("data/energy_surfaces/" + f"underlying_maze_{self.images_name}", self.underlying_maze)
+        np.save(PATH_ENERGY_SURFACES + f"underlying_maze_{self.images_name}", self.underlying_maze)
         m = max(maze.size)
         tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
         # WARNING! We change the size, so need to update geometry and the grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
-        np.savez(f"data/energy_grids/grid_x_y_{self.images_name}", x=self.grid_x, y=self.grid_y)
+        np.savez(PATH_ENERGY_GRIDS + f"grid_x_y_{self.images_name}", x=self.grid_x, y=self.grid_y)
         self.energies = interpolate.bisplev(self.grid_x[:, 0], self.grid_y[0, :], tck)
         self.size = self.energies.shape
         self._prepare_geometry()
         self.spline = tck
-        np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
+        np.save(PATH_ENERGY_SURFACES + f"surface_{self.images_name}", self.energies)
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"factor = {factor_grid}\n")
             arr1, arr2, arr3, num1, num2 = tuple(self.spline)
@@ -325,7 +325,7 @@ class EnergyFromPotential(Energy):
                          grid_start=grid_start, grid_end=grid_end, cutoff=cutoff, size=size)
         self.energies = self.square_well(self.grid_x, self.grid_y)
         self.pbc = False
-        np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
+        np.save(PATH_ENERGY_SURFACES + f"surface_{self.images_name}", self.energies)
 
     def square_well(self, x, y, a=5, b=10):
         return a * (x ** 2 - 0.3) ** 2 + b * (y ** 2 - 0.5) ** 2
@@ -482,7 +482,7 @@ class EnergyFromAtoms(Energy):
             f.write(f"atom_positions = {[tuple(atom.position) for atom in self.atoms]}\n")
             f.write(f"epsilons = {[atom.epsilon for atom in atoms]}\n")
             f.write(f"sigmas = {[atom.sigma for atom in atoms]}\n")
-        np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
+        np.save(PATH_ENERGY_SURFACES + f"surface_{self.images_name}", self.energies)
 
     def get_full_potential(self, point: tuple) -> float:
         full_potential = 0

@@ -106,7 +106,6 @@ def produce_simulation(args, energy):
     end_simulation_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_simulation_time)
     print(f" -> time for simulation: {hours}h {minutes}min {seconds}s.")
-    my_simulation.save_information()
     # visualization
     if args.visualize != "n":
         print("Calculating the MSM ...")

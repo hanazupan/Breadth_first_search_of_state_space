@@ -13,7 +13,7 @@ from scipy.sparse.linalg import eigs
 import seaborn as sns
 import time
 from datetime import datetime
-from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT, DATA_PATH, IMG_PATH
+from constants import *
 
 sns.set_style("ticks")
 sns.set_context("talk")
@@ -71,6 +71,7 @@ class Simulation:
         ymin = self.energy.grid_y[0, 0] - self.step_y / 2
         ymax = self.energy.grid_y[-1, -1] + self.step_y / 2
         self.grid_edges = (xmin, xmax, ymin, ymax)
+        self.save_information()
 
     def integrate(self, dt: float = None, N: int = None, save_trajectory: bool = False):
         """
@@ -122,7 +123,12 @@ class Simulation:
                 assert not self.energy.pbc
         # normalizing the histogram
         self.histogram = self.histogram / np.sum(self.histogram)
+        np.save(PATH_HISTOGRAMS + f"histogram_{self.images_name}", self.histogram)
         self.traj_cell = np.array(self.traj_cell)
+        np.save(PATH_TRAJECTORIES + f"cell_trajectory_{self.images_name}", self.traj_cell)
+        if save_trajectory:
+            np.savez(PATH_TRAJECTORIES + f"trajectory_x_y_{self.images_name}",
+                     x=np.array(self.traj_x), y=np.array(self.traj_y))
 
     def _euler_maruyama(self, x_n: float, y_n: float) -> tuple:
         """
@@ -213,92 +219,92 @@ class Simulation:
             index = index * self.histogram.shape[i] + cell[i]
         return index
 
-    def get_transitions_matrix(self, tau_array: np.ndarray = None, noncorr: bool = False) -> np.ndarray:
-        """
-        Obtain a set of transition matrices for different tau-s specified in tau_array.
-
-        Args:
-            tau_array: 1D array of tau values for which the transition matrices should be constructed
-            noncorr: bool, should only every tau-th frame be used for MSM construction
-                     (if False, use sliding window - much more expensive but throws away less data)
-        Returns:
-            an array of transition matrices
-        """
-        if tau_array:
-            self.tau_array = tau_array
-
-        def window(seq, len_window):
-            # in this case always move the window by 1 and use all points in simulations to count transitions
-            return [seq[k: k + len_window:len_window-1] for k in range(0, (len(seq)+1)-len_window)]
-
-        def noncorr_window(seq, len_window):
-            # in this case, only use every tau-th element for MSM. Faster but loses a lot of data
-            cut_seq = seq[0:-1:len_window]
-            return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
-
-        # now we are creating transitions matrix only for accessible cells - already ordered
-        acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
-                     if self.energy.is_accessible((i, j))]
-        cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
-        #all_cells = len(acc_cells)
-        all_cells = len(cells)
-        self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
-        for tau_i, tau in enumerate(tqdm(self.tau_array)):
-            count_per_cell = {(i, j, m, n): 0 for i, j in cells for m, n in cells}
-            if not noncorr:
-                window_cell = window(self.traj_cell, int(tau))
-            else:
-                window_cell = noncorr_window(self.traj_cell, int(tau))
-            for cell_slice in window_cell:
-                start_cell = cell_slice[0]
-                end_cell = cell_slice[1]
-                count_per_cell[(start_cell[0], start_cell[1], end_cell[0], end_cell[1])] += 1
-            for key, value in count_per_cell.items():
-                a, b, c, d = key
-                start_cell = (a, b)
-                end_cell = (c, d)
-                #if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)) and \
-                #        value != 0:
-                #i = acc_cells.index(start_cell)
-                #j = acc_cells.index(end_cell)
-                i = cells.index(start_cell)
-                j = cells.index(end_cell)
-                self.transition_matrices[tau_i][i, j] += value
-                # enforce detailed balance
-                self.transition_matrices[tau_i][j, i] += value
-        # divide each row of each matrix by the sum of that row
-        sums = self.transition_matrices.sum(axis=-1, keepdims=True)
-        sums[sums == 0] = 1
-        self.transition_matrices = self.transition_matrices / sums
-        return self.transition_matrices
-
-    def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs) -> tuple:
-        """
-        Obtain eigenvectors and eigenvalues of the transition matrices.
-
-        Args:
-            num_eigv: how many eigenvalues/vectors pairs
-            **kwargs: named arguments to forward to eigs()
-        Returns:
-            (eigenval, eigenvec) a tuple of eigenvalues and eigenvectors, first num_eigv given for all tau-s
-        """
-        tau_eigenvals = np.zeros((len(self.tau_array), num_eigv))
-        tau_eigenvec = np.zeros((len(self.tau_array), self.transition_matrices[0].shape[0], num_eigv))
-        for i, tau in enumerate(self.tau_array):
-            tm = self.transition_matrices[i].T
-            eigenval, eigenvec = eigs(tm, num_eigv, **kwargs)
-            if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
-                eigenvec = eigenvec.real
-                eigenval = eigenval.real
-            # sort eigenvectors according to their eigenvalues
-            idx = eigenval.argsort()[::-1]
-            eigenval = eigenval[idx]
-            tau_eigenvals[i] = eigenval.real
-            eigenvec = eigenvec[:, idx]
-            tau_eigenvec[i] = eigenvec
-        self.eigenvals = tau_eigenvals
-        self.eigenvec = tau_eigenvec
-        return tau_eigenvals, tau_eigenvec
+    # def get_transitions_matrix(self, tau_array: np.ndarray = None, noncorr: bool = False) -> np.ndarray:
+    #     """
+    #     Obtain a set of transition matrices for different tau-s specified in tau_array.
+    #
+    #     Args:
+    #         tau_array: 1D array of tau values for which the transition matrices should be constructed
+    #         noncorr: bool, should only every tau-th frame be used for MSM construction
+    #                  (if False, use sliding window - much more expensive but throws away less data)
+    #     Returns:
+    #         an array of transition matrices
+    #     """
+    #     if tau_array:
+    #         self.tau_array = tau_array
+    #
+    #     def window(seq, len_window):
+    #         # in this case always move the window by 1 and use all points in simulations to count transitions
+    #         return [seq[k: k + len_window:len_window-1] for k in range(0, (len(seq)+1)-len_window)]
+    #
+    #     def noncorr_window(seq, len_window):
+    #         # in this case, only use every tau-th element for MSM. Faster but loses a lot of data
+    #         cut_seq = seq[0:-1:len_window]
+    #         return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
+    #
+    #     # now we are creating transitions matrix only for accessible cells - already ordered
+    #     acc_cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
+    #                  if self.energy.is_accessible((i, j))]
+    #     cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
+    #     #all_cells = len(acc_cells)
+    #     all_cells = len(cells)
+    #     self.transition_matrices = np.zeros(shape=(len(self.tau_array), all_cells, all_cells))
+    #     for tau_i, tau in enumerate(tqdm(self.tau_array)):
+    #         count_per_cell = {(i, j, m, n): 0 for i, j in cells for m, n in cells}
+    #         if not noncorr:
+    #             window_cell = window(self.traj_cell, int(tau))
+    #         else:
+    #             window_cell = noncorr_window(self.traj_cell, int(tau))
+    #         for cell_slice in window_cell:
+    #             start_cell = cell_slice[0]
+    #             end_cell = cell_slice[1]
+    #             count_per_cell[(start_cell[0], start_cell[1], end_cell[0], end_cell[1])] += 1
+    #         for key, value in count_per_cell.items():
+    #             a, b, c, d = key
+    #             start_cell = (a, b)
+    #             end_cell = (c, d)
+    #             #if self.energy.is_accessible(tuple(start_cell)) and self.energy.is_accessible(tuple(end_cell)) and \
+    #             #        value != 0:
+    #             #i = acc_cells.index(start_cell)
+    #             #j = acc_cells.index(end_cell)
+    #             i = cells.index(start_cell)
+    #             j = cells.index(end_cell)
+    #             self.transition_matrices[tau_i][i, j] += value
+    #             # enforce detailed balance
+    #             self.transition_matrices[tau_i][j, i] += value
+    #     # divide each row of each matrix by the sum of that row
+    #     sums = self.transition_matrices.sum(axis=-1, keepdims=True)
+    #     sums[sums == 0] = 1
+    #     self.transition_matrices = self.transition_matrices / sums
+    #     return self.transition_matrices
+    #
+    # def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs) -> tuple:
+    #     """
+    #     Obtain eigenvectors and eigenvalues of the transition matrices.
+    #
+    #     Args:
+    #         num_eigv: how many eigenvalues/vectors pairs
+    #         **kwargs: named arguments to forward to eigs()
+    #     Returns:
+    #         (eigenval, eigenvec) a tuple of eigenvalues and eigenvectors, first num_eigv given for all tau-s
+    #     """
+    #     tau_eigenvals = np.zeros((len(self.tau_array), num_eigv))
+    #     tau_eigenvec = np.zeros((len(self.tau_array), self.transition_matrices[0].shape[0], num_eigv))
+    #     for i, tau in enumerate(self.tau_array):
+    #         tm = self.transition_matrices[i].T
+    #         eigenval, eigenvec = eigs(tm, num_eigv, **kwargs)
+    #         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
+    #             eigenvec = eigenvec.real
+    #             eigenval = eigenval.real
+    #         # sort eigenvectors according to their eigenvalues
+    #         idx = eigenval.argsort()[::-1]
+    #         eigenval = eigenval[idx]
+    #         tau_eigenvals[i] = eigenval.real
+    #         eigenvec = eigenvec[:, idx]
+    #         tau_eigenvec[i] = eigenvec
+    #     self.eigenvals = tau_eigenvals
+    #     self.eigenvec = tau_eigenvec
+    #     return tau_eigenvals, tau_eigenvec
 
     ############################################################################
     # ------------------------   VISUALIZATION  --------------------------------
@@ -460,15 +466,18 @@ class Simulation:
             plt.savefig(self.images_path + f"{self.images_name}_trajectory.pdf")
             plt.close()
 
-    def save_information(self):
+    def path_to_summary(self):
         data_path = DATA_PATH + "simulation_summaries/"
-        if type(self.energy) == EnergyFromPotential:
+        if type(self) == EnergyFromPotential:
             data_path += "potentials/"
-        elif type(self.energy) == EnergyFromMaze:
+        elif type(self) == EnergyFromMaze:
             data_path += "mazes/"
-        elif type(self.energy) == EnergyFromAtoms:
+        elif type(self) == EnergyFromAtoms:
             data_path += "atoms/"
-        with open(data_path + f"{self.images_name}_summary.txt", "w") as f:
+        return data_path
+
+    def save_information(self):
+        with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "w") as f:
             describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms"}
             f.write(f"# Simulation performed with the script simulation.create_simulation.py.\n")
             f.write(f"# Time of execution: {datetime.now()}\n")
