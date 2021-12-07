@@ -15,3 +15,4 @@ PATH_ENERGY_SURFACES = "data/energy_surfaces/"
 PATH_ENERGY_RATES = "data/sqra_rates_matrices/"
 PATH_ENERGY_EIGEN = "data/sqra_eigenvectors_eigenvalues/"
 PATH_ENERGY_GRIDS = "data/energy_grids/"
+kB = 0.008314463  # kJ/mol/K

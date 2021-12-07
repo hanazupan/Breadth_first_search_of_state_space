@@ -7,6 +7,7 @@ Square root approximation is implemented using the rates matrices of those surfa
 # internal imports
 from .create_mazes import Maze, AbstractEnergy
 from .explore_mazes import BFSExplorer, DFSExplorer
+from constants import kB, PATH_IMG_MAZES, PATH_IMG_ATOMS, PATH_IMG_POTENTIALS
 # standard library
 from abc import abstractmethod
 from datetime import datetime
@@ -16,9 +17,6 @@ from scipy import interpolate
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix, diags, save_npz
 from scipy.interpolate import bisplev
-
-# DEFINING BOLTZMANN CONSTANT
-kB = 0.008314463  # kJ/mol/K
 
 
 class Energy(AbstractEnergy):
@@ -50,7 +48,7 @@ class Energy(AbstractEnergy):
         # empty objects
         self.rates_matrix = None
         self.explorer = None
-        # prepare for the grid
+        # prepare the grid
         self.grid_start = grid_start
         self.grid_end = grid_end
         self.grid_full_len = tuple(np.array(self.grid_end) - np.array(self.grid_start))
@@ -65,6 +63,7 @@ class Energy(AbstractEnergy):
         self.hs = (self.grid_full_len[0] / self.size[0], self.grid_full_len[1] / self.size[1])
         # surface areas between cells: (horizontal, vertical)
         self.Ss = (self.grid_full_len[1] / self.size[1], self.grid_full_len[0] / self.size[0])
+        # volumes of cells
         self.V = np.prod(np.array(self.hs))  # volume of cells
 
     def _prepare_grid(self, factor=1) -> tuple:
@@ -116,13 +115,16 @@ class Energy(AbstractEnergy):
                 kB*self.temperature)))
         return min(Q_ij, limit)
 
-    def _calculate_rates_matrix(self, selected_explorer):
+    def _calculate_rates_matrix(self, selected_explorer: str):
         """
         Explores the self.energies matrix using breadth-first search, t.i. starting in a random accessible
         (energy < energy_cutoff) cell and then exploring accessible neighbours of the cell. This creates an adjacency
         matrix. For every 1 in adj_matrix, the SqRA formula is applied to calculate the rate of adjacent cells and this
         value is saved in the ij-position of the rates_matrix. The diagonal elements of rates_matrix are determined
-        so that the rowsum of rates_matrix = 0.
+        so that the row sum of rates_matrix = 0.
+
+        Args:
+            selected_explorer: if 'bfs' od 'dfs', use that explorer, else use the full state space
         """
         if selected_explorer == "bfs":
             self.explorer = BFSExplorer(self)
@@ -135,7 +137,7 @@ class Energy(AbstractEnergy):
             self.energy_cutoff = np.max(self.energies) + 1
             full_len = self.size[0]*self.size[1]
             ones = [1]*full_len
-            # if PBC, the offseted diagonals of neighbours continue on another diagonal
+            # if PBC, the off-seted diagonals of neighbours continue on another diagonal
             if self.pbc:
                 adj_matrix = diags((ones, ones, ones, ones, ones, ones, ones, ones),
                                    offsets=(1, self.size[0], -1, -self.size[0],
@@ -164,15 +166,9 @@ class Energy(AbstractEnergy):
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
+        # save the rates matrix and connected info
         self.rates_matrix = csr_matrix(self.rates_matrix)
-        data_path = "data/energy_summaries/"
-        if type(self) == EnergyFromPotential:
-            data_path += "potentials/"
-        elif type(self) == EnergyFromMaze:
-            data_path += "mazes/"
-        elif type(self) == EnergyFromAtoms:
-            data_path += "atoms/"
-        with open(data_path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+        with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"explorer type = {selected_explorer}\n")
             f.write(f"accessible cells = {self.explorer.get_sorted_accessible_cells()}\n")
         save_npz("data/sqra_rates_matrices/" + f"rates_{self.images_name}", self.rates_matrix)
@@ -209,7 +205,7 @@ class Energy(AbstractEnergy):
             ValueError if no self.energies
         """
         if not self.explorer:
-            self._calculate_rates_matrix()
+            self._calculate_rates_matrix("bfs")
         # left eigenvectors and eigenvalues
         eigenval, eigenvec = eigs(self.rates_matrix.transpose(copy=True), num, **kwargs)
         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
@@ -221,6 +217,10 @@ class Energy(AbstractEnergy):
         eigenvec = eigenvec[:, idx]
         np.savez(f"data/sqra_eigenvectors_eigenvalues/eigv_{self.images_name}", eigenval=eigenval, eigenvec=eigenvec)
         return eigenval, eigenvec
+
+    ############################################################################
+    # --------------------------   SUMMARY  -----------------------------------
+    ############################################################################
 
     def path_to_summary(self):
         data_path = "data/energy_summaries/"
@@ -258,7 +258,7 @@ class Energy(AbstractEnergy):
 
 class EnergyFromMaze(Energy):
 
-    def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = "./",
+    def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = PATH_IMG_MAZES,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
                  grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 15):
         """
@@ -287,7 +287,7 @@ class EnergyFromMaze(Energy):
                 cell = maze.find_random_accessible()
                 z[cell] = -10
         self.underlying_maze = z
-        np.save("data/energy_surfaces/" + f"underlaying_maze_{self.images_name}", self.underlying_maze)
+        np.save("data/energy_surfaces/" + f"underlying_maze_{self.images_name}", self.underlying_maze)
         m = max(maze.size)
         tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
@@ -301,6 +301,8 @@ class EnergyFromMaze(Energy):
         np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"factor = {factor_grid}\n")
+            arr1, arr2, arr3, num1, num2 = tuple(self.spline)
+            f.write(f"spline = {tuple(arr1), tuple(arr2), tuple(arr3), num1, num2}\n")
 
     def get_x_derivative(self, point: tuple) -> float:
         return bisplev(point[0], point[1], self.spline, dx=1)  # do not change, this is correct
@@ -311,7 +313,7 @@ class EnergyFromMaze(Energy):
 
 class EnergyFromPotential(Energy):
 
-    def __init__(self, size: tuple = (12, 16), images_path: str = "./",
+    def __init__(self, size: tuple = (12, 16), images_path: str = PATH_IMG_POTENTIALS,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
                  grid_start: tuple = (-1.4, -1.4), grid_end: tuple = (1.4, 1.4), cutoff: float = 10):
         """
@@ -447,9 +449,9 @@ class Atom:
 
 class EnergyFromAtoms(Energy):
 
-    def __init__(self, size: tuple, atoms: tuple, images_path: str = "./",
+    def __init__(self, size: tuple, atoms: tuple, images_path: str = PATH_IMG_ATOMS,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: tuple = (0, 0), grid_end: tuple = (12, 12), cutoff: float = 30):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (12, 12)):
         """
         Initiate an energy surface with LJ potentials induced by atoms placed on the surface.
         Atoms must be placed on positions between 0 and size.
@@ -541,8 +543,3 @@ if __name__ == '__main__':
     # me.explore_and_animate()
     # me = DFSExplorer(my_energy)
     # me.explore_and_animate()
-    # ------------------- GENERAL FUNCTIONS -----------------------
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-    my_energy.visualize_eigenvalues()
-    my_energy.save_information()
-

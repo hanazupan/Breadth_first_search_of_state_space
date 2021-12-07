@@ -1,8 +1,10 @@
+# internal imports
 from plotting.read_files import read_summary_file, read_everything_energies
 from constants import DIM_LANDSCAPE, PATH_DATA_MAZES
+# external imports
+from matplotlib import colors, cm
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import colors, cm
 import seaborn as sns
 import pandas as pd
 
@@ -10,9 +12,12 @@ sns.set_style("ticks")
 sns.set_context("talk")
 
 
-def plot_maze(file_id):
+def plot_maze(file_id: str):
     """
     Visualize the maze with black squares (walls) and white squares (halls).
+
+    Args:
+        file_id: the img_name of the saved data
     """
     energies = np.load(PATH_DATA_MAZES + "maze_" + file_id + ".npy")
     dict_properties = read_summary_file(file_id)
@@ -22,7 +27,16 @@ def plot_maze(file_id):
         plt.close()
 
 
-def plot_energy(properties, energies, grid_x, grid_y):
+def plot_energy(properties: dict, energies: np.ndarray, grid_x: np.ndarray, grid_y: np.ndarray):
+    """
+    Plot the energy surface from data.
+
+    Args:
+        properties: dictionary of properties read from the summary file
+        energies: array of saved energies
+        grid_x: array of saved grid x
+        grid_y: array of saved grid y
+    """
     with plt.style.context(['Stylesheets/not_animation.mplstyle']):
         fig, ax = plt.subplots(1, 1)
         df = pd.DataFrame(data=energies, index=grid_x[:, 0], columns=grid_y[0, :])
@@ -44,9 +58,15 @@ def plot_energy(properties, energies, grid_x, grid_y):
         plt.close()
 
 
-def plot_energy_3d(properties, energies, grid_x, grid_y):
+def plot_energy_3d(properties: dict, energies: np.ndarray, grid_x: np.ndarray, grid_y: np.ndarray):
     """
-    Visualizes the array self.energies in 3D.
+    Visualizes the array of energies in 3D.
+
+    Args:
+        properties: dictionary of properties read from the summary file
+        energies: array of saved energies
+        grid_x: array of saved grid x
+        grid_y: array of saved grid y
     """
     with plt.style.context('Stylesheets/not_animation.mplstyle'):
         ax = plt.axes(projection='3d')
@@ -63,9 +83,13 @@ def plot_energy_3d(properties, energies, grid_x, grid_y):
         plt.close()
 
 
-def plot_underlying_maze(properties, maze):
+def plot_underlying_maze(properties: dict, maze: np.ndarray):
     """
     Visualization of the maze (with eventually added noise) from which the Energy object was created.
+
+    Args:
+        properties: dictionary of properties read from the summary file
+        maze: array of the underlying maze read from the file
     """
     with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
         fig, ax = plt.subplots(1, 1)
@@ -74,9 +98,13 @@ def plot_underlying_maze(properties, maze):
         plt.close()
 
 
-def plot_rates_matrix(properties, rates):
+def plot_rates_matrix(properties: dict, rates):
     """
-    Visualizes the array self.rates_matrix.
+    Visualizes the array rates_matrix.
+
+    Args:
+        properties: dictionary of properties read from the summary file
+        rates: array of the rates matrix read from the file
     """
     with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
         norm = colors.TwoSlopeNorm(vcenter=0)
@@ -87,14 +115,15 @@ def plot_rates_matrix(properties, rates):
         plt.close()
 
 
-def plot_eigenvectors(properties, eigenvectors, num: int = 3):
+def plot_eigenvectors(properties: dict, eigenvectors: np.ndarray, num: int = 3):
     """
     Visualize the energy surface and the first num (default=3) eigenvectors as a 2D image in a maze.
     Black squares mean the cells are not accessible.
 
     Args:
+        properties: dictionary of properties read from the summary file
+        eigenvectors: array of the eigenvectors read from the file
         num: int, how many eigenvectors of rates matrix to show
-        **kwargs: named arguments that can be passed to self.get_eigenval_eigenvec()
     """
     eigenvectors = eigenvectors[:, :num]
     with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
@@ -126,9 +155,14 @@ def plot_eigenvectors(properties, eigenvectors, num: int = 3):
         plt.close()
 
 
-def plot_eigenvalues(properties, eigenvalues, num=None):
+def plot_eigenvalues(properties: dict, eigenvalues: np.ndarray, num: int = None):
     """
     Visualize the eigenvalues of rate matrix.
+
+    Args:
+        properties: dictionary of properties read from the summary file
+        eigenvalues: array of the eigenvalues read from the file
+        num: int, how many eigenvalues of rates matrix to show - if None, all available
     """
     if num:
         eigenvalues = eigenvalues[:num]
@@ -145,7 +179,19 @@ def plot_eigenvalues(properties, eigenvalues, num=None):
         plt.close()
 
 
-def plot_everything_energy(file_id: str, num_eigenvec=6, num_eigenval=None, plot_rates=False):
+def plot_everything_energy(file_id: str, num_eigenvec: int = 6, num_eigenval: int = None, plot_rates: bool = False):
+    """
+    Save all the energy plots connected with some file_id.
+
+    Args:
+        file_id: the img_name of the saved data
+        num_eigenvec: int, how many eigenvectors of rates matrix to show
+        num_eigenval: int, how many eigenvalues of rates matrix to show - if None, all available
+        plot_rates: whether to plot rates matrix (impacts performance)
+
+    Returns:
+
+    """
     properties = read_everything_energies(file_id)
     if file_id.startswith("maze"):
         dict_properties, energies, grid_x, grid_y, rates_matrix, eigenvec, eigenval, underlying_maze = properties

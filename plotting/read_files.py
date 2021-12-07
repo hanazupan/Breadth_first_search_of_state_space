@@ -57,7 +57,7 @@ def read_everything_energies(file_id: str):
     grid_x = grids["x"]
     grid_y = grids["y"]
     if file_id.startswith("maze"):
-        underlying_maze = np.load(PATH_ENERGY_SURFACES + f"underlaying_maze_{file_id}.npy")
+        underlying_maze = np.load(PATH_ENERGY_SURFACES + f"underlying_maze_{file_id}.npy")
     rates_matrix = load_npz(PATH_ENERGY_RATES + f"rates_{file_id}.npz")
     eigvs = np.load(PATH_ENERGY_EIGEN + f"eigv_{file_id}.npz")
     eigenvec = eigvs["eigenvec"]
