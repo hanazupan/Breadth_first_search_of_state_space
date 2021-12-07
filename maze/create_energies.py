@@ -4,25 +4,18 @@ This is implemented in subclasses EnergyFromMaze, EnergyFromPotential and Energy
 Square root approximation is implemented using the rates matrices of those surfaces.
 """
 
-from abc import abstractmethod
+# internal imports
 from .create_mazes import Maze, AbstractEnergy
-from .explore_mazes import BFSExplorer, DFSExplorer, DijkstraExplorer
+from .explore_mazes import BFSExplorer, DFSExplorer
+# standard library
+from abc import abstractmethod
+from datetime import datetime
+# external imports
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy import interpolate
-from matplotlib import colors, cm
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csr_matrix, diags, save_npz
 from scipy.interpolate import bisplev
-import seaborn as sns
-import pandas as pd
-from datetime import datetime
-from constants import DIM_LANDSCAPE, DIM_SQUARE, DIM_PORTRAIT
-from mpl_toolkits import mplot3d  # a necessary import
-from os.path import exists
-
-sns.set_style("ticks")
-sns.set_context("talk")
 
 # DEFINING BOLTZMANN CONSTANT
 kB = 0.008314463  # kJ/mol/K
@@ -43,8 +36,9 @@ class Energy(AbstractEnergy):
             images_name: an identifier of saved images
             m: mass of a particle
             friction: friction coefficient (for now assumed constant)
-            T: temperature
+            temperature: temperature
         """
+        # initiates AbstractEnergy that is also common with Maze objects
         super().__init__(energies=None, energy_cutoff=cutoff, size=size, images_path=images_path,
                          images_name=images_name)
         # and let´s assume room temperature
@@ -171,7 +165,21 @@ class Energy(AbstractEnergy):
         for i, row in enumerate(self.rates_matrix):
             self.rates_matrix[i, i] = - np.sum(row)
         self.rates_matrix = csr_matrix(self.rates_matrix)
+        data_path = "data/energy_summaries/"
+        if type(self) == EnergyFromPotential:
+            data_path += "potentials/"
+        elif type(self) == EnergyFromMaze:
+            data_path += "mazes/"
+        elif type(self) == EnergyFromAtoms:
+            data_path += "atoms/"
+        with open(data_path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+            f.write(f"explorer type = {selected_explorer}\n")
+            f.write(f"accessible cells = {self.explorer.get_sorted_accessible_cells()}\n")
         save_npz("data/sqra_rates_matrices/" + f"rates_{self.images_name}", self.rates_matrix)
+
+    ############################################################################
+    # --------------------------   GETTERS  -----------------------------------
+    ############################################################################
 
     def get_rates_matix(self, explorer: str = "bfs") -> np.ndarray:
         """
@@ -186,24 +194,6 @@ class Energy(AbstractEnergy):
         if not self.explorer:
             self._calculate_rates_matrix(explorer)
         return self.rates_matrix
-
-    ############################################################################
-    # --------------------------   GETTERS  -----------------------------------
-    ############################################################################
-
-    def get_boltzmann(self) -> np.ndarray:
-        """
-        Obtain a Boltzmann distribution for all accessible cells (ordered as nodes in the graph, meaning in the
-        order they were discovered by the explorer.
-
-        Returns:
-            an array of floats, each containing Boltzmann distribution at the energy of one accessible cell
-        """
-        if not self.explorer:
-            self._calculate_rates_matrix()
-        list_of_cells = self.explorer.get_sorted_accessible_cells()
-        boltzmanns = np.array([np.exp(-self.get_energy(cell) / (kB * self.temperature)) for cell in list_of_cells])
-        return boltzmanns
 
     def get_eigenval_eigenvec(self, num: int = 10, **kwargs) -> tuple:
         """
@@ -229,68 +219,10 @@ class Energy(AbstractEnergy):
         idx = eigenval.argsort()[::-1]
         eigenval = eigenval[idx]
         eigenvec = eigenvec[:, idx]
+        np.savez(f"data/sqra_eigenvectors_eigenvalues/eigv_{self.images_name}", eigenval=eigenval, eigenvec=eigenvec)
         return eigenval, eigenvec
 
-    ############################################################################
-    # -----------------------   VISUALIZATION  ---------------------------------
-    ############################################################################
-
-
-    def visualize_eigenvectors_in_maze(self, num: int = 3, **kwargs):
-        """
-        Visualize the energy surface and the first num (default=3) eigenvectors as a 2D image in a maze.
-        Black squares mean the cells are not accessible.
-
-        Args:
-            num: int, how many eigenvectors of rates matrix to show
-            **kwargs: named arguments that can be passed to self.get_eigenval_eigenvec()
-        """
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, **kwargs)
-        with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
-            full_width = DIM_LANDSCAPE[0]
-            fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
-            cmap = cm.get_cmap("RdBu").copy()
-            try:
-                accesible = self.explorer.get_sorted_accessible_cells()
-            except AttributeError:
-                accesible = [(i, j) for i in range(self.energies.shape[0]) for j in range(self.energies.shape[1])]
-            len_acc = len(accesible)
-            assert eigenvec.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
-            vmax = np.max(eigenvec[:, :num+1])
-            vmin = np.min(eigenvec[:, :num+1])
-            for i in range(num):
-                array = np.full(self.size, vmax+1)
-                for index, cell in enumerate(accesible):
-                    if eigenvec[index, 0] > 0:
-                        array[cell] = eigenvec[index, i]
-                    else:
-                        array[cell] = - eigenvec[index, i]
-                ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
-                ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
-            plt.savefig(self.images_path + f"{self.images_name}_eigenvectors_sqra.pdf")
-            plt.close()
-
-    def visualize_eigenvalues(self):
-        """
-        Visualize the eigenvalues of rate matrix.
-        """
-        if not self.explorer:
-            self._calculate_rates_matrix(selected_explorer="bfs")
-        num = self.rates_matrix.shape[0] - 2
-        eigenval, eigenvec = self.get_eigenval_eigenvec(num=num, which="LR")
-        with plt.style.context(['Stylesheets/not_animation.mplstyle']):
-            fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
-            xs = np.linspace(0, 1, num=num)
-            plt.scatter(xs, eigenval, s=5, c="black")
-            for i, eigenw in enumerate(eigenval):
-                plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
-            plt.hlines(0, 0, 1)
-            ax.set_ylabel("Eigenvalues (SqRA)")
-            ax.axes.get_xaxis().set_visible(False)
-            plt.savefig(self.images_path + f"{self.images_name}_eigenvalues_sqra.pdf")
-            plt.close()
-
-    def save_information(self):
+    def path_to_summary(self):
         data_path = "data/energy_summaries/"
         if type(self) == EnergyFromPotential:
             data_path += "potentials/"
@@ -298,7 +230,11 @@ class Energy(AbstractEnergy):
             data_path += "mazes/"
         elif type(self) == EnergyFromAtoms:
             data_path += "atoms/"
-        with open(data_path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+        return data_path
+
+    def save_information(self):
+        path = self.path_to_summary()
+        with open(path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             describe_types = {EnergyFromMaze: "maze", EnergyFromPotential: "double_well", EnergyFromAtoms: "atoms",
                               Energy: "not determined"}
             f.write(f"# Simulation performed with the script simulation.create_energies.py.\n")
@@ -315,6 +251,9 @@ class Energy(AbstractEnergy):
             f.write(f"friction = {self.friction}\n")
             f.write(f"temperature = {self.temperature}\n")
             f.write(f"D = {self.D}\n")
+            f.write(f"hs = {self.hs}\n")
+            f.write(f"Ss = {self.Ss}\n")
+            f.write(f"V = {self.V}\n")
 
 
 class EnergyFromMaze(Energy):
@@ -360,6 +299,8 @@ class EnergyFromMaze(Energy):
         self._prepare_geometry()
         self.spline = tck
         np.save("data/energy_surfaces/" + f"surface_{self.images_name}", self.energies)
+        with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+            f.write(f"factor = {factor_grid}\n")
 
     def get_x_derivative(self, point: tuple) -> float:
         return bisplev(point[0], point[1], self.spline, dx=1)  # do not change, this is correct
@@ -535,8 +476,7 @@ class EnergyFromAtoms(Energy):
                 point_y = self.grid_y[i, j]
                 self.energies[i, j] = self.get_full_potential((point_x, point_y))
         self.energies[self.energies > 4*self.epsilon] = 4*self.epsilon
-        data_path = "data/energy_summaries/atoms/"
-        with open(data_path + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+        with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"atom_positions = {[tuple(atom.position) for atom in self.atoms]}\n")
             f.write(f"epsilons = {[atom.epsilon for atom in atoms]}\n")
             f.write(f"sigmas = {[atom.sigma for atom in atoms]}\n")

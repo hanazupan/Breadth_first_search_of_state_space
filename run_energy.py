@@ -4,14 +4,20 @@ python3 run_energy.py --type potential --size "(40, 40)"
 python3 run_energy.py --type maze --size "(15, 20)"
 python3 run_energy.py --type atoms --size "(15,15)" --num_atoms 4
 """
+
+# internal imports
+from plotting.plotting_energies import plot_everything_energy
 from maze.create_mazes import Maze
 from maze.create_energies import EnergyFromPotential, EnergyFromMaze, EnergyFromAtoms, Atom
 from maze.explore_mazes import BFSExplorer, DFSExplorer
-import numpy as np
+# standard library
 from ast import literal_eval
 import argparse
 import time
 from os.path import exists
+# external imports
+import numpy as np
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--type', metavar='t', type=str, nargs='?',
@@ -68,7 +74,6 @@ def produce_energies(args):
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name)
         my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name)
-        #my_energy.visualize_underlying_maze()
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -91,14 +96,12 @@ def produce_energies(args):
     if args.visualize != "n":
         print("Calculating the rates matrix ...")
         my_energy.get_rates_matix()
+        my_energy.get_eigenval_eigenvec(20, which="LR")
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_setup_time, end_matrix_time)
         print(f" -> time for rates matrix: {hours}h {minutes}min {seconds}s.")
         print("Producing images ...")
-        #my_energy.visualize()
-        #my_energy.visualize_3d()
-        my_energy.visualize_eigenvectors_in_maze(num=8, which="LR")
-        my_energy.visualize_eigenvalues()
+        plot_everything_energy(name)
         end_visualization_time = time.time()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")

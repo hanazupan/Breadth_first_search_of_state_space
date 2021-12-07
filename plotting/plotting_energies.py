@@ -1,26 +1,20 @@
-from plotting.read_files import read_summary_file
-from constants import DIM_SQUARE
+from plotting.read_files import read_summary_file, read_everything_energies
+from constants import DIM_LANDSCAPE, PATH_DATA_MAZES
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors, cm
-from scipy.sparse import load_npz
 import seaborn as sns
 import pandas as pd
 
-
-path_data_mazes = "data/mazes/"
-path_data_summary = "data/mazes_summaries/"
-path_energy_summary = "data/energy_summaries/"
-path_energy_surfaces = "data/energy_surfaces/"
-path_energy_rates = "data/sqra_rates_matrices/"
-path_energy_eigen = "data/sqra_eigenvectors_eigenvalues/"
+sns.set_style("ticks")
+sns.set_context("talk")
 
 
 def plot_maze(file_id):
     """
     Visualize the maze with black squares (walls) and white squares (halls).
     """
-    energies = np.load(path_data_mazes + "maze_" + file_id + ".npy")
+    energies = np.load(PATH_DATA_MAZES + "maze_" + file_id + ".npy")
     dict_properties = read_summary_file(file_id)
     with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
         ax = plt.imshow(energies, cmap="Greys")
@@ -28,49 +22,35 @@ def plot_maze(file_id):
         plt.close()
 
 
-def plot_with_cutoff(file_id):
-    energies = np.load(path_energy_surfaces + "surface_" + file_id + ".npy")
-    grids = np.load(f"data/energy_grids/grid_x_y_{file_id}.npz")
-    grid_x = grids["x"]
-    grid_y = grids["y"]
-    dict_properties = read_summary_file(file_id, summary_type="energy")
+def plot_energy(properties, energies, grid_x, grid_y):
     with plt.style.context(['Stylesheets/not_animation.mplstyle']):
         fig, ax = plt.subplots(1, 1)
         df = pd.DataFrame(data=energies, index=grid_x[:, 0], columns=grid_y[0, :])
-        if "atom_positions" in dict_properties.keys():
-            sns.heatmap(df, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=dict_properties["energy cutoff"]),
-                    fmt='.2f', square=True, ax=ax, yticklabels=[], xticklabels=[])
+        if "atom_positions" in properties.keys():
+            sns.heatmap(df, cmap="RdBu_r", norm=colors.TwoSlopeNorm(vcenter=0, vmax=properties["energy cutoff"]),
+                        fmt='.2f', square=True, ax=ax, yticklabels=[], xticklabels=[])
         else:
-            sns.heatmap(df, cmap="RdBu",
-                    fmt='.2f', square=True, ax=ax, yticklabels=[], xticklabels=[])
+            sns.heatmap(df, cmap="RdBu", fmt='.2f', square=True, ax=ax, yticklabels=[], xticklabels=[])
         # if you want labels: yticklabels=[f"{ind:.2f}" for ind in df.index]
         # xticklabels=[f"{col:.2f}" for col in df.columns]
-        if "atom_positions" in dict_properties.keys():
-            for atom in dict_properties["atom_positions"]:
-                range_x_grid = dict_properties["grid_end"][0] - dict_properties["grid_start"][0]
-                range_y_grid = dict_properties["grid_end"][1] - dict_properties["grid_start"][1]
-                ax.scatter((atom[1] - dict_properties["grid_start"][1]) * dict_properties["size"][1] / range_y_grid,
-                           (atom[0] - dict_properties["grid_start"][0]) * dict_properties["size"][0] / range_x_grid,
+        if "atom_positions" in properties.keys():
+            for atom in properties["atom_positions"]:
+                range_x_grid = properties["grid_end"][0] - properties["grid_start"][0]
+                range_y_grid = properties["grid_end"][1] - properties["grid_start"][1]
+                ax.scatter((atom[1] - properties["grid_start"][1]) * properties["size"][1] / range_y_grid,
+                           (atom[0] - properties["grid_start"][0]) * properties["size"][0] / range_x_grid,
                            marker="o", c="white")
-        ax.figure.savefig(dict_properties["images path"] + f"{dict_properties['images name']}_energy.pdf")
+        ax.figure.savefig(properties["images path"] + f"{properties['images name']}_energy.pdf")
         plt.close()
 
 
-def plot_energy_3d(file_id):
+def plot_energy_3d(properties, energies, grid_x, grid_y):
     """
     Visualizes the array self.energies in 3D.
-
-    Raises:
-        ValueError: if there are no self.energies
     """
-    energies = np.load(path_energy_surfaces + "surface_" + file_id + ".npy")
-    grids = np.load(f"data/energy_grids/grid_x_y_{file_id}.npz")
-    grid_x = grids["x"]
-    grid_y = grids["y"]
-    dict_properties = read_summary_file(file_id, summary_type="energy")
     with plt.style.context('Stylesheets/not_animation.mplstyle'):
         ax = plt.axes(projection='3d')
-        if "atom_positions" in dict_properties.keys():
+        if "atom_positions" in properties.keys():
             ax.plot_surface(grid_x, grid_y, energies, rstride=1, cstride=1, cmap='RdBu_r',
                             norm=colors.SymLogNorm(linthresh=1e-13, vmax=np.max(energies), vmin=-np.max(energies)),
                             edgecolor='none')
@@ -79,45 +59,108 @@ def plot_energy_3d(file_id):
                             cmap='RdBu', edgecolor='none')
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.figure.savefig(dict_properties["images path"] + f"{dict_properties['images name']}_3D_energy.pdf")
+        ax.figure.savefig(properties["images path"] + f"{properties['images name']}_3D_energy.pdf")
         plt.close()
 
 
-def plot_underlying_maze(file_id):
+def plot_underlying_maze(properties, maze):
     """
     Visualization of the maze (with eventually added noise) from which the Energy object was created.
-
-    Raises:
-        Value error: if there is no self.underlying_maze (if self.from_maze has not been used).
     """
-    underlying_maze = np.load("data/energy_surfaces/" + f"underlaying_maze_{file_id}.npy")
-    dict_properties = read_summary_file(file_id, summary_type="energy")
     with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
         fig, ax = plt.subplots(1, 1)
-        sns.heatmap(underlying_maze, cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
-        ax.figure.savefig(dict_properties["images path"] + f"{dict_properties['images name']}_underlying_maze.pdf")
+        sns.heatmap(maze, cmap='RdBu_r', norm=colors.TwoSlopeNorm(vcenter=0))
+        ax.figure.savefig(properties["images path"] + f"{properties['images name']}_underlying_maze.pdf")
         plt.close()
 
 
-def plot_rates_matrix(file_id):
+def plot_rates_matrix(properties, rates):
     """
     Visualizes the array self.rates_matrix.
     """
-    rates_matrix = load_npz(path_energy_rates + f"rates_{file_id}.npz")
-    dict_properties = read_summary_file(file_id, summary_type="energy")
     with plt.style.context(['Stylesheets/maze_style.mplstyle', 'Stylesheets/not_animation.mplstyle']):
         norm = colors.TwoSlopeNorm(vcenter=0)
         fig, ax = plt.subplots(1, 1)
-        sns.heatmap(rates_matrix.toarray(), cmap="RdBu_r", norm=norm)
+        sns.heatmap(rates.toarray(), cmap="RdBu_r", norm=norm)
         ax.set_title("Rates matrix")
-        fig.savefig(dict_properties["images path"] + f"{dict_properties['images name']}_rates_matrix.pdf")
+        fig.savefig(properties["images path"] + f"{properties['images name']}_rates_matrix.pdf")
         plt.close()
 
 
+def plot_eigenvectors(properties, eigenvectors, num: int = 3):
+    """
+    Visualize the energy surface and the first num (default=3) eigenvectors as a 2D image in a maze.
+    Black squares mean the cells are not accessible.
+
+    Args:
+        num: int, how many eigenvectors of rates matrix to show
+        **kwargs: named arguments that can be passed to self.get_eigenval_eigenvec()
+    """
+    eigenvectors = eigenvectors[:, :num]
+    with plt.style.context(['Stylesheets/not_animation.mplstyle', 'Stylesheets/maze_style.mplstyle']):
+        full_width = DIM_LANDSCAPE[0]
+        fig, ax = plt.subplots(1, num, sharey="row", figsize=(full_width, full_width/num))
+        cmap = cm.get_cmap("RdBu").copy()
+        try:
+            accesible = properties["accessible cells"]
+        except AttributeError:
+            accesible = [(i, j) for i in range(properties["size"][0]) for j in range(properties["size"][1])]
+        len_acc = len(accesible)
+        assert eigenvectors.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
+        vmax = np.max(eigenvectors[:, :num+1])
+        vmin = np.min(eigenvectors[:, :num+1])
+        if "factor" in properties.keys():
+            size = int(properties["size"][0])*properties["factor"], int(properties["size"][1])*properties["factor"]
+        else:
+            size = properties["size"]
+        for i in range(num):
+            array = np.full(size, vmax+1)
+            for index, cell in enumerate(accesible):
+                if eigenvectors[index, 0] > 0:
+                    array[cell] = eigenvectors[index, i]
+                else:
+                    array[cell] = - eigenvectors[index, i]
+            ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
+            ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
+        plt.savefig(properties["images path"] + f"{properties['images name']}_eigenvectors_sqra.pdf")
+        plt.close()
+
+
+def plot_eigenvalues(properties, eigenvalues, num=None):
+    """
+    Visualize the eigenvalues of rate matrix.
+    """
+    if num:
+        eigenvalues = eigenvalues[:num]
+    with plt.style.context(['Stylesheets/not_animation.mplstyle']):
+        fig, ax = plt.subplots(1, 1, figsize=DIM_LANDSCAPE)
+        xs = np.linspace(0, 1, num=len(eigenvalues))
+        plt.scatter(xs, eigenvalues, s=5, c="black")
+        for i, eigenw in enumerate(eigenvalues):
+            plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
+        plt.hlines(0, 0, 1)
+        ax.set_ylabel("Eigenvalues (SqRA)")
+        ax.axes.get_xaxis().set_visible(False)
+        plt.savefig(properties["images path"] + f"{properties['images name']}_eigenvalues_sqra.pdf")
+        plt.close()
+
+
+def plot_everything_energy(file_id: str, num_eigenvec=6, num_eigenval=None, plot_rates=False):
+    properties = read_everything_energies(file_id)
+    if file_id.startswith("maze"):
+        dict_properties, energies, grid_x, grid_y, rates_matrix, eigenvec, eigenval, underlying_maze = properties
+        plot_underlying_maze(dict_properties, underlying_maze)
+    else:
+        dict_properties, energies, grid_x, grid_y, rates_matrix, eigenvec, eigenval = properties
+    if plot_rates:
+        plot_rates_matrix(dict_properties, rates_matrix)
+    plot_energy(dict_properties, energies, grid_x, grid_y)
+    plot_energy_3d(dict_properties, energies, grid_x, grid_y)
+    plot_eigenvectors(dict_properties, eigenvec, num=num_eigenvec)
+    plot_eigenvalues(dict_properties, eigenval, num=num_eigenval)
+
+
 if __name__ == '__main__':
-    file = "maze011"
+    file = "maze017"
     #plot_maze(file)
-    plot_with_cutoff(file)
-    plot_energy_3d(file)
-    plot_underlying_maze(file)
-    plot_rates_matrix(file)
+    plot_everything_energy(file)
