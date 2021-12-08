@@ -18,6 +18,9 @@ class MSM:
         self.images_path = images_path
         self.histogram = np.load(PATH_HISTOGRAMS + f"histogram_{self.images_name}.npy")
         self.traj_cell = np.load(PATH_TRAJECTORIES + f"cell_trajectory_{self.images_name}.npy")
+        with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+") as f:
+            f.write(f"tau_array = {tuple(self.tau_array)}\n")
+            f.write(f"len_tau = {len(self.tau_array)}\n")
 
     def get_transitions_matrix(self, tau_array: np.ndarray = None, noncorr: bool = False):
         """
@@ -82,7 +85,7 @@ class MSM:
         """
         if not exists(PATH_MSM_TRANSITION_MATRICES + f"transition_matrix_0_{self.images_name}.npy"):
             self.get_transitions_matrix()
-        for tau_i, tau in self.tau_array:
+        for tau_i, tau in enumerate(self.tau_array):
             tm = np.load(PATH_MSM_TRANSITION_MATRICES + f"transition_matrix_{tau_i}_{self.images_name}.npy")
             tm = tm.T
             eigenval, eigenvec = eigs(tm, num_eigv, **kwargs)
@@ -94,3 +97,13 @@ class MSM:
             eigenval = eigenval[idx]
             eigenvec = eigenvec[:, idx]
             np.savez(PATH_MSM_EIGEN + f"eigv_{tau_i}_{self.images_name}", eigenval=eigenval, eigenvec=eigenvec)
+
+    def path_to_summary(self):
+        data_path = DATA_PATH + "simulation_summaries/"
+        if self.images_name.startswith("potential"):
+            data_path += "potentials/"
+        elif self.images_name.startswith("maze"):
+            data_path += "mazes/"
+        elif self.images_name.startswith("atom"):
+            data_path += "atoms/"
+        return data_path

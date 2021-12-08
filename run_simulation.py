@@ -8,6 +8,9 @@ from maze.create_mazes import Maze
 from maze.create_energies import EnergyFromPotential, EnergyFromMaze, EnergyFromAtoms, Atom
 from run_energy import determine_name
 from simulation.create_simulation import Simulation
+from simulation.create_msm import MSM
+from plotting.plotting_simulations import plot_everything_simulation
+from plotting.plotting_energies import plot_everything_energy
 import numpy as np
 from ast import literal_eval
 import argparse
@@ -72,17 +75,12 @@ def produce_energies(args):
     if args.visualize != "n" and args.compare != "n":
         print("Calculating the rates matrix ...")
         my_energy.get_rates_matix()
+        my_energy.get_eigenval_eigenvec(20, which="LR")
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_setup_time, end_matrix_time)
         print(f" -> time for rates matrix: {hours}h {minutes}min {seconds}s.")
         print("Producing images ...")
-        if args.type == "maze":
-            my_energy.visualize_underlying_maze()
-        my_energy.visualize()
-        my_energy.visualize_3d()
-        my_energy.get_eigenval_eigenvec(6, which="LR")
-        my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-        my_energy.visualize_eigenvalues()
+        plot_everything_energy(name)
         end_visualization_time = time.time()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")
@@ -102,27 +100,21 @@ def produce_simulation(args, energy):
     hours, minutes, seconds = report_time(start_time, end_setup_time)
     print(f" -> time for setup: {hours}h {minutes}min {seconds}s.")
     print("Simulating the trajectory ...")
-    my_simulation.integrate(N=args.duration, dt=args.time_step)
+    my_simulation.integrate(N=args.duration, dt=args.time_step, save_trajectory=False)
     end_simulation_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_simulation_time)
     print(f" -> time for simulation: {hours}h {minutes}min {seconds}s.")
     # visualization
     if args.visualize != "n":
         print("Calculating the MSM ...")
-        my_simulation.get_transitions_matrix()
+        msm = MSM(energy.images_name, images_path=energy.images_path)
+        msm.get_transitions_matrix()
+        msm.get_eigenval_eigenvec(num_eigv=20, which="LR")
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_simulation_time, end_matrix_time)
         print(f" -> time for MSM: {hours}h {minutes}min {seconds}s.")
         print("Producing images ...")
-        my_simulation.visualize_hist_2D()
-        my_simulation.visualize_population_per_energy()
-        my_simulation.visualize_eigenvec(6, which="LR")
-        if args.compare != "n":
-            e_eigval, e_eigvec = energy.get_eigenval_eigenvec(6, which="LR")
-            my_simulation.visualize_its(num_eigv=6, which="LR", rates_eigenvalues=e_eigval)
-        else:
-            my_simulation.visualize_its(num_eigv=6, which="LR")
-        my_simulation.visualize_eigenvalues()
+        plot_everything_simulation(energy.images_name, traj=False)
         end_visualization_time = time.time()
         hours, minutes, seconds = report_time(end_matrix_time, end_visualization_time)
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")

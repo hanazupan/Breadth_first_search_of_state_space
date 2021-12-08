@@ -2,13 +2,16 @@
 In this file, molecular dynamics simulation on an Energy surface is performed.
 """
 
+# internal imports
 from maze.create_energies import Energy, EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms  # need all
 from maze.create_mazes import Maze  # need this import
-import numpy as np
-from tqdm import tqdm
+from constants import *
+# standard library
 import time
 from datetime import datetime
-from constants import *
+# external imports
+import numpy as np
+from tqdm import tqdm
 
 
 class Simulation:
@@ -202,11 +205,11 @@ class Simulation:
 
     def path_to_summary(self):
         data_path = DATA_PATH + "simulation_summaries/"
-        if type(self) == EnergyFromPotential:
+        if type(self.energy) == EnergyFromPotential:
             data_path += "potentials/"
-        elif type(self) == EnergyFromMaze:
+        elif type(self.energy) == EnergyFromMaze:
             data_path += "mazes/"
-        elif type(self) == EnergyFromAtoms:
+        elif type(self.energy) == EnergyFromAtoms:
             data_path += "atoms/"
         return data_path
 
@@ -230,7 +233,6 @@ class Simulation:
             f.write(f"D = {self.D}\n")
             f.write(f"N = {self.N}\n")
             f.write(f"dt = {self.dt}\n")
-            f.write(f"tau_array = {self.tau_array}\n")
 
 
 if __name__ == '__main__':

@@ -155,7 +155,7 @@ def plot_eigenvectors(properties: dict, eigenvectors: np.ndarray, num: int = 3):
         plt.close()
 
 
-def plot_eigenvalues(properties: dict, eigenvalues: np.ndarray, num: int = None):
+def plot_eigenvalues(properties: dict, eigenvalues: np.ndarray, num: int = None, calc_type: str = "sqra"):
     """
     Visualize the eigenvalues of rate matrix.
 
@@ -173,9 +173,9 @@ def plot_eigenvalues(properties: dict, eigenvalues: np.ndarray, num: int = None)
         for i, eigenw in enumerate(eigenvalues):
             plt.vlines(xs[i], eigenw, 0, linewidth=0.5)
         plt.hlines(0, 0, 1)
-        ax.set_ylabel("Eigenvalues (SqRA)")
+        ax.set_ylabel(f"Eigenvalues ({calc_type.upper()})")
         ax.axes.get_xaxis().set_visible(False)
-        plt.savefig(properties["images path"] + f"{properties['images name']}_eigenvalues_sqra.pdf")
+        plt.savefig(properties["images path"] + f"{properties['images name']}_eigenvalues_{calc_type}.pdf")
         plt.close()
 
 
@@ -210,3 +210,4 @@ if __name__ == '__main__':
     file = "maze017"
     #plot_maze(file)
     plot_everything_energy(file)
+
