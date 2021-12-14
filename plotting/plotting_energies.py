@@ -9,7 +9,7 @@ import seaborn as sns
 import pandas as pd
 
 sns.set_style("ticks")
-sns.set_context("talk")
+sns.set_context("paper")
 
 
 def plot_maze(file_id: str):

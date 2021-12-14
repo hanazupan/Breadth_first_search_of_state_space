@@ -9,7 +9,7 @@ import numpy as np
 import seaborn as sns
 
 sns.set_style("ticks")
-sns.set_context("talk")
+sns.set_context("paper")
 
 
 def plot_eigenvec(properties, file_id, num_eigv: int = 6):
