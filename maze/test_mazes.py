@@ -5,6 +5,7 @@ The file for testing create_mazes and explore_mazes.
 import numpy as np
 from .create_mazes import Maze
 from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
+from plotting.plotting_energies import plot_maze
 
 all_algorithms = ["Prim", "random"]
 img_path = "images/tests/"
@@ -28,7 +29,7 @@ def test_run_everything():
         width = np.random.randint(6, 20)
         test_maze = Maze((height, width), algorithm='Prim', animate=animate,
                          images_name="test", images_path=img_path)
-        test_maze.visualize()
+        plot_maze(test_maze.images_name)
         bfs_explorer = BFSExplorer(test_maze)
         bfs_explorer.draw_connections_graph()
         bfs_explorer.explore()

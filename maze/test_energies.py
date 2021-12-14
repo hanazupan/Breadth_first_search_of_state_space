@@ -2,8 +2,10 @@ import numpy as np
 from .create_mazes import Maze
 from .explore_mazes import BFSExplorer, DijkstraExplorer, DFSExplorer
 from .create_energies import EnergyFromAtoms, EnergyFromPotential, EnergyFromMaze, kB, Atom
+from plotting.plotting_energies import plot_everything_energy, plot_maze
 
 PATH = "images/tests/"
+
 
 def formula(x, y):
     return 5 * (x ** 2 - 0.3) ** 2 + 10 * (y ** 2 - 0.5) ** 2
@@ -84,11 +86,11 @@ def test_q_ij():
     my_energy = EnergyFromPotential(size, images_path=PATH, images_name="test", grid_start=(-1, -1),
                                     grid_end=(1, 1))
     dx = 2 / size[0]
-    cell_i = (2, 3)
-    cell_j = (6, 1)
+    cell_i = (6, 3)
+    cell_j = (6, 2)
     q_ij = my_energy._calculate_rates_matrix_ij(cell_i, cell_j)
     sigma = np.sqrt(2*my_energy.D)
-    correct_rate = sigma ** 2 / 2 / dx ** 2 * np.sqrt(np.exp(-1/(kB*my_energy.temperature) * (formula(0.3, -0.7) - formula(-0.5, -0.3))))
+    correct_rate = sigma ** 2 / 2 / dx ** 2 * np.sqrt(np.exp(-1/(kB*my_energy.temperature) * (formula(0.3, -0.5) - formula(0.3, -0.3))))
     assert np.allclose(q_ij, correct_rate)
 
 
@@ -163,7 +165,6 @@ def test_potential_and_derivatives_pbc():
 
 
 def test_closest_mirror():
-    # TODO: find issue
     epsilon = 3.18 * 1.6022e-22
     sigma = 5.928
     atom_1 = Atom((3.3, 7.5), epsilon, sigma)
@@ -188,7 +189,9 @@ def test_run_everything():
     atom_2 = Atom((14.3, 9.3), epsilon, sigma-2)
     atom_3 = Atom((5.3, 45.3), epsilon/5, sigma)
     my_energy = EnergyFromAtoms((9, 8), (atom_1, atom_2, atom_3), grid_start=(0, 0), grid_end=(20, 50),
-                                images_name="test_atoms", images_path=PATH)
+                                images_name="atoms_test", images_path=PATH)
+    my_energy.get_rates_matix()
+    my_energy.get_eigenval_eigenvec()
     print(my_energy.images_path)
     # ------------------- EXPLORERS -----------------------
     me = BFSExplorer(my_energy)
@@ -196,30 +199,25 @@ def test_run_everything():
     me = DFSExplorer(my_energy)
     me.explore_and_animate()
     # ------------------- GENERAL FUNCTIONS -----------------------
-    my_energy.visualize()
-    my_energy.visualize_3d()
-    my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-    my_energy.visualize_eigenvalues()
+    plot_everything_energy(my_energy.images_name, plot_rates=True)
     # ------------------- MAZES -----------------------
-    my_maze = Maze((15, 12), images_path=PATH, images_name="test_mazes", no_branching=False, edge_is_wall=False)
-    my_energy = EnergyFromMaze(my_maze, images_path=PATH, images_name="test_mazes", friction=10)
+    my_maze = Maze((15, 12), images_path=PATH, images_name="mazes_test", no_branching=False, edge_is_wall=False)
+    my_energy = EnergyFromMaze(my_maze, images_path=PATH, images_name="mazes_test", friction=10)
+    my_energy.get_rates_matix()
+    my_energy.get_eigenval_eigenvec()
     print(my_energy.images_path)
-    my_maze.visualize()
-    my_energy.visualize_underlying_maze()
+    plot_maze(my_maze.images_name)
     # ------------------- EXPLORERS -----------------------
     me = BFSExplorer(my_energy)
     me.explore_and_animate()
     me = DFSExplorer(my_energy)
     me.explore_and_animate()
     # ------------------- GENERAL FUNCTIONS -----------------------
-    my_energy.visualize()
-    my_energy.visualize_3d()
-    my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-    my_energy.visualize_eigenvalues()
+    plot_everything_energy(my_energy.images_name)
     # ------------------- POTENTIAL -----------------------
-    my_energy = EnergyFromPotential((12, 10), images_path=PATH, images_name="test_potential", friction=10)
+    my_energy = EnergyFromPotential((12, 10), images_path=PATH, images_name="potential_test", friction=10)
+    my_energy.get_rates_matix()
+    my_energy.get_eigenval_eigenvec()
     print(my_energy.images_path)
     # ------------------- EXPLORERS -----------------------
     me = BFSExplorer(my_energy)
@@ -227,8 +225,4 @@ def test_run_everything():
     me = DFSExplorer(my_energy)
     me.explore_and_animate()
     # ------------------- GENERAL FUNCTIONS -----------------------
-    my_energy.visualize()
-    my_energy.visualize_3d()
-    my_energy.visualize_rates_matrix()
-    my_energy.visualize_eigenvectors_in_maze(num=6, which="LR")
-    my_energy.visualize_eigenvalues()
+    plot_everything_energy(my_energy.images_name)
