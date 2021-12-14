@@ -163,6 +163,7 @@ def plot_eigenvalues(properties: dict, eigenvalues: np.ndarray, num: int = None,
         properties: dictionary of properties read from the summary file
         eigenvalues: array of the eigenvalues read from the file
         num: int, how many eigenvalues of rates matrix to show - if None, all available
+        calc_type: 'sqra' or 'msm', for correct labeling
     """
     if num:
         eigenvalues = eigenvalues[:num]

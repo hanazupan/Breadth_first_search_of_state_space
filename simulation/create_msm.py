@@ -1,5 +1,8 @@
+# internal imports
 from constants import *
+# standard library
 from os.path import exists
+# external imports
 from scipy.sparse.linalg import eigs
 import numpy as np
 from tqdm import tqdm

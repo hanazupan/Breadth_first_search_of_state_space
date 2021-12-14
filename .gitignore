@@ -8,9 +8,19 @@ report/
 *.png
 *.gif
 playground.py
-images/
-data/
+images/*.png
+images/*.pdf
+images/*.txt
+images/analysis/*png
+images/analysis/*txt
+images/analysis/*eigenve*
+images/analysis/*energy*
+images/analysis/
+data/*.txt
+data/*csv
 img_to_save/
+data/
+images/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

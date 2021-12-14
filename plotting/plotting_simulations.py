@@ -1,6 +1,8 @@
+# internal imports
 from constants import *
 from plotting.plotting_energies import plot_eigenvalues
 from plotting.read_files import read_everything_simulations
+# external imports
 import matplotlib.pyplot as plt
 from matplotlib import cm, colors
 import numpy as np

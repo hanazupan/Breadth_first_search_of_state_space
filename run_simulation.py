@@ -4,6 +4,8 @@ python3 run_simulation.py --type potential --size "(40, 40)" --compare n
 python3 run_simulation.py --type maze --size "(15, 20)" --duration 1e7
 python3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --time_step 0.1
 """
+
+# internal imports
 from maze.create_mazes import Maze
 from maze.create_energies import EnergyFromPotential, EnergyFromMaze, EnergyFromAtoms, Atom
 from run_energy import determine_name
@@ -11,10 +13,14 @@ from simulation.create_simulation import Simulation
 from simulation.create_msm import MSM
 from plotting.plotting_simulations import plot_everything_simulation
 from plotting.plotting_energies import plot_everything_energy
-import numpy as np
+from constants import *
+# standard library
 from ast import literal_eval
 import argparse
 import time
+# external imports
+import numpy as np
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--type', metavar='t', type=str, nargs='?',
@@ -48,10 +54,10 @@ def produce_energies(args):
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path="images/potentials/", images_name=name, friction=10)
+        my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=10)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name, factor_grid=1, friction=5,
+        my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=True, no_branching=True)
+        my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=1, friction=5,
                                    grid_start=(-10, -10), grid_end=(10, 10))
     elif args.type == "atoms":
         atoms = []
@@ -64,7 +70,7 @@ def produce_energies(args):
             atom = Atom((x_coo, y_coo), epsilon, sigma)
             atoms.append(atom)
         atoms = tuple(atoms)
-        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, images_path="images/atoms/", grid_start=(0, 0),
+        my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, images_path=PATH_IMG_ATOMS, grid_start=(0, 0),
                                     grid_end=(10, 10), images_name=name, friction=1, m=1)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")

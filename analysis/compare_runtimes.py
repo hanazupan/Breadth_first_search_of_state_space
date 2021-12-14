@@ -1,6 +1,8 @@
 from maze.create_energies import Energy, EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms  # need all
 from maze.create_mazes import Maze  # need this import
-from simulation.create_simulation import Simulation
+from plotting.plotting_energies import *
+from plotting.read_files import read_everything_energies
+from constants import *
 import matplotlib.pyplot as plt
 from constants import DATA_PATH, IMG_PATH
 import pandas as pd
@@ -11,8 +13,6 @@ from tqdm import tqdm
 
 sns.set_style("ticks")
 sns.set_context("talk")
-
-img_compare_path = IMG_PATH + "analysis/"
 
 
 def run_energy(my_energy: Energy, my_explorer: str, cutoff: float) -> tuple:
@@ -55,17 +55,18 @@ def time_comparison_explorers(e_type: str = "potential"):
         cutoffs = np.linspace(3, 100, num=30)
         additional = np.array([150, 200, 250, 300, 350, 400])
         cutoffs = np.concatenate((cutoffs, additional))
-        my_energy = EnergyFromPotential(size=(50, 50), images_path=img_compare_path, friction=friction,
+        my_energy = EnergyFromPotential(size=(50, 50), images_path=PATH_IMG_ANALYSIS, friction=friction,
                                         grid_start=(-2.5, -2.5), grid_end=(2.5, 2.5))
     elif e_type.startswith("maze"):
         cutoffs = np.linspace(5, 9, num=11)
         additional = np.linspace(10.5, 15, num=11)
         cutoffs = np.concatenate((cutoffs, additional))
-        my_maze = Maze(size=(25, 25), images_path=img_compare_path, edge_is_wall=True, no_branching=True)
-        my_maze.visualize()
-        my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=img_compare_path, factor_grid=1,
+        my_maze = Maze(size=(25, 25), images_path=PATH_IMG_ANALYSIS, edge_is_wall=True, no_branching=True)
+        plot_maze(my_maze.images_name)
+        my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=PATH_IMG_ANALYSIS, factor_grid=1,
                                    grid_start=(-1, -1), grid_end=(1, 1))
-        my_energy.visualize()
+        properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
+        plot_energy(properties, e, x, y)
     else:
         cutoffs = np.linspace(-2, 19, num=21)
         #additional = np.array([20, 23, 25, 28, 30, 35, 40, 45, 50])
@@ -81,8 +82,9 @@ def time_comparison_explorers(e_type: str = "potential"):
             atoms.append(atom)
         atoms = tuple(atoms)
         my_energy = EnergyFromAtoms(size=(25, 25), atoms=atoms, grid_start=(0, 0), grid_end=(10, 10),
-                                    images_path=img_compare_path)
-        my_energy.visualize()
+                                    images_path=PATH_IMG_ANALYSIS)
+        properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
+        plot_energy(properties, e, x, y)
     # loop over cutoff
     for j, co in enumerate(tqdm(cutoffs)):
         my_energy.images_name = f"cutoff_{int(co)}_{e_type}"
@@ -140,7 +142,7 @@ def plot_time_comparison_explorers(file_path, name):
     #sns.lineplot(x="Cutoff", y="% explored", data=data, label="% explored", color="black", ax=ax2, legend=False)
     #plt.tight_layout()
     plt.tight_layout()
-    plt.savefig(img_compare_path + f"plot_time_comparison_explorers_{name}.pdf")
+    plt.savefig(PATH_IMG_ANALYSIS + f"plot_time_comparison_explorers_{name}.pdf")
 
 
 def plot_scan_cutoff(file_path, e_type):
@@ -159,7 +161,7 @@ def plot_scan_cutoff(file_path, e_type):
     #ax2 = ax1.twinx()
     #sns.lineplot(x="Cutoff", y="% explored", data=data, label="% explored", color="black", ax=ax2, legend=False)
     plt.tight_layout()
-    plt.savefig(img_compare_path+f"scan_cutoff_{e_type}.pdf")
+    plt.savefig(PATH_IMG_ANALYSIS + f"scan_cutoff_{e_type}.pdf")
 
 
 if __name__ == '__main__':
