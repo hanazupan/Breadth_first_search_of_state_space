@@ -2,6 +2,7 @@
 from constants import *
 # standard library
 from os.path import exists
+import gc
 # external imports
 from scipy.sparse.linalg import eigs
 import numpy as np
@@ -75,6 +76,9 @@ class MSM:
             sums[sums == 0] = 1
             transition_matrix = transition_matrix / sums
             np.save(PATH_MSM_TRANSITION_MATRICES + f"transition_matrix_{tau_i}_{self.images_name}", transition_matrix)
+            del transition_matrix
+            del count_per_cell
+            gc.collect()
 
     def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs):
         """
