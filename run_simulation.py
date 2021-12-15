@@ -57,8 +57,8 @@ def produce_energies(args):
         my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=10)
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=1, friction=5,
-                                   grid_start=(-10, -10), grid_end=(10, 10))
+        my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=3, friction=1,
+                                   grid_start=(-1, -1), grid_end=(1, 1))
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)
@@ -114,7 +114,7 @@ def produce_simulation(args, energy):
     if args.visualize != "n":
         print("Calculating the MSM ...")
         msm = MSM(energy.images_name, images_path=energy.images_path)
-        msm.get_transitions_matrix()
+        msm.get_transitions_matrix(noncorr=True)
         msm.get_eigenval_eigenvec(num_eigv=20, which="LR")
         end_matrix_time = time.time()
         hours, minutes, seconds = report_time(end_simulation_time, end_matrix_time)

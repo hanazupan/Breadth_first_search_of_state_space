@@ -108,7 +108,8 @@ class Energy(AbstractEnergy):
         elif self.are_neighbours(cell_i, cell_j, axis=1):
             n_dim = 1
         else:
-            raise ValueError("Trying to calculate Q_ij for non-neighbours!")
+            print(f"Trying to calculate Q_ij for non-neighbours {cell_i} and {cell_j}!")
+            return 0
         Q_ij = self.D * self.Ss[n_dim] / self.hs[n_dim] / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(
                 kB*self.temperature)))
         limit = self.D * self.Ss[n_dim] / self.hs[n_dim] / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(
@@ -137,6 +138,9 @@ class Energy(AbstractEnergy):
             self.energy_cutoff = np.max(self.energies) + 1
             full_len = self.size[0]*self.size[1]
             ones = [1]*full_len
+            mixed = [1]*(self.size[0] - 1)
+            mixed.append(0)
+            mixed = mixed * (self.size[1] + 1)
             # if PBC, the off-seted diagonals of neighbours continue on another diagonal
             if self.pbc:
                 adj_matrix = diags((ones, ones, ones, ones, ones, ones, ones, ones),
@@ -145,7 +149,7 @@ class Energy(AbstractEnergy):
                                             full_len - 1, - full_len + 1),
                                    shape=(full_len, full_len))
             else:
-                adj_matrix = diags((ones, ones, ones, ones),
+                adj_matrix = diags((mixed, ones, mixed, ones),
                                    offsets=(1, self.size[0], -1, -self.size[0]),
                                    shape=(full_len, full_len))
         self.adj_matrix = adj_matrix
@@ -162,6 +166,7 @@ class Energy(AbstractEnergy):
             else:
                 cell_i = self.node_to_cell(r)
                 cell_j = self.node_to_cell(c)
+
             self.rates_matrix[r, c] += self._calculate_rates_matrix_ij(cell_i, cell_j)
         # get the i == j elements
         for i, row in enumerate(self.rates_matrix):
@@ -170,7 +175,8 @@ class Energy(AbstractEnergy):
         self.rates_matrix = csr_matrix(self.rates_matrix)
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"explorer type = {selected_explorer}\n")
-            f.write(f"accessible cells = {self.explorer.get_sorted_accessible_cells()}\n")
+            if selected_explorer == "bfs" or selected_explorer == "dfs":
+                f.write(f"accessible cells = {self.explorer.get_sorted_accessible_cells()}\n")
         save_npz(PATH_ENERGY_RATES + f"rates_{self.images_name}", self.rates_matrix)
 
     ############################################################################
@@ -260,7 +266,7 @@ class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = PATH_IMG_MAZES,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 15):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 70):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -278,7 +284,7 @@ class EnergyFromMaze(Energy):
             raise ValueError("Maze does not have the right dimensionality.")
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
-        z = z * 10   # TODO: test increasing the energy of walls
+        z = z * 100   # TODO: test increasing the energy of walls
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()

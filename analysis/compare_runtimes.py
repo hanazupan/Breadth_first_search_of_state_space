@@ -1,18 +1,21 @@
+# internal imports
 from maze.create_energies import Energy, EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms  # need all
 from maze.create_mazes import Maze  # need this import
 from plotting.plotting_energies import *
 from plotting.read_files import read_everything_energies
 from constants import *
 import matplotlib.pyplot as plt
-from constants import DATA_PATH, IMG_PATH
+# standard library
+from os.path import exists
+import time
+# external imports
 import pandas as pd
 import seaborn as sns
 import numpy as np
-import time
 from tqdm import tqdm
 
 sns.set_style("ticks")
-sns.set_context("talk")
+sns.set_context("paper")
 
 
 def run_energy(my_energy: Energy, my_explorer: str, cutoff: float) -> tuple:
@@ -34,8 +37,16 @@ def run_energy(my_energy: Energy, my_explorer: str, cutoff: float) -> tuple:
     my_energy.energy_cutoff = cutoff
     my_energy.get_rates_matix(explorer=my_explorer)
     eigenval, eigenvec = my_energy.get_eigenval_eigenvec(num_eigv, which="LR")
+    my_energy.save_information()
+    np.save(PATH_ENERGY_SURFACES + f"surface_{my_energy.images_name}", my_energy.energies)
+    np.savez(PATH_ENERGY_GRIDS + f"grid_x_y_{my_energy.images_name}", x=my_energy.grid_x, y=my_energy.grid_y)
     end_sqra_time = time.time()
     return end_sqra_time - start_sqra_time, eigenval
+
+
+def get_properties_eigenvec(name):
+    properties, energies, grid_x, grid_y, rates_matrix, eigenvec, eigenval, *extra = read_everything_energies(name)
+    return properties, eigenvec
 
 
 def time_comparison_explorers(e_type: str = "potential"):
@@ -52,11 +63,11 @@ def time_comparison_explorers(e_type: str = "potential"):
     data = pd.DataFrame()
     # prepare an energy surface of the specified type
     if e_type.startswith("potential"):
-        cutoffs = np.linspace(3, 100, num=30)
+        cutoffs = np.linspace(5, 100, num=30)
         additional = np.array([150, 200, 250, 300, 350, 400])
         cutoffs = np.concatenate((cutoffs, additional))
-        my_energy = EnergyFromPotential(size=(50, 50), images_path=PATH_IMG_ANALYSIS, friction=friction,
-                                        grid_start=(-2.5, -2.5), grid_end=(2.5, 2.5))
+        my_energy = EnergyFromPotential(size=(40, 40), images_path=PATH_IMG_ANALYSIS, friction=friction,
+                                        grid_start=(-2.5, -2.5), grid_end=(2.5, 2.5), images_name=e_type)
     elif e_type.startswith("maze"):
         cutoffs = np.linspace(5, 9, num=11)
         additional = np.linspace(10.5, 15, num=11)
@@ -64,9 +75,9 @@ def time_comparison_explorers(e_type: str = "potential"):
         my_maze = Maze(size=(25, 25), images_path=PATH_IMG_ANALYSIS, edge_is_wall=True, no_branching=True)
         plot_maze(my_maze.images_name)
         my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=PATH_IMG_ANALYSIS, factor_grid=1,
-                                   grid_start=(-1, -1), grid_end=(1, 1))
-        properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
-        plot_energy(properties, e, x, y)
+                                   grid_start=(-1, -1), grid_end=(1, 1), images_name=e_type)
+        #properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
+        #plot_energy(properties, e, x, y)
     else:
         cutoffs = np.linspace(-2, 19, num=21)
         #additional = np.array([20, 23, 25, 28, 30, 35, 40, 45, 50])
@@ -82,19 +93,19 @@ def time_comparison_explorers(e_type: str = "potential"):
             atoms.append(atom)
         atoms = tuple(atoms)
         my_energy = EnergyFromAtoms(size=(25, 25), atoms=atoms, grid_start=(0, 0), grid_end=(10, 10),
-                                    images_path=PATH_IMG_ANALYSIS)
-        properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
-        plot_energy(properties, e, x, y)
+                                    images_path=PATH_IMG_ANALYSIS, images_name=e_type)
+        #properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
+        #plot_energy(properties, e, x, y)
     # loop over cutoff
     for j, co in enumerate(tqdm(cutoffs)):
-        my_energy.images_name = f"cutoff_{int(co)}_{e_type}"
+        my_energy.images_name += f"{e_type}_cutoff_{int(co)}"
         for i in range(3):
             num_cells = my_energy.size[0] * my_energy.size[1]
-            # option 3 - no cutoff, no explorer
-            full_time, eigenval_ss = run_energy(my_energy, "none", co)
             # option 1 - cutoff 5 and bfs explorer
             time_bfs, eigenval_bfs = run_energy(my_energy, "bfs", co)
             explored_bfs = len(my_energy.explorer.get_sorted_accessible_cells()) / num_cells * 100
+            # option 3 - no cutoff, no explorer
+            full_time, eigenval_ss = run_energy(my_energy, "none", co)
             # option 2 - cutoff 5 and dfs explorer
             time_dfs, eigenval_dfs = run_energy(my_energy, "dfs", co)
             dict_values = {f"Eigenvalue {i + 1}": eigv for i, eigv in enumerate(eigenval_bfs)}
@@ -109,12 +120,14 @@ def time_comparison_explorers(e_type: str = "potential"):
             data = data.append(dict_values, ignore_index=True)
         # plot the first and the last one
         if j % 3 == 0:
-            my_energy.visualize_eigenvectors_in_maze(4, which="LR")
+            pro, eigv = get_properties_eigenvec(my_energy.images_name)
+            plot_eigenvectors(pro, eigv, num=4)
         name_file = DATA_PATH+f"time_comparison_explorers_{e_type}.csv"
         data.to_csv(path_or_buf=name_file)
     run_energy(my_energy, "none", 1)
     my_energy.images_name += "full_ss"
-    my_energy.visualize_eigenvectors_in_maze(4, which="LR")
+    pro, eigv = get_properties_eigenvec(my_energy.images_name)
+    plot_eigenvectors(pro, eigv, num=4)
 
 
 def plot_time_comparison_explorers(file_path, name):
@@ -164,9 +177,31 @@ def plot_scan_cutoff(file_path, e_type):
     plt.savefig(PATH_IMG_ANALYSIS + f"scan_cutoff_{e_type}.pdf")
 
 
+def determine_name(type_e):
+    # set the name of the file
+    name_int = 0
+    if type_e == "potential":
+        name = f"potential{name_int:03d}"
+        while exists("data/energy_summaries/potentials/" + name + "_summary.txt"):
+            name_int += 1
+            name = f"potential{name_int:03d}"
+    elif type_e == "maze":
+        name = f"maze{name_int:03d}"
+        while exists("data/energy_summaries/mazes/" + name + "_summary.txt"):
+            name_int += 1
+            name = f"maze{name_int:03d}"
+    elif type_e == "atoms":
+        name = f"atoms{name_int:03d}"
+        while exists("data/energy_summaries/atoms/" + name + "_summary.txt"):
+            name_int += 1
+            name = f"atoms{name_int:03d}"
+    else:
+        raise ValueError(f"{type_e} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
+    return name
+
+
 if __name__ == '__main__':
-    names = ["maze25"]
-    for name in names:
-        #time_comparison_explorers(e_type=name)
-        plot_time_comparison_explorers(DATA_PATH + f"time_comparison_explorers_{name}.csv", name)
-        plot_scan_cutoff(DATA_PATH+f"time_comparison_explorers_{name}.csv", name)
+    my_name = "potential11"
+    time_comparison_explorers(e_type=my_name)
+    plot_time_comparison_explorers(DATA_PATH + f"time_comparison_explorers_{my_name}.csv", my_name)
+    plot_scan_cutoff(DATA_PATH+f"time_comparison_explorers_{my_name}.csv", my_name)

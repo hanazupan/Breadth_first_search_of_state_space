@@ -31,7 +31,7 @@ if __name__ == '__main__':
         if my_args.redo_msm == "y":
             try:
                 msm = MSM(my_args.name, images_path=find_img_path(my_args.name))
-                msm.get_transitions_matrix()
+                msm.get_transitions_matrix(noncorr=True)
                 msm.get_eigenval_eigenvec(num_eigv=20, which="LR")
             except FileNotFoundError:
                 print("Files required to construct MSM not found.")

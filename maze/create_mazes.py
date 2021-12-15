@@ -72,6 +72,8 @@ class AbstractEnergy(ABC):
         Returns:
             (int, int, ...), representing the coordinates of the corresponding cell in the maze
         """
+        if node < 0 or node > np.prod(self.size) - 1:
+            raise IndexError("Node out of range (negative or bigger than the length of the flattened energy array).")
         cell = np.zeros(len(self.size), dtype=int)
         for i in range(len(self.size) - 1, 0, -1):
             cell[i] = node % self.size[i]

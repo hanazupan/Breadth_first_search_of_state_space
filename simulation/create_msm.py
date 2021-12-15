@@ -13,9 +13,9 @@ class MSM:
 
     def __init__(self, name_id: str, images_path: str = IMG_PATH):
         if name_id.startswith("potential"):
-            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 250, 500, 700, 1000])
+            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 250])
         elif name_id.startswith("maze"):
-            self.tau_array = np.array([5, 7, 10, 20, 30, 10, 50, 100, 500, 700, 1000, 1500, 2000, 2500, 3000])
+            self.tau_array = np.array([10, 20, 30, 10, 50, 100, 200, 350, 500, 700, 1000, 1500, 2000, 2500, 3000])
         else:
             self.tau_array = np.array([10, 20, 50, 70, 100, 250, 500, 700, 1000, 1500, 2000, 2500, 3000])
         self.images_name = name_id
@@ -40,9 +40,9 @@ class MSM:
         if tau_array:
             self.tau_array = tau_array
 
-        def window(seq, len_window):
-            # in this case always move the window by 1 and use all points in simulations to count transitions
-            return [seq[k: k + len_window:len_window-1] for k in range(0, (len(seq)+1)-len_window)]
+        def window(seq, len_window, step=1):
+            # in this case always move the window by step and use all points in simulations to count transitions
+            return [seq[k: k + len_window:len_window-1] for k in range(0, (len(seq)+1)-len_window, step)]
 
         def noncorr_window(seq, len_window):
             # in this case, only use every tau-th element for MSM. Faster but loses a lot of data
@@ -57,7 +57,11 @@ class MSM:
             if not noncorr:
                 window_cell = window(self.traj_cell, int(tau))
             else:
-                window_cell = noncorr_window(self.traj_cell, int(tau))
+                # for large taus full non-correlation doesn't provide good results
+                if tau >= 100:
+                    window_cell = window(self.traj_cell, int(tau), step=5)
+                else:
+                    window_cell = noncorr_window(self.traj_cell, int(tau))
             for cell_slice in window_cell:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
@@ -76,9 +80,6 @@ class MSM:
             sums[sums == 0] = 1
             transition_matrix = transition_matrix / sums
             np.save(PATH_MSM_TRANSITION_MATRICES + f"transition_matrix_{tau_i}_{self.images_name}", transition_matrix)
-            del transition_matrix
-            del count_per_cell
-            gc.collect()
 
     def get_eigenval_eigenvec(self, num_eigv: int = 6, **kwargs):
         """

@@ -46,7 +46,7 @@ def plot_eigenvec(properties, file_id, num_eigv: int = 6):
                     else:
                         array[m, n] = - eigenvec[index, j]
                     index += 1
-            ax[i][j].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
+            ax[i][j].imshow(array.real, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
             ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7, fontweight="bold")
             ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7, fontweight="bold")
             ax[i][j].axes.get_xaxis().set_visible(False)
@@ -134,16 +134,21 @@ def plot_population_per_energy(properties: dict, energy: np.ndarray, histogram: 
         fig, ax = plt.subplots(1, 1, figsize=DIM_SQUARE)
         energies = np.array(energies)
         E_population = np.histogram(energies, bins=25)
+        print(E_population)
         E_pop = np.zeros(energies.shape)
         for i, e in enumerate(energies):
-            for j, ep in enumerate(E_population[1][1:]):
-                if E_population[1][j -1] < e <= E_population[1][j]:
-                    E_pop[i] = E_population[0][j -1]
+            for j, ep in enumerate(E_population[1][:]):
+                if e <= E_population[1][j]:
+                    E_pop[i] = E_population[0][j - 1]
+                    break
         population = np.array(population)
         population[E_pop == 0] = 0
         E_pop[E_pop == 0] = 1
-        sns.histplot(x=energies, bins=25, weights=population/E_pop, ax=ax, element="step",
-                     color="black", fill=False, kde=False)
+        weights = population/E_pop
+        # weights must be the shape of energies
+        # kde=True, kde_kws=dict(gridsize=3000, cut=0)
+        sns.histplot(x=energies, bins=25, weights=weights, ax=ax, element="step",
+                     color="black", fill=False)
         ax.set_xlabel("Cell energy")
         ax.set_ylabel("Relative cell population")
         plt.savefig(properties["images path"] + f"{properties['images name']}_population_per_energy.pdf")
