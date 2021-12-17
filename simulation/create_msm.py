@@ -13,11 +13,11 @@ class MSM:
 
     def __init__(self, name_id: str, images_path: str = IMG_PATH):
         if name_id.startswith("potential"):
-            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 250])
+            self.tau_array = np.array([5, 7, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250])
         elif name_id.startswith("maze"):
             self.tau_array = np.array([10, 20, 30, 10, 50, 100, 200, 350, 500, 700, 1000, 1500, 2000, 2500, 3000])
         else:
-            self.tau_array = np.array([10, 20, 50, 70, 100, 250, 500, 700, 1000, 1500, 2000, 2500, 3000])
+            self.tau_array = np.array([5, 7, 10, 20, 50, 70, 100, 150, 250, 300])
         self.images_name = name_id
         self.images_path = images_path
         self.histogram = np.load(PATH_HISTOGRAMS + f"histogram_{self.images_name}.npy")

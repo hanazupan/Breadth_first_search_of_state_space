@@ -36,7 +36,10 @@ def run_energy(my_energy: Energy, my_explorer: str, cutoff: float) -> tuple:
     my_energy.rates_matrix = None
     my_energy.energy_cutoff = cutoff
     my_energy.get_rates_matix(explorer=my_explorer)
-    eigenval, eigenvec = my_energy.get_eigenval_eigenvec(num_eigv, which="SR", sigma=0)
+    if my_energy.images_name.startswith("maze"):
+        eigenval, eigenvec = my_energy.get_eigenval_eigenvec(num_eigv, which="SR", sigma=0)
+    else:
+        eigenval, eigenvec = my_energy.get_eigenval_eigenvec(num_eigv, which="LR")
     my_energy.save_information()
     # need to save what is usually saved in __init__
     np.save(PATH_ENERGY_SURFACES + f"surface_{my_energy.images_name}", my_energy.energies)
@@ -82,9 +85,9 @@ def time_comparison_explorers(e_type: str = "potential"):
                                         grid_start=(-2.5, -2.5), grid_end=(2.5, 2.5), images_name=e_type)
     elif e_type.startswith("maze"):
         cutoffs = np.linspace(50, 95, num=11)
-        additional = np.linspace(105, 150, num=5)
+        additional = np.linspace(105, 150, num=6)
         cutoffs = np.concatenate((cutoffs, additional))
-        my_maze = Maze(size=(25, 25), images_path=PATH_IMG_ANALYSIS, edge_is_wall=True, no_branching=True)
+        my_maze = Maze(size=(15, 15), images_path=PATH_IMG_ANALYSIS, edge_is_wall=True, no_branching=True)
         plot_maze(my_maze.images_name)
         my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=PATH_IMG_ANALYSIS, factor_grid=3,
                                    grid_start=(0, 0), grid_end=(10, 10), images_name=e_type)
@@ -102,10 +105,8 @@ def time_comparison_explorers(e_type: str = "potential"):
             atom = Atom((x_coo, y_coo), epsilon, sigma)
             atoms.append(atom)
         atoms = tuple(atoms)
-        my_energy = EnergyFromAtoms(size=(15, 15), atoms=atoms, grid_start=(0, 0), grid_end=(10, 10),
+        my_energy = EnergyFromAtoms(size=(25, 25), atoms=atoms, grid_start=(0, 0), grid_end=(10, 10),
                                     images_path=PATH_IMG_ANALYSIS, images_name=e_type)
-        properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
-        plot_energy(properties, e, x, y)
     # loop over cutoff, repeat the calculation for each cutoff with dfs, bfs and full ss several times
     for j, co in enumerate(tqdm(cutoffs)):
         my_energy.images_name = f"{e_type}_cutoff_{int(co)}"
@@ -120,9 +121,9 @@ def time_comparison_explorers(e_type: str = "potential"):
                 # option 3 - cutoff 5 and dfs explorer
                 time_dfs, eigenval_dfs = run_energy(my_energy, "dfs", co)
                 # save everything to a dataframe
-                dict_values = {f"Eigenvalue {i + 1}": eigv for i, eigv in enumerate(eigenval_bfs)}
-                dict_values.update({f"Eigenvalue DFS {i + 1}": eigv for i, eigv in enumerate(eigenval_dfs)})
-                dict_values.update({f"Eigenvalue Full SS {i + 1}": eigv for i, eigv in enumerate(eigenval_ss)})
+                dict_values = {f"Eigenvalue {i + 1}": eigv.real for i, eigv in enumerate(eigenval_bfs)}
+                dict_values.update({f"Eigenvalue DFS {i + 1}": eigv.real for i, eigv in enumerate(eigenval_dfs)})
+                dict_values.update({f"Eigenvalue Full SS {i + 1}": eigv.real for i, eigv in enumerate(eigenval_ss)})
                 dict_values.update({"Num. of cells": num_cells,
                                     "Cutoff": co,
                                     "% explored": explored_bfs,
@@ -139,10 +140,6 @@ def time_comparison_explorers(e_type: str = "potential"):
             plot_eigenvectors(pro, eigv, num=4)
         name_file = PATH_DATA_ANALYSIS + f"time_comparison_explorers_{e_type}.csv"
         data.to_csv(path_or_buf=name_file)
-    run_energy(my_energy, "none", 1)
-    pro, eigv = get_properties_eigenvec(my_energy.images_name)
-    my_energy.images_name += "full_ss"
-    plot_eigenvectors(pro, eigv, num=4)
     if e_type.startswith("maze"):
         properties, e, x, y, rm, eigenvec, eigenval, underlying_maze = read_everything_energies(my_energy.images_name)
         plot_energy(properties, e, x, y)
@@ -157,7 +154,7 @@ def plot_time_comparison_explorers(file_path: str, name: str):
         name: the ID with which the image will be associated
     """
     data = pd.read_csv(file_path)
-    data = data.loc[data["Cutoff"] > 4]
+    #data = data.loc[data["Cutoff"] > 60]
     fig, ax = plt.subplots(1, 1)
     sns.lineplot(x="Cutoff", y="BFS time [s]", data=data, label="breadth-first search",
                  ax=ax, ci="sd")
@@ -166,7 +163,7 @@ def plot_time_comparison_explorers(file_path: str, name: str):
     #sns.lineplot(x="% explored", y="Full state space time [s]", data=data, label="Full SS",
     #             ax=ax, ci="sd")
     # cannot automatically create error bars for full SS, so they are created here
-    plt.hlines(data["Full state space time [s]"].mean(), data["Cutoff"].min(), data["Cutoff"].max(),
+    plt.hlines(data["Full state space time [s]"].astype(complex).mean(), data["Cutoff"].min(), data["Cutoff"].max(),
                label="full state space", color="green")
     plus_sd = data["Full state space time [s]"].mean() + data["Full state space time [s]"].std()
     minus_sd = data["Full state space time [s]"].mean() - data["Full state space time [s]"].std()
@@ -175,7 +172,7 @@ def plot_time_comparison_explorers(file_path: str, name: str):
     plt.legend(loc="lower right", framealpha=0.8)
     ax.set_ylabel("Time [s]")
     ax.set_xlabel("Cutoff")
-    #plt.vlines(14, ax.axes.get_ylim()[0], ax.axes.get_ylim()[1], color="black", linestyles="dashed")
+    #plt.vlines(5, ax.axes.get_ylim()[0], ax.axes.get_ylim()[1], color="black", linestyles="dashed")
     #ax2 = ax.twinx()
     #sns.lineplot(x="Cutoff", y="% explored", data=data, label="% explored", color="black", ax=ax2, legend=False)
     plt.tight_layout()
@@ -191,7 +188,7 @@ def plot_scan_cutoff(file_path: str, e_type: str):
         e_type: the ID with which the image will be associated
     """
     data = pd.read_csv(file_path)
-    data = data.loc[data["Cutoff"] > 4]
+    #data = data.loc[data["Cutoff"] > 60]
     fig, ax = plt.subplots(1, 1)
     all_eigenvalues = [f"Eigenvalue {i+1}" for i in range(6)]
     all_ss_eigenvalues = [f"Eigenvalue Full SS {i+1}" for i in range(6)]
@@ -201,7 +198,7 @@ def plot_scan_cutoff(file_path: str, e_type: str):
         plt.hlines(data[ss_eigenvalue].mean(), data["Cutoff"].min(), data["Cutoff"].max(), linestyles="dotted",
                    color="black")
     ax.set_ylabel("Eigenvalues")
-    #plt.vlines(14, ax.axes.get_ylim()[0], ax.axes.get_ylim()[1], color="black", linestyles="dashed")
+    #plt.vlines(5, ax.axes.get_ylim()[0], ax.axes.get_ylim()[1], color="black", linestyles="dashed")
     #ax2 = ax.twinx()
     #sns.lineplot(x="Cutoff", y="% explored", data=data, label="% explored", color="black", ax=ax2, legend=False)
     plt.tight_layout()
@@ -209,7 +206,8 @@ def plot_scan_cutoff(file_path: str, e_type: str):
 
 
 if __name__ == '__main__':
-    my_name = "maze02"
+    my_name = "maze04"
+    #my_name = "atoms00"
     time_comparison_explorers(e_type=my_name)
     plot_time_comparison_explorers(PATH_DATA_ANALYSIS + f"time_comparison_explorers_{my_name}.csv", my_name)
     plot_scan_cutoff(PATH_DATA_ANALYSIS + f"time_comparison_explorers_{my_name}.csv", my_name)

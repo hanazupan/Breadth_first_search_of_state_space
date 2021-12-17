@@ -134,7 +134,6 @@ def plot_population_per_energy(properties: dict, energy: np.ndarray, histogram: 
         fig, ax = plt.subplots(1, 1, figsize=DIM_SQUARE)
         energies = np.array(energies)
         E_population = np.histogram(energies, bins=25)
-        print(E_population)
         E_pop = np.zeros(energies.shape)
         for i, e in enumerate(energies):
             for j, ep in enumerate(E_population[1][:]):
