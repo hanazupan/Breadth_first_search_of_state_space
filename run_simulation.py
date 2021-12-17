@@ -18,6 +18,7 @@ from constants import *
 from ast import literal_eval
 import argparse
 import time
+import random
 # external imports
 import numpy as np
 
@@ -37,6 +38,7 @@ parser.add_argument('--time_step', metavar='ts', type=str, nargs='?',
                     default='0.01', help='What should the time step be?')
 parser.add_argument('--compare', metavar='c', type=str, nargs='?',
                     default='y', help='Compare to SqRA?')
+parser.add_argument('--seed', type=str, default='n', help="Set a seed for random processes?")
 
 
 def report_time(start, end):
@@ -48,13 +50,19 @@ def report_time(start, end):
 
 
 def produce_energies(args):
+    # set a seed if given by the user
+    if my_args.seed != "n":
+        random.seed(int(my_args.seed))
+        np.random.seed(int(my_args.seed))
+    # generate the name and create Energy object
     name = determine_name(args)
     print(f"Given the name: {name}")
     print("Setting up the Energy object ...")
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=10)
+        my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=10,
+                                        T=400)
     elif args.type == "maze":
         my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=True, no_branching=True)
         my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=3, friction=1,
@@ -71,7 +79,7 @@ def produce_energies(args):
             atoms.append(atom)
         atoms = tuple(atoms)
         my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, images_path=PATH_IMG_ATOMS, grid_start=(0, 0),
-                                    grid_end=(10, 10), images_name=name, friction=1, m=1)
+                                    grid_end=(10, 10), images_name=name, friction=1, m=1, T=400)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
     end_setup_time = time.time()
@@ -126,6 +134,10 @@ def produce_simulation(args, energy):
         print(f" -> time for images: {hours}h {minutes}min {seconds}s.")
     end_time = time.time()
     hours, minutes, seconds = report_time(start_time, end_time)
+    # write the seed to file
+    path = my_simulation.path_to_summary()
+    with open(path + f"{my_simulation.images_name}_summary.txt", "a+", encoding='utf-8') as f:
+        f.write(f"seed = {args.seed}")
     print(f"-------- Total Simulation time: {hours}h {minutes}min {seconds}s. --------")
 
 
