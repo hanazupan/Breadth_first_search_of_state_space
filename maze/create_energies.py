@@ -108,8 +108,7 @@ class Energy(AbstractEnergy):
         elif self.are_neighbours(cell_i, cell_j, axis=1):
             n_dim = 1
         else:
-            print(f"Trying to calculate Q_ij for non-neighbours {cell_i} and {cell_j}!")
-            return 0
+            raise TypeError(f"Trying to calculate Q_ij for non-neighbours {cell_i} and {cell_j}!")
         Q_ij = self.D * self.Ss[n_dim] / self.hs[n_dim] / self.V * np.sqrt(np.exp(-(energy_j - energy_i)/(
                 kB*self.temperature)))
         limit = self.D * self.Ss[n_dim] / self.hs[n_dim] / self.V * np.sqrt(np.exp(10*self.energy_cutoff/(
@@ -138,19 +137,22 @@ class Energy(AbstractEnergy):
             self.energy_cutoff = np.max(self.energies) + 1
             full_len = self.size[0]*self.size[1]
             ones = [1]*full_len
-            mixed = [1]*(self.size[0] - 1)
+            mixed = [1]*(self.size[1] - 1)
             mixed.append(0)
-            mixed = mixed * (self.size[1] + 1)
+            mixed = mixed * (self.size[0] + 1)
+            inverse_mixed = [1]
+            inverse_mixed.extend([0]*(self.size[1] - 1))
+            inverse_mixed = inverse_mixed * (self.size[0] + 1)
             # if PBC, the off-seted diagonals of neighbours continue on another diagonal
             if self.pbc:
-                adj_matrix = diags((ones, ones, ones, ones, ones, ones, ones, ones),
-                                   offsets=(1, self.size[0], -1, -self.size[0],
-                                            full_len - self.size[0], - full_len + self.size[0],
-                                            full_len - 1, - full_len + 1),
+                adj_matrix = diags((mixed, ones, mixed, ones, inverse_mixed, inverse_mixed, ones, ones),
+                                   offsets=(1, self.size[1], -1, -self.size[1],
+                                            self.size[1] - 1, -self.size[0] + 1,
+                                            full_len - self.size[0], - full_len + self.size[1]),
                                    shape=(full_len, full_len))
             else:
                 adj_matrix = diags((mixed, ones, mixed, ones),
-                                   offsets=(1, self.size[0], -1, -self.size[0]),
+                                   offsets=(1, self.size[1], -1, -self.size[1]),
                                    shape=(full_len, full_len))
         self.adj_matrix = adj_matrix
         self.rates_matrix = np.zeros(adj_matrix.shape)
