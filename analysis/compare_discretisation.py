@@ -59,14 +59,15 @@ def plot_grid_scan(name: str = "potential", num_eigenv: int = 20):
         data[f"ITS {i + 1}"] = -1 / data[f"Eigenvalue {i + 1}"]
         sns.lineplot(x="Grid side", y=f"ITS {i + 1}", data=data, ax=ax[1])
         repeated_sim_eigv = np.array([-(100 * 0.005) / np.log(np.abs(sim_eigenval[i])) for _ in range(data["Grid side"].size)])
-        ax[1].plot(data["Grid side"], repeated_sim_eigv, color="black", ls="--")
-    ax[1].set_ylabel("Eigenvalues")
+        ax[1].plot(data["Grid side"], repeated_sim_eigv, color="black", ls="dotted")
+    ax[1].set_ylabel("ITS")
     plt.tight_layout()
-    plt.savefig(PATH_IMG_ANALYSIS + f"scan_cutoff_{name}.pdf")
-    plt.show()
+    plt.savefig(PATH_IMG_ANALYSIS + f"scan_grid_{name}.pdf")
 
 
 if __name__ == '__main__':
     num_eig = 10
-    grid_scan(num_eigenv=num_eig)
+    # TODO: save images of surface
+    # TODO: repeat for mazes/atoms
+    #grid_scan(num_eigenv=num_eig)
     plot_grid_scan(num_eigenv=num_eig)
