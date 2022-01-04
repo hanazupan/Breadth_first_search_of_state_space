@@ -57,7 +57,7 @@ def plot_eigenvec(properties, file_id, num_eigv: int = 6):
     plt.close()
 
 
-def plot_its(properties, file_id, num_eigv: int = 6, rates_eigenvalues=None):
+def plot_its(properties, file_id, num_eigv: int = 10, rates_eigenvalues=None):
     """
     Plot iterative timescales.
 
@@ -83,7 +83,8 @@ def plot_its(properties, file_id, num_eigv: int = 6, rates_eigenvalues=None):
         for j in range(1, len(rates_eigenvalues[:num_eigv])):
             absolute_its = np.array([- 1 / rates_eigenvalues[j] for _ in tau_array])
             ax.plot(tau_array * properties["dt"], absolute_its, color="black", ls="--")
-    ax.set_ylim(bottom=0)
+    #ax.set_ylim(bottom=0)
+    ax.set_yscale('log')
     ax.set_xlim(left=0, right=tau_array[-1] * properties["dt"])
     ax.set_xlabel(r"$\tau$")
     ax.set_ylabel(r"ITS")
@@ -190,7 +191,7 @@ def plot_everything_simulation(file_id: str, traj: bool = False):
     plot_hist_2D(dict_properties, histogram)
     plot_population_per_energy(dict_properties, energies, histogram)
     plot_eigenvec(dict_properties, file_id)
-    plot_its(dict_properties, file_id, rates_eigenvalues=sqra_eigenval)
+    plot_its(dict_properties, file_id, rates_eigenvalues=sqra_eigenval, num_eigv=10)
 
 
 if __name__ == '__main__':

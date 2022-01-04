@@ -11,11 +11,16 @@ from tqdm import tqdm
 
 class MSM:
 
-    def __init__(self, name_id: str, images_path: str = IMG_PATH):
-        if name_id.startswith("potential"):
+    def __init__(self, name_id: str, images_path: str = IMG_PATH, change_tau=None):
+        if change_tau:
+            self.tau_array = np.array(change_tau)
+        elif name_id.startswith("potential"):
             self.tau_array = np.array([5, 7, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250])
         elif name_id.startswith("maze"):
-            self.tau_array = np.array([10, 20, 30, 10, 50, 100, 200, 350, 500, 700, 1000, 1500, 2000, 2500, 3000])
+            #, 500, 700, 1000, 1500, 2000, 2500, 3000
+            # [3, 5, 10, 15, 20, 25, 30]
+            # [5, 7, 10, 20, 30, 10, 50, 100, 500, 700, 1000, 1500, 2000, 2500, 3000]
+            self.tau_array = np.array([10, 20, 30, 10, 50, 100, 500, 1000, 1500, 2000, 3000])
         else:
             self.tau_array = np.array([5, 7, 10, 20, 50, 70, 100, 150, 250, 300])
         self.images_name = name_id

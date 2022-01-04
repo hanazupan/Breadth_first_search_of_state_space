@@ -84,10 +84,10 @@ def time_comparison_explorers(e_type: str = "potential"):
         my_energy = EnergyFromPotential(size=(40, 40), images_path=PATH_IMG_ANALYSIS, friction=friction,
                                         grid_start=(-2.5, -2.5), grid_end=(2.5, 2.5), images_name=e_type)
     elif e_type.startswith("maze"):
-        cutoffs = np.linspace(50, 95, num=11)
+        cutoffs = np.linspace(55, 95, num=11)
         additional = np.linspace(105, 150, num=6)
         cutoffs = np.concatenate((cutoffs, additional))
-        my_maze = Maze(size=(15, 15), images_path=PATH_IMG_ANALYSIS, edge_is_wall=True, no_branching=True)
+        my_maze = Maze(size=(15, 15), images_path=PATH_IMG_ANALYSIS, edge_is_wall=True, no_branching=False)
         plot_maze(my_maze.images_name)
         my_energy = EnergyFromMaze(my_maze, friction=friction, images_path=PATH_IMG_ANALYSIS, factor_grid=3,
                                    grid_start=(0, 0), grid_end=(10, 10), images_name=e_type)
@@ -137,7 +137,7 @@ def time_comparison_explorers(e_type: str = "potential"):
         # plot eigenvalues for every third cutoff (DFS)
         if j % 3 == 0:
             pro, eigv = get_properties_eigenvec(my_energy.images_name)
-            plot_eigenvectors(pro, eigv, num=4)
+            plot_eigenvectors(pro, eigv.real, num=4)
         name_file = PATH_DATA_ANALYSIS + f"time_comparison_explorers_{e_type}.csv"
         data.to_csv(path_or_buf=name_file)
     if e_type.startswith("maze"):
@@ -154,7 +154,7 @@ def plot_time_comparison_explorers(file_path: str, name: str):
         name: the ID with which the image will be associated
     """
     data = pd.read_csv(file_path)
-    #data = data.loc[data["Cutoff"] > 60]
+    data = data.loc[data["Cutoff"] > 60]
     fig, ax = plt.subplots(1, 1)
     sns.lineplot(x="Cutoff", y="BFS time [s]", data=data, label="breadth-first search",
                  ax=ax, ci="sd")
@@ -188,7 +188,7 @@ def plot_scan_cutoff(file_path: str, e_type: str):
         e_type: the ID with which the image will be associated
     """
     data = pd.read_csv(file_path)
-    #data = data.loc[data["Cutoff"] > 60]
+    data = data.loc[data["Cutoff"] > 60]
     fig, ax = plt.subplots(1, 1)
     all_eigenvalues = [f"Eigenvalue {i+1}" for i in range(6)]
     all_ss_eigenvalues = [f"Eigenvalue Full SS {i+1}" for i in range(6)]
@@ -206,7 +206,7 @@ def plot_scan_cutoff(file_path: str, e_type: str):
 
 
 if __name__ == '__main__':
-    my_name = "maze04"
+    my_name = "maze06"
     #my_name = "atoms00"
     time_comparison_explorers(e_type=my_name)
     plot_time_comparison_explorers(PATH_DATA_ANALYSIS + f"time_comparison_explorers_{my_name}.csv", my_name)

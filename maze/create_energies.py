@@ -268,7 +268,7 @@ class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = PATH_IMG_MAZES,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 70):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 60):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
