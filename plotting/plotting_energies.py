@@ -9,7 +9,7 @@ import seaborn as sns
 import pandas as pd
 
 sns.set_style("ticks")
-sns.set_context("paper")
+sns.set_context("talk")
 
 
 def plot_maze(file_id: str):
@@ -203,8 +203,10 @@ def plot_everything_energy(file_id: str, num_eigenvec: int = 6, num_eigenval: in
         plot_rates_matrix(dict_properties, rates_matrix)
     plot_energy(dict_properties, energies, grid_x, grid_y)
     plot_energy_3d(dict_properties, energies, grid_x, grid_y)
-    plot_eigenvectors(dict_properties, eigenvec, num=num_eigenvec)
-    plot_eigenvalues(dict_properties, eigenval, num=num_eigenval)
+    if int(num_eigenvec) > 0:
+        plot_eigenvectors(dict_properties, eigenvec, num=num_eigenvec)
+    if num_eigenval == None or int(num_eigenval) > 0:
+        plot_eigenvalues(dict_properties, eigenval, num=num_eigenval)
 
 
 if __name__ == '__main__':

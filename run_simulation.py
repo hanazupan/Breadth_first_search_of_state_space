@@ -64,9 +64,9 @@ def produce_energies(args):
         my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=10,
                                         T=400)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=True, no_branching=True)
-        my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=1, friction=5,
-                                   grid_start=(-10, -10), grid_end=(10, 10))
+        my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=False, no_branching=False)
+        my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=3, friction=5,
+                                   grid_start=(-10, -10), grid_end=(10, 10), cutoff=8)
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)

@@ -268,7 +268,7 @@ class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = PATH_IMG_MAZES,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 60):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 8):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -286,7 +286,7 @@ class EnergyFromMaze(Energy):
             raise ValueError("Maze does not have the right dimensionality.")
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
-        z = z * 100   # TODO: test increasing the energy of walls
+        z = z * 10   # TODO: test increasing the energy of walls
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
@@ -297,7 +297,7 @@ class EnergyFromMaze(Energy):
         self.underlying_maze = z
         np.save(PATH_ENERGY_SURFACES + f"underlying_maze_{self.images_name}", self.underlying_maze)
         m = max(maze.size)
-        tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=factor_grid * m, nyest=factor_grid * m, task=-1,
+        tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=round(2 * m), nyest=round(2 * m), task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
         # WARNING! We change the size, so need to update geometry and the grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
@@ -308,7 +308,7 @@ class EnergyFromMaze(Energy):
         self.spline = tck
         np.save(PATH_ENERGY_SURFACES + f"surface_{self.images_name}", self.energies)
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
-            f.write(f"factor = {factor_grid}\n")
+            f.write(f"factor = {round(factor_grid)}\n")
             arr1, arr2, arr3, num1, num2 = tuple(self.spline)
             f.write(f"spline = {tuple(arr1), tuple(arr2), tuple(arr3), num1, num2}\n")
 

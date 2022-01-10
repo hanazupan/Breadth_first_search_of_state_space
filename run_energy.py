@@ -6,13 +6,14 @@ python3 run_energy.py --type atoms --size "(15,15)" --num_atoms 4
 """
 
 # internal imports
-from plotting.plotting_energies import plot_everything_energy
+from plotting.plotting_energies import plot_everything_energy, plot_maze
 from maze.create_mazes import Maze
 from maze.create_energies import EnergyFromPotential, EnergyFromMaze, EnergyFromAtoms, Atom
 from maze.explore_mazes import BFSExplorer, DFSExplorer
 # standard library
 from ast import literal_eval
 import argparse
+import random
 import time
 from os.path import exists
 # external imports
@@ -30,6 +31,7 @@ parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
                     default='y', help='Produce all plots? (y/n)')
 parser.add_argument('--num_atoms', metavar='na', type=str, nargs='?',
                     default='3', help='How many atoms if type==atoms?')
+parser.add_argument('--seed', type=str, default='n', help="Set a seed for random processes?")
 
 
 def report_time(start, end):
@@ -43,6 +45,9 @@ def report_time(start, end):
 def determine_name(args):
     # set the name of the file
     name_int = 0
+    if args.seed != "n":
+        random.seed(int(args.seed))
+        np.random.seed(int(args.seed))
     if args.type == "potential":
         name = f"potential{name_int:03d}"
         while exists("data/energy_summaries/potentials/" + name + "_summary.txt"):
@@ -72,8 +77,9 @@ def produce_energies(args):
     if args.type == "potential":
         my_energy = EnergyFromPotential(size=args.size, images_path="images/potentials/", images_name=name)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name)
-        my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name)
+        my_maze = Maze(size=args.size, images_path="images/mazes/", images_name=name, edge_is_wall=True)
+        plot_maze(my_maze.images_name)
+        my_energy = EnergyFromMaze(my_maze, images_path="images/mazes/", images_name=name, factor_grid=3)
     elif args.type == "atoms":
         atoms = []
         args.num_atoms = int(args.num_atoms)

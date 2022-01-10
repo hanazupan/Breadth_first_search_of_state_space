@@ -9,7 +9,7 @@ import numpy as np
 import seaborn as sns
 
 sns.set_style("ticks")
-sns.set_context("paper")
+sns.set_context("talk")
 
 
 def plot_eigenvec(properties, file_id, num_eigv: int = 6):
@@ -83,8 +83,8 @@ def plot_its(properties, file_id, num_eigv: int = 10, rates_eigenvalues=None):
         for j in range(1, len(rates_eigenvalues[:num_eigv])):
             absolute_its = np.array([- 1 / rates_eigenvalues[j] for _ in tau_array])
             ax.plot(tau_array * properties["dt"], absolute_its, color="black", ls="--")
-    #ax.set_ylim(bottom=0)
-    ax.set_yscale('log')
+    ax.set_ylim(bottom=0)
+    #ax.set_yscale('log')
     ax.set_xlim(left=0, right=tau_array[-1] * properties["dt"])
     ax.set_xlabel(r"$\tau$")
     ax.set_ylabel(r"ITS")

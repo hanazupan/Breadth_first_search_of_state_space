@@ -10,6 +10,7 @@ from plotting.plotting_energies import plot_maze
 from ast import literal_eval
 from os.path import exists
 import argparse
+import random
 
 # Warning: saves in images/animations even if animations are not produced
 PATH = "images/animations/"
@@ -25,6 +26,7 @@ parser.add_argument('--graph', metavar='g', type=str, nargs='?',
                     default='n', help='Produce graph image?')
 parser.add_argument('--visualize', metavar='v', type=str, nargs='?',
                     default='y', help='Produce maze image?')
+parser.add_argument('--seed', type=str, default='n', help="Set a seed for random processes?")
 
 
 def explore(explorer, type_explorer, animate, name, args):
@@ -38,6 +40,8 @@ def explore(explorer, type_explorer, animate, name, args):
 def create_and_explore_maze(args):
     # set the name of the file
     name_int = 0
+    if my_args.seed != "n":
+        random.seed(int(my_args.seed))
     name = f"maze_only{name_int:03d}"
     while exists(PATH + name + "_maze.pdf"):
         name_int += 1
@@ -50,7 +54,7 @@ def create_and_explore_maze(args):
         animate = False
     # correctly interpret a tuple for size input
     args.size = literal_eval(args.size)
-    maze = Maze(args.size, animate=animate, images_name=name, images_path=PATH)
+    maze = Maze(args.size, animate=animate, images_name=name, images_path=PATH, edge_is_wall=True, no_branching=False)
     # visualization
     if args.visualize != "n":
         plot_maze(name)
