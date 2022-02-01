@@ -1,3 +1,7 @@
+"""
+This file reads saved data so that it is possible to re-plot old simulations.
+"""
+
 from constants import *
 from ast import literal_eval
 import numpy as np
@@ -31,7 +35,10 @@ def read_summary_file(file_summary_id, summary_type="maze"):
     with open(file_summary, "r") as f:
         for line in f:
             if not line.startswith("#"):
-                key, value = line.strip().split(" = ")
+                try:
+                    key, value = line.strip().split(" = ")
+                except ValueError:
+                    print(f"Line {line} cannot be separated by =.")
                 dict_properties[key] = value
     dict_properties["size"] = literal_eval(dict_properties["size"])
     if summary_type == "maze":

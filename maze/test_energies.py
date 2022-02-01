@@ -107,38 +107,6 @@ def test_acessible():
     assert my_energy.is_accessible((4, 0))
 
 
-# def test_adj_energy():
-#     # NOT WORKING example too small
-#     # TODO: handmade2 that is bigger
-#     maze = Maze((6, 6), algorithm="handmade1", images_name="test_handmade", images_path="images/tests/")
-#     energy = EnergyFromMaze(maze, images_name="test_handmade", images_path="images/tests/")
-#     energy.energy_cutoff = 5
-#     energy.get_rates_matix()
-#     correct = np.array([0, 1, 0, 0, 0, 0, 0, 1, 1])
-#     toarry = energy.adj_matrix[0, :9].astype(int).toarray()[0]
-#     assert np.all([x == y for x, y in zip(correct, toarry)])
-#     assert np.all([x == 0 for x in energy.adj_matrix[0, 9:].toarray()])
-
-def test_adj_full_ss():
-    # periodic full ss
-    size = (5, 5)
-    my_energy = EnergyFromPotential(size, images_path=PATH, images_name="test1", grid_start=(-1, -1),
-                                    grid_end=(1, 1))
-    my_energy.pbc = True
-    my_energy.get_rates_matix(explorer="none")
-    correct = np.loadtxt("maze/input_test_adjacency.csv")
-    result = my_energy.adj_matrix.toarray()
-    assert np.equal(correct, result)
-    # non-periodic full ss
-    size = (5, 5)
-    my_energy2 = EnergyFromPotential(size, images_path=PATH, images_name="test2", grid_start=(-1, -1),
-                                    grid_end=(1, 1))
-    my_energy2.get_rates_matix(explorer="none")
-    correct = np.loadtxt("maze/input_test_adjacency2.csv")
-    result = my_energy2.adj_matrix.toarray()
-    assert np.equal(correct, result)
-
-
 def test_atoms():
     epsilon = 3.18*1.6022e-22
     sigma = 5.928

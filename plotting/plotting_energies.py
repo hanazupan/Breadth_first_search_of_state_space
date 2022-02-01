@@ -45,8 +45,6 @@ def plot_energy(properties: dict, energies: np.ndarray, grid_x: np.ndarray, grid
                         fmt='.2f', square=True, ax=ax, yticklabels=[], xticklabels=[])
         else:
             sns.heatmap(df, cmap="RdBu", fmt='.2f', square=True, ax=ax, yticklabels=[], xticklabels=[])
-        # if you want labels: yticklabels=[f"{ind:.2f}" for ind in df.index]
-        # xticklabels=[f"{col:.2f}" for col in df.columns]
         if "atom_positions" in properties.keys():
             for atom in properties["atom_positions"]:
                 range_x_grid = properties["grid_end"][0] - properties["grid_start"][0]
@@ -132,7 +130,7 @@ def plot_eigenvectors(properties: dict, eigenvectors: np.ndarray, num: int = 3):
         cmap = cm.get_cmap("RdBu").copy()
         try:
             accesible = properties["accessible cells"]
-        except AttributeError:
+        except AttributeError or KeyError:
             accesible = [(i, j) for i in range(properties["size"][0]) for j in range(properties["size"][1])]
         len_acc = len(accesible)
         assert eigenvectors.shape[0] == len_acc, "The length of the eigenvector should equal the num of accesible cells"
@@ -150,7 +148,7 @@ def plot_eigenvectors(properties: dict, eigenvectors: np.ndarray, num: int = 3):
                 else:
                     array[cell] = - eigenvectors[index, i]
             ax[i].imshow(array, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
-            ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
+            #ax[i].set_title(f"Eigenvector {i+1}", fontsize=7, fontweight="bold")
         plt.savefig(properties["images path"] + f"{properties['images name']}_eigenvectors_sqra.pdf")
         plt.close()
 
@@ -211,6 +209,5 @@ def plot_everything_energy(file_id: str, num_eigenvec: int = 6, num_eigenval: in
 
 if __name__ == '__main__':
     file = "maze017"
-    #plot_maze(file)
     plot_everything_energy(file)
 

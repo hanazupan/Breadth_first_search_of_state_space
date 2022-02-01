@@ -1,7 +1,7 @@
 # internal imports
 from constants import *
 from plotting.plotting_energies import plot_eigenvalues
-from plotting.read_files import read_everything_simulations
+from plotting.read_files import read_everything_simulations, read_summary_file
 # external imports
 import matplotlib.pyplot as plt
 from matplotlib import cm, colors
@@ -25,30 +25,32 @@ def plot_eigenvec(properties, file_id, num_eigv: int = 6):
     full_width = DIM_LANDSCAPE[0]
     fig, ax = plt.subplots(len(properties["tau_array"][:taus_to_plot]), num_eigv, sharey="row",
                            figsize=(full_width, full_width / num_eigv * len(properties["tau_array"][:taus_to_plot])))
-    # TODO: plot better taus
     cmap = cm.get_cmap("RdBu").copy()
     cmap.set_over("black")
     cmap.set_under("black")
-    for i, tau in enumerate(properties["tau_array"][:taus_to_plot]):
+    try:
+        energy_properties = read_summary_file(file_id, summary_type="energy")
+        accesible = energy_properties["accessible cells"]
+    except AttributeError or KeyError:
+        accesible = [(i, j) for i in range(properties["size"][0]) for j in range(properties["size"][1])]
+    selected_taus = [20, 50, 100, 150, 200]
+    for i, tau in enumerate(selected_taus):
         # load eigenvectors
-        eig = np.load(PATH_MSM_EIGEN + f"eigv_{i}_{file_id}.npz")
+        tau_index = properties["tau_array"].index(tau)
+        eig = np.load(PATH_MSM_EIGEN + f"eigv_{tau_index}_{file_id}.npz")
         eigenvec = eig["eigenvec"][:, :num_eigv]
         vmin = np.min(eigenvec)
         vmax = np.max(eigenvec)
         for j in range(num_eigv):
             array = np.full(properties["size"], np.max(eigenvec[:, j]) + 1)
-            index = 0
             must_flip = np.sum(eigenvec[:, 0])
-            for m in range(properties["size"][0]):
-                for n in range(properties["size"][1]):
-                    if must_flip > 0 or (j + 1) % 2 == 0:
-                        array[m, n] = eigenvec[index, j]
-                    else:
-                        array[m, n] = - eigenvec[index, j]
-                    index += 1
+            for index, cell in enumerate(accesible):
+                if must_flip > 0 or (j + 1) % 2 == 0:
+                    array[cell] = eigenvec[index, j]
+                else:
+                    array[cell] = - eigenvec[index, j]
             ax[i][j].imshow(array.real, cmap=cmap, norm=colors.TwoSlopeNorm(vmax=vmax, vcenter=0, vmin=vmin))
-            ax[0][j].set_title(f"Eigenvector {j + 1}", fontsize=7, fontweight="bold")
-            ax[i][0].set_ylabel(f"tau = {tau}", fontsize=7, fontweight="bold")
+            ax[i][0].set_ylabel(r"$\tau$"+f" = {tau}", fontsize=14)
             ax[i][j].axes.get_xaxis().set_visible(False)
             ax[i][j].set_yticks([])
             ax[i][j].set_yticklabels([])
@@ -68,9 +70,9 @@ def plot_its(properties, file_id, num_eigv: int = 10, rates_eigenvalues=None):
         rates_eigenvalues: if not None, provide a list of SqRA eigenvalues so that it is possible to
                            plot ITS of SqRA as dashed lines for comparison
     """
-    tau_array = np.array(properties["tau_array"])
-    tau_eigenvals = np.zeros((num_eigv, properties["len_tau"]))
-    for tau_i in range(properties["len_tau"]):
+    tau_array = np.array(properties["tau_array"])[:-2]
+    tau_eigenvals = np.zeros((num_eigv, len(tau_array)))
+    for tau_i in range(len(tau_array)):
         eig = np.load(PATH_MSM_EIGEN + f"eigv_{tau_i}_{file_id}.npz")
         eigenval = eig["eigenval"][:num_eigv]
         tau_eigenvals[:, tau_i] = eigenval
@@ -83,8 +85,6 @@ def plot_its(properties, file_id, num_eigv: int = 10, rates_eigenvalues=None):
         for j in range(1, len(rates_eigenvalues[:num_eigv])):
             absolute_its = np.array([- 1 / rates_eigenvalues[j] for _ in tau_array])
             ax.plot(tau_array * properties["dt"], absolute_its, color="black", ls="--")
-    ax.set_ylim(bottom=0)
-    #ax.set_yscale('log')
     ax.set_xlim(left=0, right=tau_array[-1] * properties["dt"])
     ax.set_xlabel(r"$\tau$")
     ax.set_ylabel(r"ITS")
@@ -145,8 +145,6 @@ def plot_population_per_energy(properties: dict, energy: np.ndarray, histogram: 
         population[E_pop == 0] = 0
         E_pop[E_pop == 0] = 1
         weights = population/E_pop
-        # weights must be the shape of energies
-        # kde=True, kde_kws=dict(gridsize=3000, cut=0)
         sns.histplot(x=energies, bins=25, weights=weights, ax=ax, element="step",
                      color="black", fill=False)
         ax.set_xlabel("Cell energy")

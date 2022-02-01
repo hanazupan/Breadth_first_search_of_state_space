@@ -1,8 +1,8 @@
 import timeit
 import numpy as np
 import matplotlib.pyplot as plt
-from explore_mazes import DFSExplorer, BFSExplorer
-from create_mazes import Maze
+from .explore_mazes import DFSExplorer, BFSExplorer
+from .create_mazes import Maze
 
 
 def compare_dfs_to_bfs():

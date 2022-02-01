@@ -161,7 +161,6 @@ class Energy(AbstractEnergy):
         for r, c in zip(rows, cols):
             # important! Index in adj cell is not the same as index in self.energies because non-accessible
             # cells are skipped! Will not work if you use node_to_cell!
-            # TODO: create an Energy method that gets a cell from index of accessible and vice versa
             if selected_explorer == "bfs" or selected_explorer == "dfs":
                 cell_i = self.explorer.get_cell_from_adj(r)
                 cell_j = self.explorer.get_cell_from_adj(c)
@@ -179,6 +178,9 @@ class Energy(AbstractEnergy):
             f.write(f"explorer type = {selected_explorer}\n")
             if selected_explorer == "bfs" or selected_explorer == "dfs":
                 f.write(f"accessible cells = {self.explorer.get_sorted_accessible_cells()}\n")
+            else:
+                all_cells = [(i, j) for i in range(self.size[0]) for j in range(self.size[1])]
+                f.write(f"accessible cells = {all_cells}\n")
         save_npz(PATH_ENERGY_RATES + f"rates_{self.images_name}", self.rates_matrix)
 
     ############################################################################
@@ -215,7 +217,7 @@ class Energy(AbstractEnergy):
         if not self.explorer:
             self._calculate_rates_matrix("bfs")
         # left eigenvectors and eigenvalues
-        eigenval, eigenvec = eigs(self.rates_matrix.transpose(copy=True), num, **kwargs)
+        eigenval, eigenvec = eigs(self.rates_matrix.transpose(copy=True), num, maxiter=100000, **kwargs)
         if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
             eigenvec = eigenvec.real
             eigenval = eigenval.real
@@ -268,7 +270,7 @@ class EnergyFromMaze(Energy):
 
     def __init__(self, maze: Maze, add_noise: bool = True, factor_grid: int = 2, images_path: str = PATH_IMG_MAZES,
                  images_name: str = "energy", m: float = 1, friction: float = 10, T: float = 293,
-                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 8):
+                 grid_start: tuple = (0, 0), grid_end: tuple = (5, 5), cutoff: float = 15):
         """
         Creating a energy surface from a 2D maze object.
         Grid x is the same for the first row, changes row for row.
@@ -286,18 +288,18 @@ class EnergyFromMaze(Energy):
             raise ValueError("Maze does not have the right dimensionality.")
         z = maze.energies.copy()
         # change some random zeroes into -1 and -2
-        z = z * 10   # TODO: test increasing the energy of walls
+        z = z * 10
         if add_noise:
             for _ in range(int(0.05 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -5
+                z[cell] = -2
             for _ in range(int(0.04 * np.prod(maze.size))):
                 cell = maze.find_random_accessible()
-                z[cell] = -10
+                z[cell] = -5
         self.underlying_maze = z
         np.save(PATH_ENERGY_SURFACES + f"underlying_maze_{self.images_name}", self.underlying_maze)
         m = max(maze.size)
-        tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=round(2 * m), nyest=round(2 * m), task=-1,
+        tck = interpolate.bisplrep(self.grid_x, self.grid_y, z, nxest=round(3 * m), nyest=round(3 * m), task=-1,
                                    tx=self.grid_x[:, 0], ty=self.grid_y[0, :])
         # WARNING! We change the size, so need to update geometry and the grid
         self.grid_x, self.grid_y = self._prepare_grid(factor=factor_grid)
@@ -485,7 +487,7 @@ class EnergyFromAtoms(Energy):
                 point_x = self.grid_x[i, j]
                 point_y = self.grid_y[i, j]
                 self.energies[i, j] = self.get_full_potential((point_x, point_y))
-        self.energies[self.energies > 4*self.epsilon] = 4*self.epsilon
+        self.energies[self.energies > 20*self.epsilon] = 20*self.epsilon
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+", encoding='utf-8') as f:
             f.write(f"atom_positions = {[tuple(atom.position) for atom in self.atoms]}\n")
             f.write(f"epsilons = {[atom.epsilon for atom in atoms]}\n")

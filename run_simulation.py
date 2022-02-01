@@ -61,10 +61,10 @@ def produce_energies(args):
     start_time = time.time()
     args.size = literal_eval(args.size)
     if args.type == "potential":
-        my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=10,
-                                        T=400)
+        my_energy = EnergyFromPotential(size=args.size, images_path=PATH_IMG_POTENTIALS, images_name=name, friction=50,
+                                        T=293)
     elif args.type == "maze":
-        my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=False, no_branching=False)
+        my_maze = Maze(size=args.size, images_path=PATH_IMG_MAZES, images_name=name, edge_is_wall=True, no_branching=True)
         my_energy = EnergyFromMaze(my_maze, images_path=PATH_IMG_MAZES, images_name=name, factor_grid=3, friction=5,
                                    grid_start=(-10, -10), grid_end=(10, 10), cutoff=8)
     elif args.type == "atoms":
@@ -79,7 +79,7 @@ def produce_energies(args):
             atoms.append(atom)
         atoms = tuple(atoms)
         my_energy = EnergyFromAtoms(size=args.size, atoms=atoms, images_path=PATH_IMG_ATOMS, grid_start=(0, 0),
-                                    grid_end=(10, 10), images_name=name, friction=1, m=1, T=400)
+                                    grid_end=(10, 10), images_name=name, friction=5, m=1, T=500)
     else:
         raise ValueError(f"{args.type} is not a valid type of Energy surface! Select from: (potential, maze, atoms).")
     end_setup_time = time.time()
@@ -137,7 +137,7 @@ def produce_simulation(args, energy):
     # write the seed to file
     path = my_simulation.path_to_summary()
     with open(path + f"{my_simulation.images_name}_summary.txt", "a+", encoding='utf-8') as f:
-        f.write(f"seed = {args.seed}")
+        f.write(f"seed = {args.seed}\n")
     print(f"-------- Total Simulation time: {hours}h {minutes}min {seconds}s. --------")
 
 

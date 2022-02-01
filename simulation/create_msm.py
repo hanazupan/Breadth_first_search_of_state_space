@@ -1,8 +1,8 @@
 # internal imports
 from constants import *
+from plotting.read_files import read_summary_file
 # standard library
 from os.path import exists
-import gc
 # external imports
 from scipy.sparse.linalg import eigs
 import numpy as np
@@ -15,18 +15,20 @@ class MSM:
         if change_tau:
             self.tau_array = np.array(change_tau)
         elif name_id.startswith("potential"):
-            self.tau_array = np.array([5, 7, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250])
+            self.tau_array = np.array([5, 7, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 130, 150, 180, 200])
         elif name_id.startswith("maze"):
-            #, 500, 700, 1000, 1500, 2000, 2500, 3000
-            # [3, 5, 10, 15, 20, 25, 30]
-            # [5, 7, 10, 20, 30, 10, 50, 100, 500, 700, 1000, 1500, 2000, 2500, 3000]
-            self.tau_array = np.array([10, 20, 30, 10, 50, 100, 500, 1000, 1500, 2000, 3000])
+            self.tau_array = np.array([10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 85, 100, 150, 200, 500, 700, 1000,
+                                       1500, 2000, 2500, 3000, 5000, 8000, 10000])
         else:
-            self.tau_array = np.array([5, 7, 10, 20, 50, 70, 100, 150, 250, 300])
+            self.tau_array = np.array([5, 7, 10, 20, 30, 50, 70, 100, 150, 200, 300, 350, 400])
         self.images_name = name_id
         self.images_path = images_path
         self.histogram = np.load(PATH_HISTOGRAMS + f"histogram_{self.images_name}.npy")
         self.traj_cell = np.load(PATH_TRAJECTORIES + f"cell_trajectory_{self.images_name}.npy")
+        try:
+            self.accessible = read_summary_file(name_id, summary_type="energy")["accessible cells"]
+        except KeyError:
+            self.accessible = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
         with open(self.path_to_summary() + f"{self.images_name}_summary.txt", "a+") as f:
             f.write(f"tau_array = {tuple(self.tau_array)}\n")
             f.write(f"len_tau = {len(self.tau_array)}\n")
@@ -54,7 +56,8 @@ class MSM:
             cut_seq = seq[0:-1:len_window]
             return [[a, b] for a, b in zip(cut_seq[0:-2], cut_seq[1:])]
 
-        cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])]
+        cells = [(i, j) for i in range(self.histogram.shape[0]) for j in range(self.histogram.shape[1])
+                 if (i, j) in self.accessible]
         all_cells = len(cells)
         for tau_i, tau in enumerate(tqdm(self.tau_array)):
             transition_matrix = np.zeros(shape=(all_cells, all_cells))
@@ -62,15 +65,14 @@ class MSM:
             if not noncorr:
                 window_cell = window(self.traj_cell, int(tau))
             else:
-                # for large taus full non-correlation doesn't provide good results
-                if tau >= 100:
-                    window_cell = window(self.traj_cell, int(tau), step=5)
-                else:
-                    window_cell = noncorr_window(self.traj_cell, int(tau))
+                window_cell = noncorr_window(self.traj_cell, int(tau))
             for cell_slice in window_cell:
                 start_cell = cell_slice[0]
                 end_cell = cell_slice[1]
-                count_per_cell[(start_cell[0], start_cell[1], end_cell[0], end_cell[1])] += 1
+                try:
+                    count_per_cell[(start_cell[0], start_cell[1], end_cell[0], end_cell[1])] += 1
+                except KeyError:
+                    pass
             for key, value in count_per_cell.items():
                 a, b, c, d = key
                 start_cell = (a, b)
@@ -101,7 +103,7 @@ class MSM:
         for tau_i, tau in enumerate(self.tau_array):
             tm = np.load(PATH_MSM_TRANSITION_MATRICES + f"transition_matrix_{tau_i}_{self.images_name}.npy")
             tm = tm.T
-            eigenval, eigenvec = eigs(tm, num_eigv, **kwargs)
+            eigenval, eigenvec = eigs(tm, num_eigv, maxiter=100000, tol=0, **kwargs)
             if eigenvec.imag.max() == 0 and eigenval.imag.max() == 0:
                 eigenvec = eigenvec.real
                 eigenval = eigenval.real

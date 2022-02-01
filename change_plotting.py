@@ -1,3 +1,8 @@
+"""
+A file to replot (and possibly redo MSM) for already run energy/simulation run.
+Must provide the name (unique ID, e.g. maze012) to work.
+"""
+
 import argparse
 from plotting.plotting_energies import plot_everything_energy
 from plotting.plotting_simulations import plot_everything_simulation

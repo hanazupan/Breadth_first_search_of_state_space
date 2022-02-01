@@ -16,7 +16,6 @@ import heapq
 from scipy.sparse import csr_matrix
 
 
-
 class Explorer(ABC):
 
     def __init__(self, energy: AbstractEnergy, explorer_name: str):
@@ -418,8 +417,6 @@ class DijkstraExplorer(Explorer):
         Yields:
             an image for the animation
         """
-        #TODO: change indexing to left-right, top-bottom
-        # create empty objects
         self.visited = np.zeros(self.maze.size, dtype=int)
         self.distances = np.full(self.maze.size, np.inf)
         for_plotting = np.zeros(self.maze.size, dtype=int)

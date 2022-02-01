@@ -61,4 +61,4 @@ Using optional flags like:
 Some examples to try:
  - `python3 run_simulation.py --type potential --size "(40, 40)" --compare n`
  - `python3 run_simulation.py --type maze --size "(15, 20)" --duration 1e7`
- - `ython3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --time_step 0.1`
+ - `python3 run_simulation.py --type atoms --size "(15,15)" --num_atoms 4 --time_step 0.1`

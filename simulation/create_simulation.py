@@ -3,8 +3,8 @@ In this file, molecular dynamics simulation on an Energy surface is performed.
 """
 
 # internal imports
-from maze.create_energies import Energy, EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms  # need all
-from maze.create_mazes import Maze  # need this import
+from maze.create_energies import Energy, EnergyFromPotential, EnergyFromMaze, Atom, EnergyFromAtoms
+from maze.create_mazes import Maze
 from constants import *
 # standard library
 import time
@@ -113,6 +113,7 @@ class Simulation:
         if save_trajectory:
             np.savez(PATH_TRAJECTORIES + f"trajectory_x_y_{self.images_name}",
                      x=np.array(self.traj_x), y=np.array(self.traj_y))
+        self.save_information()
 
     def _euler_maruyama(self, x_n: float, y_n: float) -> tuple:
         """
